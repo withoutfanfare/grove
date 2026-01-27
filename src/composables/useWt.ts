@@ -97,6 +97,21 @@ export function useWt() {
   }
 
   /**
+   * Open a path in the configured Git client application
+   */
+  async function openInGitClient(
+    path: string,
+    gitClient?: string,
+    customGitClientPath?: string
+  ): Promise<void> {
+    await invoke('open_in_git_client', {
+      path,
+      gitClient: gitClient ?? null,
+      customGitClientPath: customGitClientPath ?? null,
+    });
+  }
+
+  /**
    * Open a URL in the default browser
    */
   async function openInBrowser(url: string): Promise<void> {
@@ -361,6 +376,13 @@ export function useWt() {
   }
 
   /**
+   * Save a health report to the user's Desktop
+   */
+  async function saveReportToDesktop(repoName: string): Promise<string> {
+    return await invoke<string>('save_report_to_desktop', { repoName });
+  }
+
+  /**
    * Derive a repository name from a Git URL
    */
   async function deriveRepoName(url: string): Promise<string | null> {
@@ -390,6 +412,7 @@ export function useWt() {
     listWorktrees,
     getWorktreeStatus,
     openInEditor,
+    openInGitClient,
     openInTerminal,
     openInBrowser,
     openInFinder,
@@ -423,6 +446,7 @@ export function useWt() {
     unlockRepository,
     openConfig,
     generateReport,
+    saveReportToDesktop,
     deriveRepoName,
     toWtError,
   };

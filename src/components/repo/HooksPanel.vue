@@ -7,9 +7,10 @@
  * Premium UI with refined styling and animations.
  */
 import { ref, computed } from 'vue'
+import { homeDir } from '@tauri-apps/api/path'
 import { useToast, useWt } from '../../composables'
 import { storeToRefs } from 'pinia'
-import { useHooksStore } from '../../stores'
+import { useHooksStore, useSettingsStore } from '../../stores'
 import type { HookEvent, HookScope, HookScriptMeta } from '../../types'
 import { getHookEventLabel, getHookScopeLabel } from '../../types'
 import { Button, Input, ConfirmDialog } from '../ui'
@@ -20,6 +21,7 @@ const props = defineProps<{
 }>()
 
 const hooksStore = useHooksStore()
+const settingsStore = useSettingsStore()
 const { toast } = useToast()
 const wt = useWt()
 const { hooks, hooksByEvent, openHook, loading, saving } = storeToRefs(hooksStore)
@@ -157,7 +159,8 @@ async function copyPath(path: string) {
 
 async function openInExternalEditor(path: string) {
   try {
-    await wt.openInEditor(path)
+    const { editor, customEditorPath } = settingsStore.settings
+    await wt.openInEditor(path, editor, customEditorPath || undefined)
     toast.success('Opened in editor')
   } catch (e) {
     console.error('Failed to open in editor:', e)
@@ -171,6 +174,46 @@ async function revealInFinder(path: string) {
   } catch (e) {
     console.error('Failed to reveal in Finder:', e)
     toast.error('Failed to reveal in Finder')
+  }
+}
+
+async function openHooksFolder() {
+  // Get the hooks directory from the first hook, or use default
+  const firstHook = hooks.value[0]
+  if (firstHook) {
+    // Get parent directory of the hook (the event.d folder or hooks root)
+    const hookPath = firstHook.path
+    // Go up to the hooks root directory (past the .d folder if applicable)
+    const pathParts = hookPath.split('/')
+    // Find the 'hooks' directory in the path
+    const hooksIndex = pathParts.findIndex(p => p === 'hooks')
+    if (hooksIndex !== -1) {
+      const hooksDir = pathParts.slice(0, hooksIndex + 1).join('/')
+      try {
+        await wt.openInFinder(hooksDir)
+      } catch (e) {
+        console.error('Failed to open hooks folder:', e)
+        toast.error('Failed to open hooks folder')
+      }
+      return
+    }
+  }
+  // Fallback to default hooks directory
+  const homeDir = await getHomeDir()
+  const defaultHooksDir = `${homeDir}/.wt/hooks`
+  try {
+    await wt.openInFinder(defaultHooksDir)
+  } catch (e) {
+    console.error('Failed to open hooks folder:', e)
+    toast.error('Failed to open hooks folder')
+  }
+}
+
+async function getHomeDir(): Promise<string> {
+  try {
+    return await homeDir()
+  } catch {
+    return '~'
   }
 }
 
@@ -271,12 +314,19 @@ function handleEditorKeydown(e: KeyboardEvent) {
           </p>
         </div>
       </div>
-      <Button v-if="!isEditing && !isCreating" variant="primary" size="sm" @click="startCreate">
-        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+      <div v-if="!isEditing && !isCreating" class="flex items-center gap-2">
+        <Button variant="ghost" size="sm" title="Open hooks folder in Finder" @click="openHooksFolder">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+          </svg>
+        </Button>
+        <Button variant="primary" size="sm" @click="startCreate">
+          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
         </svg>
         New Hook
-      </Button>
+        </Button>
+      </div>
     </div>
 
     <!-- Loading State -->
@@ -500,6 +550,11 @@ function handleEditorKeydown(e: KeyboardEvent) {
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                     </svg>
                   </button>
+                  <button class="hook-action-btn" title="Reveal in Finder" @click="revealInFinder(hook.path)">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    </svg>
+                  </button>
                   <button class="hook-action-btn" title="Copy path" @click="copyPath(hook.path)">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -557,6 +612,8 @@ function handleEditorKeydown(e: KeyboardEvent) {
 </template>
 
 <style scoped>
+@reference "tailwindcss";
+
 .hooks-scroll {
   scrollbar-width: thin;
   scrollbar-color: var(--color-border-subtle) transparent;
@@ -567,13 +624,19 @@ function handleEditorKeydown(e: KeyboardEvent) {
 .hooks-scroll::-webkit-scrollbar-thumb:hover { background: var(--color-border-default); }
 
 .create-form-card {
-  @apply p-5 rounded-xl;
+  padding: 1.25rem;
+  border-radius: 0.75rem;
   background: linear-gradient(135deg, rgba(39, 39, 42, 0.6) 0%, rgba(24, 24, 27, 0.8) 100%);
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .form-select {
-  @apply w-full px-3 py-2.5 rounded-lg text-sm text-text-primary transition-all duration-150;
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  transition: all 0.15s;
   background: var(--color-surface-base);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -584,7 +647,9 @@ function handleEditorKeydown(e: KeyboardEvent) {
 }
 
 .event-card {
-  @apply rounded-xl overflow-hidden transition-all duration-200;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  transition: all 0.2s;
   background: linear-gradient(135deg, rgba(39, 39, 42, 0.4) 0%, rgba(24, 24, 27, 0.6) 100%);
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
@@ -593,14 +658,25 @@ function handleEditorKeydown(e: KeyboardEvent) {
 }
 
 .event-header {
-  @apply w-full flex items-center justify-between px-4 py-3 transition-colors;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  transition: background-color 0.15s;
 }
 .event-header:hover {
   background: rgba(255, 255, 255, 0.02);
 }
 
 .event-icon {
-  @apply w-8 h-8 rounded-lg flex items-center justify-center transition-colors;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
   background: rgba(255, 255, 255, 0.05);
   color: var(--color-text-muted);
 }
@@ -610,28 +686,40 @@ function handleEditorKeydown(e: KeyboardEvent) {
 }
 
 .event-content {
-  @apply border-t border-border-subtle/30;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .hook-item {
-  @apply px-4 py-3 flex items-center justify-between transition-colors;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background-color 0.15s;
 }
 .hook-item:hover {
   background: rgba(255, 255, 255, 0.02);
 }
 
 .hook-action-btn {
-  @apply p-1.5 rounded-lg text-text-muted transition-all duration-150;
+  padding: 0.375rem;
+  border-radius: 0.5rem;
+  color: var(--color-text-muted);
+  transition: all 0.15s;
 }
 .hook-action-btn:hover {
-  @apply bg-surface-overlay text-text-primary;
+  background: var(--color-surface-overlay);
+  color: var(--color-text-primary);
 }
 
 .editor-action-btn {
-  @apply p-1.5 rounded-lg text-text-muted transition-all duration-150;
+  padding: 0.375rem;
+  border-radius: 0.5rem;
+  color: var(--color-text-muted);
+  transition: all 0.15s;
 }
 .editor-action-btn:hover {
-  @apply bg-surface-overlay text-accent;
+  background: var(--color-surface-overlay);
+  color: var(--color-accent);
 }
 
 .editor-container {
@@ -641,13 +729,22 @@ function handleEditorKeydown(e: KeyboardEvent) {
 }
 
 .empty-event {
-  @apply flex flex-col items-center justify-center py-8 text-center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
 }
 
 .kbd {
-  @apply px-1.5 py-0.5 rounded text-2xs font-mono;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.625rem;
+  font-family: var(--font-mono);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 100%);
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 </style>
+

@@ -40,6 +40,7 @@ const {
   error,
   wtAvailable,
   focusedBranch,
+  expandOnFocus,
 } = storeToRefs(store)
 
 const { fetchRepositories } = useRepos()
@@ -149,20 +150,48 @@ function dismissError() {
   store.clearError()
 }
 
+// Helper to scroll focused worktree into view
+function scrollToFocusedWorktree() {
+  const branch = focusedBranch.value
+  if (!branch) return
+  
+  setTimeout(() => {
+    const element = document.getElementById(`worktree-${branch}`)
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      // Clear expandOnFocus after scroll completes (card has had time to expand)
+      setTimeout(() => {
+        store.clearExpandOnFocus()
+      }, 500)
+      // Clear focus after a delay to remove highlight
+      setTimeout(() => {
+        store.clearFocusedWorktree()
+      }, 3000)
+    }
+  }, 100)
+}
+
 // Watch for focused branch changes and scroll into view
 watch(focusedBranch, (branch) => {
   if (branch) {
-    // Use nextTick to ensure DOM has updated
-    setTimeout(() => {
-      const element = document.getElementById(`worktree-${branch}`)
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        // Clear focus after a delay to remove highlight
-        setTimeout(() => {
-          store.clearFocusedWorktree()
-        }, 3000)
-      }
-    }, 100)
+    scrollToFocusedWorktree()
+  }
+})
+
+// Also watch loadingWorktrees - when it becomes false and we have a focused branch, scroll to it
+// This handles the case where focus is set before worktrees finish loading
+watch(loadingWorktrees, (isLoading, wasLoading) => {
+  if (wasLoading && !isLoading && focusedBranch.value) {
+    // Worktrees just finished loading, try to scroll to focused branch
+    scrollToFocusedWorktree()
+  }
+})
+
+// Watch worktrees array - when it populates and we have a focused branch, scroll to it
+watch(worktrees, (newWorktrees) => {
+  if (newWorktrees.length > 0 && focusedBranch.value) {
+    // Small delay to ensure DOM has rendered
+    setTimeout(scrollToFocusedWorktree, 50)
   }
 })
 
@@ -382,11 +411,6 @@ useKeyboardShortcuts({
 
 <template>
   <div class="h-screen flex flex-col bg-surface-base text-text-primary overflow-hidden">
-    <!-- Draggable title bar region for native window feel -->
-    <div class="h-8 flex-shrink-0 titlebar-drag-region flex items-center justify-center border-b border-border-subtle bg-surface-raised/50">
-      <span class="text-xs font-medium text-text-tertiary tracking-wide">Grove</span>
-    </div>
-
     <!-- wt CLI not available state -->
     <div v-if="!wtAvailable" class="flex-1 flex items-center justify-center p-8">
       <div class="max-w-md text-center animate-fade-in">
@@ -663,6 +687,7 @@ useKeyboardShortcuts({
                   :worktrees="filteredWorktrees"
                   :repo-name="selectedRepoName!"
                   :focused-branch="focusedBranch"
+                  :expand-on-focus="expandOnFocus"
                   @delete="handleDeleteWorktree"
                 />
 
@@ -676,6 +701,7 @@ useKeyboardShortcuts({
                       :worktree="wt"
                       :repo-name="selectedRepoName!"
                       :focused="focusedBranch === wt.branch"
+                      :initially-expanded="expandOnFocus && focusedBranch === wt.branch"
                       @delete="handleDeleteWorktree"
                     />
                   </TransitionGroup>

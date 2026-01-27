@@ -238,6 +238,21 @@ export function useWorktrees() {
   }
 
   /**
+   * Open the worktree in the configured Git client
+   */
+  async function openInGitClient(path: string): Promise<void> {
+    try {
+      const { gitClient, customGitClientPath } = settingsStore.settings;
+      if (gitClient === 'none') {
+        throw new Error('No Git client configured. Please set a Git client in Settings.');
+      }
+      await wt.openInGitClient(path, gitClient, customGitClientPath || undefined);
+    } catch (error) {
+      store.setError(wt.toWtError(error));
+    }
+  }
+
+  /**
    * Open the worktree URL in the browser
    */
   async function openInBrowser(url: string): Promise<void> {
@@ -504,6 +519,7 @@ export function useWorktrees() {
     cancelPendingRefresh,
     fetchWorktreesForRepo,
     openInEditor,
+    openInGitClient,
     openInTerminal,
     openInBrowser,
     openInFinder,

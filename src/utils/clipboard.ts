@@ -2,7 +2,7 @@
  * Clipboard Utility Functions
  *
  * Provides cross-platform clipboard access for copying worktree information.
- * Uses Tauri's clipboard plugin for reliable clipboard access in the Tauri WebView.
+ * Uses Tauri's clipboard plugin with fallback to native clipboard API.
  */
 
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
@@ -14,19 +14,51 @@ export interface ClipboardResult {
 
 /**
  * Copy text to the system clipboard.
+ * Tries Tauri clipboard plugin first, falls back to native clipboard API.
  *
  * @param text - The text to copy
  * @returns A promise that resolves to a ClipboardResult
  */
 export async function copyToClipboard(text: string): Promise<ClipboardResult> {
+  // Try Tauri clipboard plugin first
   try {
     await writeText(text)
     return { success: true }
-  } catch (error) {
-    console.error('[clipboard] Failed to copy:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
+  } catch (tauriError) {
+    console.warn('[clipboard] Tauri clipboard failed, trying fallback:', tauriError)
+    
+    // Fallback to native clipboard API
+    try {
+      // Check if we're in a secure context with clipboard access
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(text)
+        return { success: true }
+      }
+      
+      // Final fallback: use execCommand (deprecated but widely supported)
+      const textArea = document.createElement('textarea')
+      textArea.value = text
+      textArea.style.position = 'fixed'
+      textArea.style.left = '-9999px'
+      textArea.style.top = '-9999px'
+      document.body.appendChild(textArea)
+      textArea.focus()
+      textArea.select()
+      
+      const successful = document.execCommand('copy')
+      document.body.removeChild(textArea)
+      
+      if (successful) {
+        return { success: true }
+      }
+      
+      throw new Error('execCommand copy failed')
+    } catch (fallbackError) {
+      console.error('[clipboard] All clipboard methods failed:', fallbackError)
+      return {
+        success: false,
+        error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+      }
     }
   }
 }

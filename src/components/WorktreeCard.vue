@@ -7,13 +7,14 @@
  * Includes copy actions and Open All functionality (Phase 1 Quick Actions).
  * Phase 2: Added age display and status badges (MERGED, STALE, MISMATCH).
  */
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { Worktree } from '../types'
 import StatusBadge from './StatusBadge.vue'
 import GradeBadge from './GradeBadge.vue'
 import WorktreeStatusBadges from './WorktreeStatusBadges.vue'
 import WorktreeDetailsPanel from './WorktreeDetailsPanel.vue'
 import { useWorktrees, useToast, formatRelativeTime } from '../composables'
+import { useSettingsStore } from '../stores/settings'
 import { IconButton, Button } from './ui'
 import { copyPath, copyBranch, copyUrl, copyCdCommand } from '../utils/clipboard'
 
@@ -21,14 +22,19 @@ const props = defineProps<{
   worktree: Worktree
   repoName: string
   focused?: boolean
+  initiallyExpanded?: boolean
 }>()
 
 const emit = defineEmits<{
   delete: [worktree: Worktree]
 }>()
 
-const { openInEditor, openInTerminal, openInBrowser, openInFinder, openAll, pullWorktree, syncWorktree, getWorktreeOperation, isWorktreeBusy } = useWorktrees()
+const { openInEditor, openInGitClient, openInTerminal, openInBrowser, openInFinder, openAll, pullWorktree, syncWorktree, getWorktreeOperation, isWorktreeBusy } = useWorktrees()
 const { toast } = useToast()
+const settingsStore = useSettingsStore()
+
+// Check if git client is configured
+const hasGitClient = computed(() => settingsStore.settings.gitClient !== 'none')
 
 // M8: Local refs for double-click prevention on git actions
 const isLocalPulling = ref(false)
@@ -36,6 +42,27 @@ const isLocalSyncing = ref(false)
 
 // Phase 3: Details panel expansion state
 const isDetailsExpanded = ref(false)
+
+// Auto-expand details when card becomes focused with initiallyExpanded flag
+watch(
+  () => props.focused,
+  (isFocused) => {
+    if (isFocused && props.initiallyExpanded) {
+      isDetailsExpanded.value = true
+    }
+  },
+  { immediate: true }
+)
+
+// Also watch initiallyExpanded in case it becomes true after mount (e.g., after worktrees load)
+watch(
+  () => props.initiallyExpanded,
+  (shouldExpand) => {
+    if (shouldExpand && props.focused) {
+      isDetailsExpanded.value = true
+    }
+  }
+)
 
 function toggleDetails() {
   isDetailsExpanded.value = !isDetailsExpanded.value
@@ -103,6 +130,10 @@ function handleOpenInBrowser() {
 
 function handleOpenInFinder() {
   openInFinder(props.worktree.path)
+}
+
+function handleOpenInGitClient() {
+  openInGitClient(props.worktree.path)
 }
 
 async function handlePull() {
@@ -320,6 +351,18 @@ async function handleOpenAll() {
             <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </IconButton>
+
+          <IconButton
+            v-if="hasGitClient"
+            tooltip="Open in Git Client"
+            size="sm"
+            @click="handleOpenInGitClient"
+          >
+            <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
             </svg>
           </IconButton>
 
