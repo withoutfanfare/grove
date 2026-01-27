@@ -1,0 +1,7 @@
+<svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Tree icon for worktree manager - monochromatic for macOS tray template -->
+  <!-- Crown of tree (three triangular layers) -->
+  <path d="M11 2 L15 7 L13.5 7 L16 11 L14 11 L17 16 L5 16 L8 11 L6 11 L8.5 7 L7 7 Z" fill="black"/>
+  <!-- Trunk -->
+  <rect x="9.5" y="16" width="3" height="4" fill="black"/>
+</svg>
