@@ -16,6 +16,8 @@ export const useWorktreeStore = defineStore('worktrees', () => {
   const wtVersion = ref<string | null>(null);
   // Focused worktree (highlighted from tray selection)
   const focusedBranch = ref<string | null>(null);
+  // Flag to expand details when focusing a worktree (e.g., from Recent list)
+  const expandOnFocus = ref(false);
 
   // Getters
   const selectedRepo = computed(() => {
@@ -60,12 +62,19 @@ export const useWorktreeStore = defineStore('worktrees', () => {
     }
   }
 
-  function focusWorktree(branch: string) {
+  function focusWorktree(branch: string, shouldExpandDetails = false) {
     focusedBranch.value = branch;
+    expandOnFocus.value = shouldExpandDetails;
   }
 
   function clearFocusedWorktree() {
     focusedBranch.value = null;
+    // Don't clear expandOnFocus here - let it persist so cards can use it when they render
+    // It will be cleared separately after the card has had a chance to expand
+  }
+
+  function clearExpandOnFocus() {
+    expandOnFocus.value = false;
   }
 
   function setLoading(isLoading: boolean) {
@@ -125,6 +134,7 @@ export const useWorktreeStore = defineStore('worktrees', () => {
     wtAvailable,
     wtVersion,
     focusedBranch,
+    expandOnFocus,
     // Getters
     selectedRepo,
     hasRepositories,
@@ -146,5 +156,6 @@ export const useWorktreeStore = defineStore('worktrees', () => {
     reset,
     focusWorktree,
     clearFocusedWorktree,
+    clearExpandOnFocus,
   };
 });

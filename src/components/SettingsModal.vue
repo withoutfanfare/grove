@@ -3,12 +3,12 @@
  * SettingsModal Component
  *
  * Application settings modal with preferences for editor, terminal,
- * default base branch, and notification settings.
+ * Git client, default base branch, and notification settings.
  */
 import { ref, watch, computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useSettingsStore, EDITOR_OPTIONS, TERMINAL_OPTIONS } from '../stores'
-import type { EditorChoice, TerminalChoice } from '../stores'
+import { useSettingsStore, EDITOR_OPTIONS, TERMINAL_OPTIONS, GIT_CLIENT_OPTIONS } from '../stores'
+import type { EditorChoice, TerminalChoice, GitClientChoice } from '../stores'
 import { Modal, Button, Input, Select, Toggle } from './ui'
 
 const props = defineProps<{
@@ -26,6 +26,8 @@ const { settings } = storeToRefs(store)
 const editor = ref<EditorChoice>(settings.value.editor)
 const customEditorPath = ref(settings.value.customEditorPath)
 const terminal = ref<TerminalChoice>(settings.value.terminal)
+const gitClient = ref<GitClientChoice>(settings.value.gitClient)
+const customGitClientPath = ref(settings.value.customGitClientPath)
 const defaultBaseBranch = ref(settings.value.defaultBaseBranch)
 const enableNotifications = ref(settings.value.enableNotifications)
 
@@ -34,9 +36,19 @@ const customEditorPathError = computed(() => {
   if (editor.value !== 'custom') return ''
   const path = customEditorPath.value.trim()
   if (!path) return 'Editor path is required when using custom editor'
-  // Check for obviously invalid characters (shell metacharacters)
   if (/[;&|`$(){}[\]<>]/.test(path)) return 'Path contains invalid characters'
-  // Check it looks like a path (starts with / or ~)
+  if (!path.startsWith('/') && !path.startsWith('~')) {
+    return 'Path should be absolute (start with / or ~)'
+  }
+  return ''
+})
+
+// Validation for custom git client path
+const customGitClientPathError = computed(() => {
+  if (gitClient.value !== 'custom') return ''
+  const path = customGitClientPath.value.trim()
+  if (!path) return 'Git client path is required when using custom'
+  if (/[;&|`$(){}[\]<>]/.test(path)) return 'Path contains invalid characters'
   if (!path.startsWith('/') && !path.startsWith('~')) {
     return 'Path should be absolute (start with / or ~)'
   }
@@ -46,17 +58,15 @@ const customEditorPathError = computed(() => {
 // L8: Validation for base branch
 const baseBranchError = computed(() => {
   const branch = defaultBaseBranch.value.trim()
-  if (!branch) return '' // Empty is allowed (uses default)
-  // Check for invalid branch name characters
+  if (!branch) return ''
   if (/[;&|`$(){}[\]<>\s]/.test(branch)) return 'Branch name contains invalid characters'
-  // Check it doesn't start with a hyphen (flag injection)
   if (branch.startsWith('-')) return 'Branch name cannot start with a hyphen'
   return ''
 })
 
 // Check if form is valid for saving
 const isFormValid = computed(() => {
-  return !customEditorPathError.value && !baseBranchError.value
+  return !customEditorPathError.value && !customGitClientPathError.value && !baseBranchError.value
 })
 
 // Reset local values when modal opens
@@ -65,18 +75,21 @@ watch(() => props.isOpen, (open) => {
     editor.value = settings.value.editor
     customEditorPath.value = settings.value.customEditorPath
     terminal.value = settings.value.terminal
+    gitClient.value = settings.value.gitClient
+    customGitClientPath.value = settings.value.customGitClientPath
     defaultBaseBranch.value = settings.value.defaultBaseBranch
     enableNotifications.value = settings.value.enableNotifications
   }
 })
 
 function handleSave() {
-  // M6/L8: Only save if form is valid
   if (!isFormValid.value) return
 
   store.setEditor(editor.value)
   store.setCustomEditorPath(customEditorPath.value)
   store.setTerminal(terminal.value)
+  store.setGitClient(gitClient.value)
+  store.setCustomGitClientPath(customGitClientPath.value)
   store.setDefaultBaseBranch(defaultBaseBranch.value)
   store.setEnableNotifications(enableNotifications.value)
   emit('close')
@@ -91,13 +104,19 @@ function handleReset() {
   editor.value = settings.value.editor
   customEditorPath.value = settings.value.customEditorPath
   terminal.value = settings.value.terminal
+  gitClient.value = settings.value.gitClient
+  customGitClientPath.value = settings.value.customGitClientPath
   defaultBaseBranch.value = settings.value.defaultBaseBranch
   enableNotifications.value = settings.value.enableNotifications
 }
 
-// Get current editor description
+// Get descriptions
 const editorDescription = computed(() => {
   return EDITOR_OPTIONS.find(o => o.value === editor.value)?.description || ''
+})
+
+const gitClientDescription = computed(() => {
+  return GIT_CLIENT_OPTIONS.find(o => o.value === gitClient.value)?.description || ''
 })
 </script>
 
@@ -125,7 +144,6 @@ const editorDescription = computed(() => {
         </h3>
 
         <div class="space-y-4">
-          <!-- Code Editor -->
           <Select
             v-model="editor"
             label="Code Editor"
@@ -133,7 +151,6 @@ const editorDescription = computed(() => {
           />
           <p class="text-2xs text-text-muted -mt-2">{{ editorDescription }}</p>
 
-          <!-- Custom Editor Path -->
           <Transition
             enter-active-class="transition ease-out duration-150"
             enter-from-class="opacity-0 -translate-y-1"
@@ -142,7 +159,6 @@ const editorDescription = computed(() => {
             leave-from-class="opacity-100 translate-y-0"
             leave-to-class="opacity-0 -translate-y-1"
           >
-            <!-- M6: Custom editor path with validation -->
             <Input
               v-if="editor === 'custom'"
               v-model="customEditorPath"
@@ -153,7 +169,6 @@ const editorDescription = computed(() => {
             />
           </Transition>
 
-          <!-- Terminal -->
           <Select
             v-model="terminal"
             label="Terminal Application"
@@ -162,16 +177,50 @@ const editorDescription = computed(() => {
         </div>
       </section>
 
-      <!-- Divider -->
       <div class="divider-horizontal" />
 
-      <!-- Git Section -->
+      <!-- Git Client Section -->
+      <section class="space-y-4">
+        <h3 class="text-xs font-semibold text-text-muted uppercase tracking-wider">
+          Git Client
+        </h3>
+
+        <div class="space-y-4">
+          <Select
+            v-model="gitClient"
+            label="Git Client Application"
+            :options="GIT_CLIENT_OPTIONS"
+          />
+          <p class="text-2xs text-text-muted -mt-2">{{ gitClientDescription }}</p>
+
+          <Transition
+            enter-active-class="transition ease-out duration-150"
+            enter-from-class="opacity-0 -translate-y-1"
+            enter-to-class="opacity-100 translate-y-0"
+            leave-active-class="transition ease-in duration-100"
+            leave-from-class="opacity-100 translate-y-0"
+            leave-to-class="opacity-0 -translate-y-1"
+          >
+            <Input
+              v-if="gitClient === 'custom'"
+              v-model="customGitClientPath"
+              label="Custom Git Client Path"
+              placeholder="/Applications/YourGitClient.app"
+              hint="Full path to your Git client application"
+              :error="customGitClientPathError || undefined"
+            />
+          </Transition>
+        </div>
+      </section>
+
+      <div class="divider-horizontal" />
+
+      <!-- Git Defaults Section -->
       <section class="space-y-4">
         <h3 class="text-xs font-semibold text-text-muted uppercase tracking-wider">
           Git Defaults
         </h3>
 
-        <!-- L8: Base branch with validation -->
         <Input
           v-model="defaultBaseBranch"
           label="Default Base Branch"
@@ -181,7 +230,6 @@ const editorDescription = computed(() => {
         />
       </section>
 
-      <!-- Divider -->
       <div class="divider-horizontal" />
 
       <!-- Notifications Section -->

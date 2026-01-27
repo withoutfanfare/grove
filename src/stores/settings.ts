@@ -18,10 +18,22 @@ export type TerminalChoice =
   | 'alacritty'
   | 'wezterm';
 
+export type GitClientChoice =
+  | 'none'
+  | 'gitkraken'
+  | 'tower'
+  | 'github-desktop'
+  | 'sourcetree'
+  | 'fork'
+  | 'sublime-merge'
+  | 'custom';
+
 export interface Settings {
   editor: EditorChoice;
   customEditorPath: string;
   terminal: TerminalChoice;
+  gitClient: GitClientChoice;
+  customGitClientPath: string;
   defaultBaseBranch: string;
   enableNotifications: boolean;
 }
@@ -32,6 +44,8 @@ const DEFAULT_SETTINGS: Settings = {
   editor: 'vscode',
   customEditorPath: '',
   terminal: 'terminal',
+  gitClient: 'none',
+  customGitClientPath: '',
   defaultBaseBranch: 'origin/staging',
   enableNotifications: true,
 };
@@ -76,6 +90,14 @@ export const useSettingsStore = defineStore('settings', () => {
     settings.value.terminal = terminal;
   }
 
+  function setGitClient(gitClient: GitClientChoice) {
+    settings.value.gitClient = gitClient;
+  }
+
+  function setCustomGitClientPath(path: string) {
+    settings.value.customGitClientPath = path;
+  }
+
   function setDefaultBaseBranch(branch: string) {
     settings.value.defaultBaseBranch = branch;
   }
@@ -93,6 +115,8 @@ export const useSettingsStore = defineStore('settings', () => {
     setEditor,
     setCustomEditorPath,
     setTerminal,
+    setGitClient,
+    setCustomGitClientPath,
     setDefaultBaseBranch,
     setEnableNotifications,
     resetToDefaults,
@@ -118,4 +142,16 @@ export const TERMINAL_OPTIONS: { value: TerminalChoice; label: string }[] = [
   { value: 'warp', label: 'Warp' },
   { value: 'alacritty', label: 'Alacritty' },
   { value: 'wezterm', label: 'WezTerm' },
+];
+
+// Git client display names and descriptions
+export const GIT_CLIENT_OPTIONS: { value: GitClientChoice; label: string; description: string }[] = [
+  { value: 'none', label: 'None', description: 'No Git client button' },
+  { value: 'gitkraken', label: 'GitKraken', description: 'GitKraken Git GUI' },
+  { value: 'tower', label: 'Tower', description: 'Tower Git Client' },
+  { value: 'github-desktop', label: 'GitHub Desktop', description: 'GitHub Desktop' },
+  { value: 'sourcetree', label: 'Sourcetree', description: 'Atlassian Sourcetree' },
+  { value: 'fork', label: 'Fork', description: 'Fork Git Client' },
+  { value: 'sublime-merge', label: 'Sublime Merge', description: 'Sublime Merge' },
+  { value: 'custom', label: 'Custom', description: 'Specify custom Git client path' },
 ];

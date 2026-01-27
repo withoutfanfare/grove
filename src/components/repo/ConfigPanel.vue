@@ -584,6 +584,8 @@ function handleEditorKeydown(e: KeyboardEvent) {
 </template>
 
 <style scoped>
+@reference "tailwindcss";
+
 .config-scroll {
   scrollbar-width: thin;
   scrollbar-color: var(--color-border-subtle) transparent;
@@ -594,7 +596,10 @@ function handleEditorKeydown(e: KeyboardEvent) {
 .config-scroll::-webkit-scrollbar-thumb:hover { background: var(--color-border-default); }
 
 .config-card {
-  @apply relative p-5 rounded-xl transition-all duration-200;
+  position: relative;
+  padding: 1.25rem;
+  border-radius: 0.75rem;
+  transition: all 0.2s;
   background: linear-gradient(135deg, rgba(39, 39, 42, 0.6) 0%, rgba(24, 24, 27, 0.8) 100%);
   border: 1px solid rgba(255, 255, 255, 0.06);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
@@ -603,20 +608,59 @@ function handleEditorKeydown(e: KeyboardEvent) {
   border-color: rgba(255, 255, 255, 0.1);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
-.config-card-header { @apply flex items-center gap-3 mb-4; }
-.config-card-icon { @apply w-8 h-8 rounded-lg flex items-center justify-center; }
-.config-card-content { @apply pl-11; }
+.config-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.config-card-icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.config-card-content {
+  padding-left: 2.75rem;
+}
 
-.config-field { @apply space-y-1.5; }
-.config-field-row { @apply flex items-center justify-between; }
-.config-label { @apply text-xs font-medium text-text-secondary uppercase tracking-wide; }
-.config-value { @apply text-sm; }
+.config-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+.config-field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.config-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.config-value {
+  font-size: 0.875rem;
+}
 .config-mono-badge {
-  @apply inline-block font-mono text-xs text-text-primary bg-surface-base/80 px-2.5 py-1 rounded-md border border-border-subtle/30;
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--color-text-primary);
+  background: rgba(9, 9, 11, 0.8);
+  padding: 0.25rem 0.625rem;
+  border-radius: 0.375rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .file-card {
-  @apply p-4 rounded-xl transition-all duration-200;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  transition: all 0.2s;
   background: linear-gradient(135deg, rgba(39, 39, 42, 0.4) 0%, rgba(24, 24, 27, 0.6) 100%);
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
@@ -626,27 +670,61 @@ function handleEditorKeydown(e: KeyboardEvent) {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(99, 102, 241, 0.1);
 }
 .file-icon {
-  @apply w-8 h-8 rounded-lg bg-surface-overlay/50 flex items-center justify-center text-text-muted;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
 }
-.file-card:hover .file-icon { @apply bg-accent/10 text-accent; }
+.file-card:hover .file-icon {
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--color-accent);
+}
 
-.file-action-btn { @apply p-1.5 rounded-lg text-text-muted transition-all duration-150; }
-.file-action-btn:hover { @apply bg-surface-overlay text-text-primary; }
-.editor-action-btn { @apply p-1.5 rounded-lg text-text-muted transition-all duration-150; }
-.editor-action-btn:hover { @apply bg-surface-overlay text-accent; }
+.file-action-btn {
+  padding: 0.375rem;
+  border-radius: 0.5rem;
+  color: var(--color-text-muted);
+  transition: all 0.15s;
+}
+.file-action-btn:hover {
+  background: var(--color-surface-overlay);
+  color: var(--color-text-primary);
+}
+.editor-action-btn {
+  padding: 0.375rem;
+  border-radius: 0.5rem;
+  color: var(--color-text-muted);
+  transition: all 0.15s;
+}
+.editor-action-btn:hover {
+  background: var(--color-surface-overlay);
+  color: var(--color-accent);
+}
 
 .editor-container {
   background: var(--color-surface-base);
   border: 1px solid rgba(255, 255, 255, 0.06);
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
-.config-editor { tab-size: 2; }
-.config-editor::placeholder { color: var(--color-text-muted); }
+.config-editor {
+  tab-size: 2;
+}
+.config-editor::placeholder {
+  color: var(--color-text-muted);
+}
 
 .kbd {
-  @apply px-1.5 py-0.5 rounded text-2xs font-mono;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.625rem;
+  font-family: var(--font-mono);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 100%);
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 </style>
+

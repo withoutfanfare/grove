@@ -17,6 +17,7 @@ const props = defineProps<{
   worktrees: Worktree[]
   repoName: string
   focusedBranch?: string | null
+  expandOnFocus?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -53,11 +54,25 @@ const totalHeight = computed(() => virtualizer.value.getTotalSize())
 watch(
   () => props.worktrees.length,
   () => {
-    // Scroll to top when list changes significantly
-    if (scrollContainerRef.value) {
+    // Scroll to top when list changes significantly (but not if we have a focused branch)
+    if (scrollContainerRef.value && !props.focusedBranch) {
       scrollContainerRef.value.scrollTop = 0
     }
   }
+)
+
+// Scroll to focused branch when it changes
+watch(
+  () => props.focusedBranch,
+  (branch) => {
+    if (branch) {
+      const index = props.worktrees.findIndex(wt => wt.branch === branch)
+      if (index !== -1) {
+        virtualizer.value.scrollToIndex(index, { align: 'center' })
+      }
+    }
+  },
+  { immediate: true }
 )
 
 // Ensure virtualizer is ready after mount
@@ -85,6 +100,7 @@ function handleDelete(worktree: Worktree) {
       <!-- Virtual items positioned absolutely -->
       <div
         v-for="virtualRow in virtualItems"
+        :id="`worktree-${worktrees[virtualRow.index].branch}`"
         :key="virtualRow.index"
         :data-index="virtualRow.index"
         class="virtual-scroll-item"
@@ -96,6 +112,7 @@ function handleDelete(worktree: Worktree) {
           :worktree="worktrees[virtualRow.index]"
           :repo-name="repoName"
           :focused="focusedBranch === worktrees[virtualRow.index].branch"
+          :initially-expanded="expandOnFocus && focusedBranch === worktrees[virtualRow.index].branch"
           @delete="handleDelete"
         />
       </div>

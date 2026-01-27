@@ -15,7 +15,7 @@ import { useRepos, useWorktrees, useRecent, useListNavigation, useKeyboardShortc
 import { IconButton, SkeletonList, Skeleton, Dropdown, DropdownItem } from './ui'
 import SearchInput from './SearchInput.vue'
 import CloneRepositoryModal from './CloneRepositoryModal.vue'
-import { copyToClipboard } from '../utils/clipboard'
+// Clipboard utility (used by other functions)
 
 const props = withDefaults(defineProps<{
   /** Sidebar width in pixels (for resizable sidebar) */
@@ -36,7 +36,7 @@ const { fetchWorktrees, openInEditor, openInTerminal, openInBrowser } = useWorkt
 const { fetchRecentWorktrees } = useRecent()
 const { tooltipWithShortcut } = useShortcutTooltip()
 const { toast } = useToast()
-const { repairRepository, unlockRepository, openConfig, generateReport } = useWt()
+const { repairRepository, unlockRepository, openConfig, saveReportToDesktop } = useWt()
 
 // Clone modal state
 const showCloneModal = ref(false)
@@ -163,6 +163,27 @@ function handleOpenRecentBrowser(url: string) {
   openInBrowser(url)
 }
 
+/**
+ * Navigate to a recent worktree - selects the repo and focuses the branch with details expanded
+ */
+async function handleNavigateToRecent(repoName: string, branch: string) {
+  // Switch to Repositories tab first
+  activeTab.value = 'repos'
+  
+  // Check if we need to switch repos
+  const needsRepoSwitch = selectedRepoName.value !== repoName
+  
+  if (needsRepoSwitch) {
+    // Select the repository and fetch worktrees
+    selectRepository(repoName)
+    // Wait for worktrees to load before focusing
+    await fetchWorktrees()
+  }
+  
+  // Focus the worktree with details expansion flag
+  store.focusWorktree(branch, true)
+}
+
 // Phase 4: Repository management actions
 function handleClone() {
   showCloneModal.value = true
@@ -226,13 +247,10 @@ async function handleGenerateReport(repoName: string) {
   generatingReport.value = repoName
 
   try {
-    const report = await generateReport(repoName)
-    // Copy to clipboard
-    const result = await copyToClipboard(report)
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to copy to clipboard')
-    }
-    toast.success(`Health report copied to clipboard`)
+    const filePath = await saveReportToDesktop(repoName)
+    // Extract just the filename for the toast
+    const filename = filePath.split('/').pop() || 'report.md'
+    toast.success(`Report saved to Desktop: ${filename}`)
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : 'Failed to generate report'
     toast.error(`${repoName}: ${errorMessage}`)
@@ -613,7 +631,7 @@ onMounted(() => {
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    {{ generatingReport === repo.name ? 'Generating...' : 'Generate Report' }}
+                    {{ generatingReport === repo.name ? 'Generating...' : 'Export Report' }}
                   </DropdownItem>
                 </template>
               </Dropdown>
@@ -671,8 +689,11 @@ onMounted(() => {
         <ul class="space-y-1">
           <li v-for="recent in recentWorktrees" :key="recent.path">
             <div class="group px-3 py-2.5 rounded-lg bg-surface-overlay/50 hover:bg-surface-overlay transition-colors">
-              <!-- Header -->
-              <div class="flex items-start gap-2">
+              <!-- Header - clickable to navigate to worktree -->
+              <button
+                class="flex items-start gap-2 w-full text-left"
+                @click="handleNavigateToRecent(recent.repo, recent.branch)"
+              >
                 <!-- Status dot -->
                 <span
                   :class="[
@@ -694,7 +715,7 @@ onMounted(() => {
                     {{ recent.accessed_ago }}
                   </span>
                 </div>
-              </div>
+              </button>
 
               <!-- Action buttons -->
               <div class="flex items-center gap-1 mt-2.5 opacity-60 group-hover:opacity-100 transition-opacity">

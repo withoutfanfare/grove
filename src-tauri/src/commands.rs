@@ -478,6 +478,118 @@ pub fn open_in_terminal(path: String, terminal: Option<String>) -> Result<(), Wt
     }
 }
 
+
+/// Get the application name for a Git client
+fn get_git_client_app(client: &str) -> &'static str {
+    match client {
+        "gitkraken" => "GitKraken",
+        "tower" => "Tower",
+        "github-desktop" => "GitHub Desktop",
+        "sourcetree" => "Sourcetree",
+        "fork" => "Fork",
+        "sublime-merge" => "Sublime Merge",
+        _ => "",
+    }
+}
+
+/// Open a path in the configured Git client application
+///
+/// Validates the path before opening to prevent path traversal attacks.
+/// Callable from frontend as: invoke('open_in_git_client', { path, gitClient, customGitClientPath })
+#[command]
+pub fn open_in_git_client(
+    path: String,
+    git_client: Option<String>,
+    custom_git_client_path: Option<String>,
+) -> Result<(), WtError> {
+    let validated_path = validate_path(&path)?;
+    let client_choice = git_client.unwrap_or_else(|| "none".to_string());
+
+    if client_choice == "none" {
+        return Err(WtError::new(
+            "NO_GIT_CLIENT",
+            "No Git client configured. Please set a Git client in Settings.".to_string(),
+        ));
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // Handle custom Git client path
+        if client_choice == "custom" {
+            if let Some(custom_path) = custom_git_client_path {
+                Command::new("open")
+                    .args(["-a", &custom_path])
+                    .arg(&validated_path)
+                    .status()
+                    .map_err(|e| {
+                        WtError::new(
+                            "OPEN_FAILED",
+                            format!("Failed to open custom Git client: {}", e),
+                        )
+                    })?;
+                return Ok(());
+            } else {
+                return Err(WtError::new(
+                    "NO_CUSTOM_PATH",
+                    "Custom Git client selected but no path configured.".to_string(),
+                ));
+            }
+        }
+
+        // Handle known Git clients
+        let app_name = get_git_client_app(&client_choice);
+        if app_name.is_empty() {
+            return Err(WtError::new(
+                "UNKNOWN_GIT_CLIENT",
+                format!("Unknown Git client: {}", client_choice),
+            ));
+        }
+
+        let result = Command::new("open")
+            .args(["-a", app_name])
+            .arg(&validated_path)
+            .status();
+
+        if let Ok(status) = result {
+            if status.success() {
+                return Ok(());
+            }
+        }
+
+        Err(WtError::new(
+            "OPEN_FAILED",
+            format!("Failed to open {} - is it installed?", app_name),
+        ))
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // On Windows, try to open with the application
+        let app_name = get_git_client_app(&client_choice);
+        Command::new("cmd")
+            .args(["/C", "start", "", app_name])
+            .arg(&validated_path)
+            .status()
+            .map_err(|e| WtError::new("OPEN_FAILED", format!("Failed to open Git client: {}", e)))?;
+        Ok(())
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // On Linux, try common command names
+        let cmd = match client_choice.as_str() {
+            "gitkraken" => "gitkraken",
+            "sublime-merge" => "smerge",
+            _ => return Err(WtError::new("UNSUPPORTED", "Git client not supported on Linux".to_string())),
+        };
+        Command::new(cmd)
+            .arg(&validated_path)
+            .status()
+            .map_err(|e| WtError::new("OPEN_FAILED", format!("Failed to open Git client: {}", e)))?;
+        Ok(())
+    }
+}
+
 /// Open a URL in the default browser
 ///
 /// Validates the URL to only allow HTTP/HTTPS protocols.
@@ -1121,6 +1233,48 @@ pub async fn generate_report(
             code: "SPAWN_ERROR".to_string(),
             message: format!("Failed to spawn background task: {}", e),
         })?
+}
+
+
+/// Save a health report to the user's Desktop
+///
+/// Generates a health report and saves it to ~/Desktop/grove-report-{repoName}-{timestamp}.md
+/// Returns the path to the saved file.
+/// Callable from frontend as: invoke('save_report_to_desktop', { repoName })
+#[command(rename_all = "camelCase")]
+pub async fn save_report_to_desktop(
+    repo_name: String,
+    app: tauri::AppHandle,
+) -> Result<String, WtError> {
+    let repo = repo_name.clone();
+    let handle = app.clone();
+
+    // Generate the report
+    let report = spawn_blocking(move || wt::generate_health_report(&handle, &repo))
+        .await
+        .map_err(|e| WtError {
+            code: "SPAWN_ERROR".to_string(),
+            message: format!("Failed to spawn background task: {}", e),
+        })??;
+
+    // Get Desktop path
+    let desktop_path = dirs::desktop_dir().ok_or_else(|| WtError {
+        code: "PATH_ERROR".to_string(),
+        message: "Could not find Desktop directory".to_string(),
+    })?;
+
+    // Create filename with timestamp
+    let timestamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
+    let filename = format!("grove-report-{}-{}.md", repo_name, timestamp);
+    let file_path = desktop_path.join(&filename);
+
+    // Write the report
+    std::fs::write(&file_path, &report).map_err(|e| WtError {
+        code: "IO_ERROR".to_string(),
+        message: format!("Failed to write report: {}", e),
+    })?;
+
+    Ok(file_path.to_string_lossy().to_string())
 }
 
 /// Derive a repository name from a Git URL
