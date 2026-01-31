@@ -154,7 +154,7 @@ function dismissError() {
 function scrollToFocusedWorktree() {
   const branch = focusedBranch.value
   if (!branch) return
-  
+
   setTimeout(() => {
     const element = document.getElementById(`worktree-${branch}`)
     if (element) {
@@ -264,11 +264,23 @@ async function handlePrune() {
   isPruning.value = true
   try {
     const result = await pruneRepo(selectedRepoName.value, false)
+    // Close the progress panel — prune doesn't emit granular progress events
+    handleProgressPanelClose()
     if (result) {
-      toast.success('Prune completed successfully')
+      const refs = result.stale_refs_pruned
+      const merged = result.merged_branches?.length ?? 0
+      if (refs === 0 && merged === 0) {
+        toast.info('Nothing to clean up — repository is already tidy')
+      } else {
+        const parts: string[] = []
+        if (refs > 0) parts.push(`${refs} stale ref${refs === 1 ? '' : 's'} pruned`)
+        if (merged > 0) parts.push(`${merged} merged branch${merged === 1 ? '' : 'es'} found`)
+        toast.success(parts.join(', '))
+      }
     }
   } catch {
-    toast.error('Failed to prune branches')
+    handleProgressPanelClose()
+    toast.error('Failed to clean up branches')
   } finally {
     isPruning.value = false
     resumeAutoRefresh()
@@ -417,7 +429,7 @@ useKeyboardShortcuts({
         <div class="w-20 h-20 mx-auto mb-8 rounded-2xl bg-danger-muted flex items-center justify-center shadow-lg">
           <svg class="w-10 h-10 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
         </div>
         <h2 class="text-2xl font-semibold text-text-primary mb-3 tracking-tight">
@@ -427,13 +439,11 @@ useKeyboardShortcuts({
           The wt command-line tool is not installed or not in your PATH.
           Please install wt to use this application.
         </p>
-        <a
-          href="https://github.com/your-repo/wt"
-          target="_blank"
-          class="inline-flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-accent-hover text-white font-medium rounded-xl transition-all duration-150 hover:shadow-glow"
-        >
+        <a href="https://github.com/your-repo/wt" target="_blank"
+          class="inline-flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-accent-hover text-white font-medium rounded-xl transition-all duration-150 hover:shadow-glow">
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-            <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0012 2z" />
+            <path fill-rule="evenodd" clip-rule="evenodd"
+              d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0012 2z" />
           </svg>
           Installation Guide
         </a>
@@ -447,139 +457,118 @@ useKeyboardShortcuts({
         <RepoList class="flex-shrink-0" :width="sidebarWidth" @open-repo-management="openRepoManagementModal" />
 
         <!-- Resize handle -->
-        <ResizeHandle
-          :is-resizing="isSidebarResizing"
-          @drag-start="startSidebarResize"
-          @reset="resetSidebarWidth"
-        />
+        <ResizeHandle :is-resizing="isSidebarResizing" @drag-start="startSidebarResize" @reset="resetSidebarWidth" />
 
         <!-- Main content area -->
-        <main class="flex-1 flex flex-col min-w-0 bg-surface-base">
-          <!-- Header -->
-          <header class="flex-shrink-0 px-6 py-4 flex items-center justify-between border-b border-border-subtle bg-surface-raised/30">
-            <div class="min-w-0">
-              <div class="flex items-center gap-2">
-                <h1 class="text-lg font-semibold text-text-primary tracking-tight truncate">
+        <main class="flex-1 flex flex-col min-w-0 bg-surface-base overflow-y-auto relative">
+          <!-- Header (Sticky & Glassmorphic) -->
+          <header class="sticky top-0 border-b border-white/5"
+            style="background-color: rgba(3, 7, 18, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); z-index: 100;">
+            <div class="px-6 py-3 flex items-center gap-4">
+              <!-- Left: repo info -->
+              <div class="flex items-center gap-3 flex-shrink-0">
+                <h1 class="text-xl font-bold text-text-primary tracking-tight truncate">
                   {{ selectedRepo?.name || 'Select a Repository' }}
                 </h1>
-                <!-- Auto-refresh indicator -->
-                <Transition name="fade">
-                  <span
-                    v-if="selectedRepo && isAutoRefreshing"
-                    class="inline-flex items-center gap-1 text-xs text-text-muted"
-                  >
-                    <span class="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                    Refreshing...
-                  </span>
-                </Transition>
-              </div>
-              <div v-if="selectedRepo" class="flex items-center gap-2 mt-0.5">
-                <p class="text-sm text-text-tertiary">
+                <span v-if="selectedRepo" class="text-sm text-text-tertiary">
                   {{ selectedRepo.worktrees }} worktree{{ selectedRepo.worktrees === 1 ? '' : 's' }}
-                </p>
-                <!-- Last updated indicator with watch status -->
-                <span class="text-xs text-text-muted flex items-center gap-1.5">
-                  <span v-if="isWatching" class="flex items-center gap-1" title="Watching for changes">
+                </span>
+                <span v-if="selectedRepo" class="flex items-center gap-2 text-xs text-text-muted">
+                  <Transition name="fade">
+                    <span v-if="isAutoRefreshing" class="inline-flex items-center gap-1">
+                      <span class="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                      Refreshing...
+                    </span>
+                  </Transition>
+                  <span v-if="isWatching" class="inline-flex items-center gap-1" title="Watching for changes">
                     <span class="w-1.5 h-1.5 bg-success rounded-full animate-pulse-subtle" />
                     <span class="text-success">Live</span>
                   </span>
                   <span>{{ lastUpdatedText }}</span>
                 </span>
               </div>
+
+              <!-- Centre: search (fills remaining space) -->
+              <div v-if="selectedRepo && worktrees.length > 0" class="flex-1 min-w-0">
+                <SearchInput ref="searchInputRef" v-model="worktreeSearchQuery"
+                  placeholder="Search worktrees..." shortcut />
+              </div>
+              <div v-else class="flex-1" />
+
+              <!-- Right: action buttons -->
+              <div v-if="selectedRepo" class="flex items-center gap-2 flex-shrink-0">
+                <Button variant="secondary" size="sm" :loading="isPullingAll" @click="handlePullAll">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  <span class="hidden sm:inline">Pull All</span>
+                </Button>
+                <Button variant="secondary" size="sm" @click="openHealthPanel">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  <span class="hidden sm:inline">Health</span>
+                </Button>
+                <Button variant="secondary" size="sm" :loading="isPruning" title="Clean up stale references and find merged branches that can be safely removed" @click="handlePrune">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  <span class="hidden sm:inline">Clean Up</span>
+                </Button>
+
+                <div class="divider-vertical mx-1 h-6" />
+
+                <Button variant="primary" size="sm" @click="openCreateModal">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                  </svg>
+                  Create
+                </Button>
+
+                <IconButton :tooltip="tooltipWithShortcut('Refresh', 'R')" @click="handleRefresh">
+                  <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </IconButton>
+                <IconButton :tooltip="tooltipWithShortcut('Repository Management', 'M')"
+                  @click="() => openRepoManagementModal()">
+                  <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                  </svg>
+                </IconButton>
+                <IconButton tooltip="Help" @click="openHelpModal">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </IconButton>
+                <IconButton :tooltip="tooltipWithShortcut('Settings', ',')" @click="openSettingsModal">
+                  <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </IconButton>
+              </div>
             </div>
 
-            <!-- Action buttons -->
-            <div v-if="selectedRepo" class="flex items-center gap-2">
-              <!-- Pull All -->
-              <Button
-                variant="secondary"
-                size="sm"
-                :loading="isPullingAll"
-                @click="handlePullAll"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                <span class="hidden sm:inline">Pull All</span>
-              </Button>
-
-              <!-- Health -->
-              <Button variant="secondary" size="sm" @click="openHealthPanel">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                <span class="hidden sm:inline">Health</span>
-              </Button>
-
-              <!-- Prune -->
-              <Button
-                variant="secondary"
-                size="sm"
-                :loading="isPruning"
-                @click="handlePrune"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                <span class="hidden sm:inline">Prune</span>
-              </Button>
-
-              <!-- Divider -->
-              <div class="divider-vertical mx-1 h-6" />
-
-              <!-- Create -->
-              <Button variant="primary" size="sm" @click="openCreateModal">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                </svg>
-                Create
-              </Button>
-
-              <!-- Refresh -->
-              <IconButton :tooltip="tooltipWithShortcut('Refresh', 'R')" @click="handleRefresh">
-                <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              </IconButton>
-
-              <!-- Settings -->
-
-              <!-- Repo Management -->
-              <IconButton :tooltip="tooltipWithShortcut('Repository Management', 'M')" @click="() => openRepoManagementModal()">
-                <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-                </svg>
-              </IconButton>
-              <IconButton tooltip="Help" @click="openHelpModal">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </IconButton>
-              <IconButton :tooltip="tooltipWithShortcut('Settings', ',')" @click="openSettingsModal">
-                <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </IconButton>
-            </div>
           </header>
 
           <!-- Error banner -->
           <Transition name="slide-down">
-            <div
-              v-if="error"
-              class="flex-shrink-0 bg-danger-muted border-b border-danger/20 px-6 py-3 flex items-center justify-between"
-            >
+            <div v-if="error"
+              class="flex-shrink-0 bg-danger-muted border-b border-danger/20 px-6 py-3 flex items-center justify-between">
               <div class="flex items-center gap-3 min-w-0">
                 <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-danger/20 flex items-center justify-center">
                   <svg class="w-4 h-4 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
                 <div class="min-w-0">
@@ -596,118 +585,92 @@ useKeyboardShortcuts({
           </Transition>
 
           <!-- Content area -->
-          <div class="flex-1 overflow-y-auto">
-            <ErrorBoundary
-              title="Failed to display worktrees"
-              description="There was an error displaying the worktree list. Please try again."
-              @retry="handleRefresh"
-            >
+          <div class="flex-1">
+            <ErrorBoundary title="Failed to display worktrees"
+              description="There was an error displaying the worktree list. Please try again." @retry="handleRefresh">
               <!-- No repo selected -->
               <div v-if="!selectedRepo" class="h-full flex items-center justify-center p-8">
-              <div class="text-center animate-fade-in">
-                <div class="w-20 h-20 mx-auto mb-6 rounded-2xl bg-surface-overlay flex items-center justify-center">
-                  <svg class="w-10 h-10 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                          d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" />
-                  </svg>
+                <div class="text-center animate-fade-in">
+                  <div class="w-20 h-20 mx-auto mb-6 rounded-2xl bg-surface-overlay flex items-center justify-center">
+                    <svg class="w-10 h-10 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                        d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" />
+                    </svg>
+                  </div>
+                  <p class="text-lg font-medium text-text-secondary">Select a repository</p>
+                  <p class="text-sm text-text-muted mt-1">to view its worktrees</p>
                 </div>
-                <p class="text-lg font-medium text-text-secondary">Select a repository</p>
-                <p class="text-sm text-text-muted mt-1">to view its worktrees</p>
-              </div>
-            </div>
-
-            <!-- Loading worktrees with skeleton cards -->
-            <div v-else-if="loadingWorktrees" class="p-6 space-y-3">
-              <SkeletonCard v-for="i in 6" :key="i" />
-            </div>
-
-            <!-- No worktrees -->
-            <div v-else-if="worktrees.length === 0" class="h-full flex items-center justify-center p-8">
-              <div class="text-center animate-fade-in max-w-sm">
-                <div class="w-20 h-20 mx-auto mb-6 rounded-2xl bg-surface-overlay flex items-center justify-center">
-                  <svg class="w-10 h-10 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                  </svg>
-                </div>
-                <p class="text-lg font-medium text-text-secondary">No worktrees found</p>
-                <p class="text-sm text-text-muted mt-2 mb-6">
-                  Create your first worktree to start working on a branch in isolation.
-                </p>
-                <Button variant="primary" @click="openCreateModal">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                  </svg>
-                  Create Worktree
-                </Button>
-                <p class="text-xs text-text-muted mt-4">
-                  Or run
-                  <code class="px-1.5 py-0.5 bg-surface-overlay rounded font-mono text-2xs">wt add {{ selectedRepo?.name }} &lt;branch&gt;</code>
-                  in your terminal
-                </p>
-              </div>
-            </div>
-
-            <!-- Worktree list with search -->
-            <div v-else class="p-6 space-y-4">
-              <!-- Search input -->
-              <!-- L12: Added ref for keyboard shortcut focus -->
-              <SearchInput
-                ref="searchInputRef"
-                v-model="worktreeSearchQuery"
-                placeholder="Search worktrees by branch name..."
-              />
-
-              <!-- No search results -->
-              <div
-                v-if="filteredWorktrees.length === 0 && worktreeSearchQuery.trim()"
-                class="py-12 text-center animate-fade-in"
-              >
-                <div class="w-16 h-16 mx-auto mb-4 rounded-xl bg-surface-overlay flex items-center justify-center">
-                  <svg class="w-8 h-8 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-                <p class="text-sm font-medium text-text-secondary">No results for '{{ worktreeSearchQuery }}'</p>
-                <p class="text-xs text-text-muted mt-1 mb-4">Try a different search term</p>
-                <Button variant="ghost" size="sm" @click="clearWorktreeSearch">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                  Clear search
-                </Button>
               </div>
 
-              <!-- Worktree cards: virtual scroll for large lists, animated TransitionGroup for smaller lists -->
-              <template v-else>
-                <!-- Virtual scrolling for 50+ items (performance optimisation) -->
-                <VirtualWorktreeList
-                  v-if="useVirtualScroll"
-                  :worktrees="filteredWorktrees"
-                  :repo-name="selectedRepoName!"
-                  :focused-branch="focusedBranch"
-                  :expand-on-focus="expandOnFocus"
-                  @delete="handleDeleteWorktree"
-                />
+              <!-- Loading worktrees with skeleton cards -->
+              <div v-else-if="loadingWorktrees" class="p-6 space-y-3">
+                <SkeletonCard v-for="i in 6" :key="i" />
+              </div>
 
-                <!-- Animated list for smaller lists (better UX with transitions) -->
-                <div v-else class="space-y-3">
-                  <TransitionGroup name="list" appear>
-                    <WorktreeCard
-                      v-for="wt in filteredWorktrees"
-                      :id="`worktree-${wt.branch}`"
-                      :key="wt.path"
-                      :worktree="wt"
-                      :repo-name="selectedRepoName!"
-                      :focused="focusedBranch === wt.branch"
-                      :initially-expanded="expandOnFocus && focusedBranch === wt.branch"
-                      @delete="handleDeleteWorktree"
-                    />
-                  </TransitionGroup>
+              <!-- No worktrees -->
+              <div v-else-if="worktrees.length === 0" class="h-full flex items-center justify-center p-8">
+                <div class="text-center animate-fade-in max-w-md">
+                  <!-- Illustration -->
+                  <div class="w-24 h-24 mx-auto mb-8 rounded-2xl bg-accent/10 flex items-center justify-center">
+                    <svg class="w-12 h-12 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                        d="M12 4v16m8-8H4" />
+                    </svg>
+                  </div>
+
+                  <h2 class="text-xl font-bold text-text-primary tracking-tight">Get started with worktrees</h2>
+                  <p class="text-sm text-text-muted mt-3 mb-8 leading-relaxed">
+                    Worktrees let you work on multiple branches at the same time, each in its own directory. Create one to get started.
+                  </p>
+
+                  <Button variant="primary" size="lg" @click="openCreateModal">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Create Your First Worktree
+                  </Button>
                 </div>
-              </template>
-            </div>
+              </div>
+
+              <!-- Worktree list -->
+              <div v-else class="p-6 space-y-4">
+                <!-- No search results -->
+                <div v-if="filteredWorktrees.length === 0 && worktreeSearchQuery.trim()"
+                  class="py-12 text-center animate-fade-in">
+                  <div class="w-16 h-16 mx-auto mb-4 rounded-xl bg-surface-overlay flex items-center justify-center">
+                    <svg class="w-8 h-8 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <p class="text-sm font-medium text-text-secondary">No results for '{{ worktreeSearchQuery }}'</p>
+                  <p class="text-xs text-text-muted mt-1 mb-4">Try a different search term</p>
+                  <Button variant="ghost" size="sm" @click="clearWorktreeSearch">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Clear search
+                  </Button>
+                </div>
+
+                <!-- Worktree cards: virtual scroll for large lists, animated TransitionGroup for smaller lists -->
+                <template v-else>
+                  <!-- Virtual scrolling for 50+ items (performance optimisation) -->
+                  <VirtualWorktreeList v-if="useVirtualScroll" :worktrees="filteredWorktrees"
+                    :repo-name="selectedRepoName!" :focused-branch="focusedBranch" :expand-on-focus="expandOnFocus"
+                    @delete="handleDeleteWorktree" />
+
+                  <!-- Animated list for smaller lists (better UX with transitions) -->
+                  <div v-else class="space-y-3">
+                    <TransitionGroup name="list" appear>
+                      <WorktreeCard v-for="wt in filteredWorktrees" :id="`worktree-${wt.branch}`" :key="wt.path"
+                        :worktree="wt" :repo-name="selectedRepoName!" :focused="focusedBranch === wt.branch"
+                        :initially-expanded="expandOnFocus && focusedBranch === wt.branch"
+                        @delete="handleDeleteWorktree" />
+                    </TransitionGroup>
+                  </div>
+                </template>
+              </div>
             </ErrorBoundary>
           </div>
         </main>
@@ -715,52 +678,24 @@ useKeyboardShortcuts({
     </template>
 
     <!-- Modals and Panels -->
-    <CreateWorktreeModal
-      :is-open="showCreateModal"
-      @close="showCreateModal = false"
-    />
+    <CreateWorktreeModal :is-open="showCreateModal" @close="showCreateModal = false" />
 
-    <DeleteWorktreeDialog
-      :is-open="showDeleteDialog"
-      :worktree="worktreeToDelete"
-      :repo-name="selectedRepoName || ''"
-      @close="showDeleteDialog = false"
-    />
+    <DeleteWorktreeDialog :is-open="showDeleteDialog" :worktree="worktreeToDelete" :repo-name="selectedRepoName || ''"
+      @close="showDeleteDialog = false" />
 
-    <SettingsModal
-      :is-open="showSettingsModal"
-      @close="showSettingsModal = false"
-    />
+    <SettingsModal :is-open="showSettingsModal" @close="showSettingsModal = false" />
 
-    <RepoManagementModal
-      :is-open="showRepoManagementModal"
-      :initial-tab="repoManagementInitialTab"
-      @close="showRepoManagementModal = false"
-    />
+    <RepoManagementModal :is-open="showRepoManagementModal" :initial-tab="repoManagementInitialTab"
+      @close="showRepoManagementModal = false" />
 
-    <HelpModal
-      :is-open="showHelpModal"
-      @close="showHelpModal = false"
-    />
+    <HelpModal :is-open="showHelpModal" @close="showHelpModal = false" />
 
-    <HealthPanel
-      :is-open="showHealthPanel"
-      :repo-name="selectedRepoName || ''"
-      @close="showHealthPanel = false"
-    />
+    <HealthPanel :is-open="showHealthPanel" :repo-name="selectedRepoName || ''" @close="showHealthPanel = false" />
 
-    <OperationProgressPanel
-      :is-open="showProgressPanel"
-      :title="progressTitle"
-      :progress="progressValue"
-      :has-failures="progressHasFailures"
-      :has-conflicts="progressHasConflicts"
-      @close="handleProgressPanelClose"
-      @cancel="handleCancelOperation"
-      @retry="handleRetryFailed"
-      @open-in-editor="handleOpenInEditor"
-      @open-in-terminal="handleOpenInTerminal"
-    />
+    <OperationProgressPanel :is-open="showProgressPanel" :title="progressTitle" :progress="progressValue"
+      :has-failures="progressHasFailures" :has-conflicts="progressHasConflicts" @close="handleProgressPanelClose"
+      @cancel="handleCancelOperation" @retry="handleRetryFailed" @open-in-editor="handleOpenInEditor"
+      @open-in-terminal="handleOpenInTerminal" />
   </div>
 </template>
 

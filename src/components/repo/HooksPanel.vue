@@ -13,7 +13,7 @@ import { storeToRefs } from 'pinia'
 import { useHooksStore, useSettingsStore } from '../../stores'
 import type { HookEvent, HookScope, HookScriptMeta } from '../../types'
 import { getHookEventLabel, getHookScopeLabel } from '../../types'
-import { Button, Input, ConfirmDialog } from '../ui'
+import { Button, Input, ConfirmDialog, Dropdown, DropdownItem } from '../ui'
 import { copyToClipboard } from '../../utils/clipboard'
 
 const props = defineProps<{
@@ -309,7 +309,7 @@ function handleEditorKeydown(e: KeyboardEvent) {
         </div>
         <div>
           <h3 class="text-sm font-semibold text-text-primary">Lifecycle Hooks</h3>
-          <p class="text-2xs text-text-muted">
+          <p class="text-xs text-text-muted">
             {{ hooks.length }} hook{{ hooks.length === 1 ? '' : 's' }} configured
           </p>
         </div>
@@ -483,7 +483,7 @@ function handleEditorKeydown(e: KeyboardEvent) {
             </div>
             <div class="text-left">
               <span class="text-sm font-medium text-text-primary">{{ getHookEventLabel(event) }}</span>
-              <p class="text-2xs text-text-muted">{{ eventDescriptions[event] }}</p>
+              <p class="text-xs text-text-muted">{{ eventDescriptions[event] }}</p>
             </div>
           </div>
           <div class="flex items-center gap-3">
@@ -544,43 +544,63 @@ function handleEditorKeydown(e: KeyboardEvent) {
                     {{ hook.security.blocked_reason }}
                   </p>
                 </div>
-                <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button class="hook-action-btn" title="Open in editor" @click="openInExternalEditor(hook.path)">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                  </button>
-                  <button class="hook-action-btn" title="Reveal in Finder" @click="revealInFinder(hook.path)">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                    </svg>
-                  </button>
-                  <button class="hook-action-btn" title="Copy path" @click="copyPath(hook.path)">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                  </button>
-                  <button
-                    class="hook-action-btn"
-                    :class="hook.security.executable ? 'text-success' : ''"
-                    :title="hook.security.executable ? 'Disable hook' : 'Enable hook'"
-                    @click="toggleExecutable(hook)"
-                  >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path v-if="hook.security.executable" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                      <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                  <button class="hook-action-btn" title="Edit in Grove" @click="openForEdit(hook)">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
-                  <button class="hook-action-btn hover:!text-danger hover:!bg-danger/10" title="Delete" @click="requestDelete(hook)">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
+                <div class="flex-shrink-0">
+                  <Dropdown align="right">
+                    <template #trigger>
+                      <button class="w-7 h-7 rounded-lg text-white flex items-center justify-center transition-colors" style="background-color: #334155" title="Actions">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                        </svg>
+                      </button>
+                    </template>
+
+                    <template #default="{ close }">
+                      <DropdownItem @click="() => { openForEdit(hook); close() }">
+                        <svg class="w-4 h-4 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        Edit in Grove
+                      </DropdownItem>
+                      <DropdownItem @click="() => { openInExternalEditor(hook.path); close() }">
+                        <svg class="w-4 h-4 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                        Open in Editor
+                      </DropdownItem>
+                      <DropdownItem @click="() => { revealInFinder(hook.path); close() }">
+                        <svg class="w-4 h-4 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                        </svg>
+                        Reveal in Finder
+                      </DropdownItem>
+                      <DropdownItem @click="() => { copyPath(hook.path); close() }">
+                        <svg class="w-4 h-4 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        Copy Path
+                      </DropdownItem>
+
+                      <div class="my-1 border-t border-border-subtle" />
+
+                      <DropdownItem @click="() => { toggleExecutable(hook); close() }">
+                        <svg class="w-4 h-4" :class="hook.security.executable ? 'text-success' : 'text-text-muted'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path v-if="hook.security.executable" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                          <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        {{ hook.security.executable ? 'Disable Hook' : 'Enable Hook' }}
+                      </DropdownItem>
+
+                      <div class="my-1 border-t border-border-subtle" />
+
+                      <DropdownItem danger @click="() => { requestDelete(hook); close() }">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Delete Hook
+                      </DropdownItem>
+                    </template>
+                  </Dropdown>
                 </div>
               </div>
             </div>
@@ -626,8 +646,9 @@ function handleEditorKeydown(e: KeyboardEvent) {
 .create-form-card {
   padding: 1.25rem;
   border-radius: 0.75rem;
-  background: linear-gradient(135deg, rgba(39, 39, 42, 0.6) 0%, rgba(24, 24, 27, 0.8) 100%);
+  background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.03);
 }
 
 .form-select {
@@ -650,11 +671,14 @@ function handleEditorKeydown(e: KeyboardEvent) {
   border-radius: 0.75rem;
   overflow: hidden;
   transition: all 0.2s;
-  background: linear-gradient(135deg, rgba(39, 39, 42, 0.4) 0%, rgba(24, 24, 27, 0.6) 100%);
+  background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.03);
 }
 .event-card:hover {
+  background: rgba(255, 255, 255, 0.04);
   border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
 }
 
 .event-header {
@@ -697,7 +721,7 @@ function handleEditorKeydown(e: KeyboardEvent) {
   transition: background-color 0.15s;
 }
 .hook-item:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .hook-action-btn {

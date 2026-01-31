@@ -29,7 +29,6 @@ const { toast } = useToast()
 
 const branch = ref('')
 const baseBranch = ref(settingsStore.settings.defaultBaseBranch)
-const template = ref('')
 const isSubmitting = ref(false)
 const error = ref<string | null>(null)
 
@@ -57,7 +56,6 @@ watch(() => props.isOpen, async (open) => {
     branch.value = ''
     baseBranch.value = settingsStore.settings.defaultBaseBranch
     branchFilter.value = settingsStore.settings.defaultBaseBranch
-    template.value = ''
     error.value = null
     showBranchDropdown.value = false
     dropdownHovered.value = false
@@ -126,7 +124,6 @@ async function handleSubmit() {
       repo: selectedRepoName.value,
       branch: branch.value.trim(),
       base: baseBranch.value || undefined,
-      template: template.value || undefined,
     })
 
     if (success) {
@@ -245,15 +242,6 @@ function handleClose() {
           </div>
         </Transition>
       </div>
-
-      <!-- Template (optional) -->
-      <Input
-        v-model="template"
-        label="Template"
-        labelHint="optional"
-        placeholder="laravel, backend, frontend..."
-        :disabled="isSubmitting"
-      />
 
       <!-- Error message -->
       <Transition

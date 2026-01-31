@@ -47,12 +47,12 @@ withDefaults(defineProps<Props>(), {
   inset: 0;
   background: linear-gradient(
     90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.06) 50%,
-    transparent 100%
+    transparent 25%,
+    rgba(255, 255, 255, 0.03) 50%,
+    transparent 75%
   );
-  background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
+  background-size: 300% 100%;
+  animation: shimmer 2.5s ease-in-out infinite;
 }
 
 @keyframes shimmer {

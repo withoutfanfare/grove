@@ -45,34 +45,33 @@ const baseClasses = `
 const variantClasses = {
   primary: `
     bg-accent text-white
-    hover:bg-accent-hover hover:shadow-glow
+    hover:bg-accent-hover shadow-sm
     focus-visible:ring-accent
     active:scale-[0.98]
+    border border-transparent
   `,
   secondary: `
-    bg-surface-overlay text-text-primary
-    border border-border-default
-    hover:bg-surface-elevated hover:border-border-strong
+    bg-white/5 text-text-primary
+    border border-white/10
+    hover:bg-white/10 hover:border-white/20
     focus-visible:ring-accent
     active:scale-[0.98]
   `,
   ghost: `
     bg-transparent text-text-secondary
-    hover:bg-surface-overlay hover:text-text-primary
+    hover:bg-white/5 hover:text-text-primary
     focus-visible:ring-accent
     active:scale-[0.98]
   `,
   danger: `
-    bg-danger-muted text-danger border border-danger/30
-    hover:bg-danger hover:text-white hover:border-danger
-    hover:shadow-glow-danger
+    bg-danger/10 text-danger border border-danger/20
+    hover:bg-danger/20 hover:border-danger/30
     focus-visible:ring-danger
     active:scale-[0.98]
   `,
   success: `
-    bg-success-muted text-success border border-success/30
-    hover:bg-success hover:text-white hover:border-success
-    hover:shadow-glow-success
+    bg-success/10 text-success border border-success/20
+    hover:bg-success/20 hover:border-success/30
     focus-visible:ring-success
     active:scale-[0.98]
   `,
@@ -86,47 +85,26 @@ const sizeClasses = {
 </script>
 
 <template>
-  <button
-    :class="[
-      baseClasses,
-      variantClasses[variant],
-      sizeClasses[size],
-      fullWidth ? 'w-full' : '',
-      loading ? 'cursor-wait' : '',
-    ]"
-    :disabled="disabled || loading"
-    @click="handleClick"
-  >
+  <button :class="[
+    baseClasses,
+    variantClasses[variant],
+    sizeClasses[size],
+    fullWidth ? 'w-full' : '',
+    loading ? 'cursor-wait' : '',
+  ]" :disabled="disabled || loading" @click="handleClick">
     <!-- Loading spinner -->
-    <svg
-      v-if="loading"
-      class="w-4 h-4 animate-spin"
-      viewBox="0 0 24 24"
-      fill="none"
-    >
-      <circle
-        class="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        stroke-width="3"
-      />
-      <path
-        class="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-      />
+    <svg v-if="loading" class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
+      <path class="opacity-75" fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
     </svg>
 
     <!-- Content -->
     <slot v-if="!loading" />
 
     <!-- Keyboard shortcut badge -->
-    <kbd
-      v-if="shortcut && !loading"
-      class="ml-1 px-1.5 py-0.5 text-2xs font-mono bg-surface-base/50 rounded border border-border-subtle"
-    >
+    <kbd v-if="shortcut && !loading"
+      class="ml-1 px-1.5 py-0.5 text-2xs font-mono bg-surface-base/50 rounded border border-border-subtle">
       {{ shortcut }}
     </kbd>
   </button>

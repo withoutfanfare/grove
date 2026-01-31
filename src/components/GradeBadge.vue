@@ -60,7 +60,7 @@ const scoreLabel = computed(() => {
     <!-- Score (smaller, muted) -->
     <span
       v-if="scoreLabel"
-      class="text-[10px] opacity-70 font-normal tabular-nums"
+      class="text-2xs opacity-70 font-normal tabular-nums"
     >
       {{ scoreLabel }}
     </span>

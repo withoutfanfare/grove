@@ -600,13 +600,14 @@ function handleEditorKeydown(e: KeyboardEvent) {
   padding: 1.25rem;
   border-radius: 0.75rem;
   transition: all 0.2s;
-  background: linear-gradient(135deg, rgba(39, 39, 42, 0.6) 0%, rgba(24, 24, 27, 0.8) 100%);
+  background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.03);
 }
 .config-card:hover {
+  background: rgba(255, 255, 255, 0.04);
   border-color: rgba(255, 255, 255, 0.1);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
 }
 .config-card-header {
   display: flex;
@@ -661,13 +662,14 @@ function handleEditorKeydown(e: KeyboardEvent) {
   padding: 1rem;
   border-radius: 0.75rem;
   transition: all 0.2s;
-  background: linear-gradient(135deg, rgba(39, 39, 42, 0.4) 0%, rgba(24, 24, 27, 0.6) 100%);
+  background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.03);
 }
 .file-card:hover {
-  border-color: rgba(99, 102, 241, 0.3);
-  background: linear-gradient(135deg, rgba(39, 39, 42, 0.6) 0%, rgba(24, 24, 27, 0.8) 100%);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(99, 102, 241, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
 }
 .file-icon {
   width: 2rem;
@@ -680,8 +682,8 @@ function handleEditorKeydown(e: KeyboardEvent) {
   color: var(--color-text-muted);
 }
 .file-card:hover .file-icon {
-  background: rgba(99, 102, 241, 0.1);
-  color: var(--color-accent);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text-secondary);
 }
 
 .file-action-btn {
