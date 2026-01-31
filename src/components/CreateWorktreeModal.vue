@@ -8,7 +8,8 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useWorktreeStore, useSettingsStore } from '../stores'
-import { useWorktrees, useToast } from '../composables'
+import type { ConfigLayer } from '../types'
+import { useWorktrees, useWt, useToast } from '../composables'
 import { Modal, Button, Input } from './ui'
 import type { Branch } from '../types'
 
@@ -25,6 +26,7 @@ const store = useWorktreeStore()
 const settingsStore = useSettingsStore()
 const { selectedRepoName } = storeToRefs(store)
 const { createWorktree, listBranches } = useWorktrees()
+const { readConfigFile } = useWt()
 const { toast } = useToast()
 
 const branch = ref('')
@@ -54,8 +56,23 @@ const filteredBranches = computed(() => {
 watch(() => props.isOpen, async (open) => {
   if (open) {
     branch.value = ''
-    baseBranch.value = settingsStore.settings.defaultBaseBranch
-    branchFilter.value = settingsStore.settings.defaultBaseBranch
+
+    // Use repo-specific default_base_branch if available, otherwise fall back to global setting
+    let defaultBase = settingsStore.settings.defaultBaseBranch
+    if (selectedRepoName.value) {
+      try {
+        const repoConfig = await readConfigFile('repo' as ConfigLayer, selectedRepoName.value)
+        const entry = repoConfig.entries.find(e => e.key === 'DEFAULT_BASE_BRANCH' && !e.commented)
+        if (entry?.value) {
+          defaultBase = entry.value
+        }
+      } catch (_) {
+        // Repo may not have a config file — fall back to global setting
+      }
+    }
+
+    baseBranch.value = defaultBase
+    branchFilter.value = defaultBase
     error.value = null
     showBranchDropdown.value = false
     dropdownHovered.value = false
@@ -195,7 +212,7 @@ function handleClose() {
         <input
           v-model="branchFilter"
           type="text"
-          :placeholder="settingsStore.settings.defaultBaseBranch"
+          :placeholder="baseBranch || settingsStore.settings.defaultBaseBranch"
           class="w-full px-3 py-2.5 bg-surface-overlay border border-border-default rounded-lg text-text-primary placeholder-text-muted text-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
           :disabled="isSubmitting"
           @focus="handleBranchInputFocus"
