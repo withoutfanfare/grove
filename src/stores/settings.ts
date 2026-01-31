@@ -40,7 +40,7 @@ export interface Settings {
 
 const STORAGE_KEY = 'wt-app-settings';
 
-const DEFAULT_SETTINGS: Settings = {
+export const DEFAULT_SETTINGS: Settings = {
   editor: 'vscode',
   customEditorPath: '',
   terminal: 'terminal',

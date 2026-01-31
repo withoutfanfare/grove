@@ -9,7 +9,11 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "prepare-sidecar": "./scripts/prepare-sidecar.sh",
-    "tauri:build": "npm run prepare-sidecar && npm run tauri build"
+    "tauri:build": "npm run prepare-sidecar && npm run tauri build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",
@@ -24,12 +28,17 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
+    "@testing-library/vue": "^8.1.0",
     "@vitejs/plugin-vue": "^6.0.3",
+    "@vitest/coverage-v8": "^4.0.18",
+    "@vue/test-utils": "^2.4.6",
     "autoprefixer": "^10.4.24",
+    "happy-dom": "^20.4.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
+    "vitest": "^4.0.18",
     "vue-tsc": "^3.2.4"
   }
 }

@@ -188,14 +188,15 @@ pub fn get_watched_repos() -> Vec<String> {
 /// Determine the type of change from the affected paths.
 fn determine_change_type(paths: &[String]) -> String {
     for path in paths {
+        // Check for FETCH_HEAD before HEAD since FETCH_HEAD contains "HEAD"
+        if path.contains("FETCH_HEAD") {
+            return "fetch".to_string();
+        }
         if path.contains("HEAD") {
             return "head".to_string();
         }
         if path.contains("index") {
             return "index".to_string();
-        }
-        if path.contains("FETCH_HEAD") {
-            return "fetch".to_string();
         }
         if path.contains("refs/heads") {
             return "refs".to_string();

@@ -418,8 +418,15 @@ fn execute_wt(app: &tauri::AppHandle, args: &[&str]) -> WtResult<String> {
     })?;
 
     // Execute with timeout to prevent indefinite hangs
-    let output = tauri::async_runtime::block_on(async {
-        tokio::time::timeout(SIDECAR_TIMEOUT, sidecar.args(args).output()).await
+    // Use a scoped thread to avoid "Cannot start a runtime from within a runtime"
+    // panics when called from spawn_blocking (which retains tokio runtime context)
+    let rt_handle = tauri::async_runtime::handle();
+    let output = std::thread::scope(|s| {
+        s.spawn(|| {
+            rt_handle.block_on(async {
+                tokio::time::timeout(SIDECAR_TIMEOUT, sidecar.args(args).output()).await
+            })
+        }).join().expect("sidecar thread panicked")
     })
     .map_err(|_| WtError::new("TIMEOUT", "Command timed out after 5 minutes"))?
     .map_err(|e| {
@@ -509,8 +516,15 @@ fn execute_wt_json_result<T: serde::de::DeserializeOwned>(
     })?;
 
     // Execute with timeout to prevent indefinite hangs
-    let output = tauri::async_runtime::block_on(async {
-        tokio::time::timeout(SIDECAR_TIMEOUT, sidecar.args(args).output()).await
+    // Use a scoped thread to avoid "Cannot start a runtime from within a runtime"
+    // panics when called from spawn_blocking (which retains tokio runtime context)
+    let rt_handle = tauri::async_runtime::handle();
+    let output = std::thread::scope(|s| {
+        s.spawn(|| {
+            rt_handle.block_on(async {
+                tokio::time::timeout(SIDECAR_TIMEOUT, sidecar.args(args).output()).await
+            })
+        }).join().expect("sidecar thread panicked")
     })
     .map_err(|_| WtError::new("TIMEOUT", "Command timed out after 5 minutes"))?
     .map_err(|e| {
@@ -622,7 +636,12 @@ pub fn is_wt_available(app: &tauri::AppHandle) -> bool {
         Err(_) => return false,
     };
 
-    tauri::async_runtime::block_on(async { sidecar.args(["--version"]).output().await })
+    let rt_handle = tauri::async_runtime::handle();
+    std::thread::scope(|s| {
+        s.spawn(|| {
+            rt_handle.block_on(async { sidecar.args(["--version"]).output().await })
+        }).join().expect("sidecar thread panicked")
+    })
         .map(|output| output.status.code().map(|c| c == 0).unwrap_or(false))
         .unwrap_or(false)
 }
