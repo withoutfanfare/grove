@@ -100,19 +100,12 @@ defineExpose({
 
     <!-- Dropdown menu (teleported to body to escape overflow clipping) -->
     <Teleport to="body">
-      <Transition
-        enter-active-class="transition ease-out duration-100"
-        enter-from-class="opacity-0 scale-95"
-        enter-to-class="opacity-100 scale-100"
-        leave-active-class="transition ease-in duration-75"
-        leave-from-class="opacity-100 scale-100"
-        leave-to-class="opacity-0 scale-95"
-      >
+      <Transition name="dropdown">
         <div
           v-if="isOpen"
           ref="dropdownRef"
-          :style="menuStyle"
-          class="z-[9999] py-1 min-w-[160px] bg-surface-raised border border-border-subtle rounded-lg shadow-elevated"
+          :style="{ ...menuStyle, transformOrigin: align === 'right' ? 'top right' : 'top left' }"
+          class="z-[var(--z-dropdown)] py-1 min-w-[160px] bg-surface-raised border border-border-subtle rounded-lg shadow-elevated"
         >
           <slot :close="close" />
         </div>
@@ -120,3 +113,21 @@ defineExpose({
     </Teleport>
   </div>
 </template>
+
+<style scoped>
+.dropdown-enter-active {
+  transition: opacity var(--duration-normal) var(--ease-spring),
+    transform var(--duration-normal) var(--ease-spring);
+}
+
+.dropdown-leave-active {
+  transition: opacity var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: scale(0.95);
+}
+</style>

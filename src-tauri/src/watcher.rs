@@ -81,10 +81,13 @@ pub fn start_watching(
         move |res: Result<Vec<notify_debouncer_mini::DebouncedEvent>, notify::Error>| {
             match res {
                 Ok(events) => {
+                    // H9: Cap event paths to prevent unbounded memory use on rapid changes
+                    const MAX_EVENT_PATHS: usize = 500;
                     let paths: Vec<String> = events
                         .iter()
                         .filter(|e| e.kind == DebouncedEventKind::Any)
                         .filter_map(|e| e.path.to_str().map(String::from))
+                        .take(MAX_EVENT_PATHS)
                         .collect();
 
                     if !paths.is_empty() {
@@ -144,8 +147,9 @@ pub fn start_watching(
         repo_name: repo_name.to_string(),
     };
 
-    if let Ok(mut watchers) = WATCHERS.lock() {
-        watchers.insert(repo_name.to_string(), handle);
+    match WATCHERS.lock() {
+        Ok(mut watchers) => { watchers.insert(repo_name.to_string(), handle); }
+        Err(e) => { e.into_inner().insert(repo_name.to_string(), handle); }
     }
 
     Ok(())
@@ -153,28 +157,27 @@ pub fn start_watching(
 
 /// Stop watching a repository.
 pub fn stop_watching(repo_name: &str) -> Result<(), WtError> {
-    if let Ok(mut watchers) = WATCHERS.lock() {
-        watchers.remove(repo_name);
+    match WATCHERS.lock() {
+        Ok(mut watchers) => { watchers.remove(repo_name); }
+        Err(e) => { e.into_inner().remove(repo_name); }
     }
     Ok(())
 }
 
 /// Check if a repository is currently being watched.
 pub fn is_watching(repo_name: &str) -> bool {
-    if let Ok(watchers) = WATCHERS.lock() {
-        watchers.contains_key(repo_name)
-    } else {
-        false
+    match WATCHERS.lock() {
+        Ok(watchers) => watchers.contains_key(repo_name),
+        Err(e) => e.into_inner().contains_key(repo_name),
     }
 }
 
 /// Get the list of currently watched repositories.
 #[allow(dead_code)]
 pub fn get_watched_repos() -> Vec<String> {
-    if let Ok(watchers) = WATCHERS.lock() {
-        watchers.keys().cloned().collect()
-    } else {
-        vec![]
+    match WATCHERS.lock() {
+        Ok(watchers) => watchers.keys().cloned().collect(),
+        Err(e) => e.into_inner().keys().cloned().collect(),
     }
 }
 

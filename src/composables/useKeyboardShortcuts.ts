@@ -100,6 +100,7 @@ export interface KeyboardShortcutHandlers {
   onCopyUrl?: () => void
   onCopyCdCommand?: () => void
   onOpenAll?: () => void
+  onCommandPalette?: () => void
 }
 
 /**
@@ -348,6 +349,14 @@ export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers = {}) {
     // Register quick select shortcuts
     quickSelectShortcuts.forEach((shortcut) => {
       registerShortcut(shortcut)
+    })
+
+    // Command palette (Cmd+K)
+    registerShortcut({
+      key: 'k',
+      description: 'Open command palette',
+      action: () => handlers.onCommandPalette?.(),
+      requiresModifier: true,
     })
 
     // L12: Register search shortcut (/ key)

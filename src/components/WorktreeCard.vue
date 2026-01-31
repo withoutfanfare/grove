@@ -244,13 +244,14 @@ async function handleOpenAll() {
 </script>
 
 <template>
-  <div class="card card-interactive group relative transition-all duration-300" :class="{
+  <div class="card card-interactive group relative" :class="{
     'opacity-75': isBusy,
     'ring-2 ring-accent ring-offset-2 ring-offset-surface-primary': focused,
     'card-expanded': isDetailsExpanded
   }">
     <!-- Main content row (click to toggle details) -->
-    <div class="p-4 flex items-center gap-4 cursor-pointer" @click="toggleDetails">
+    <div class="p-4 flex items-center gap-4 cursor-pointer" role="button" tabindex="0"
+      @click="toggleDetails" @keydown.enter.prevent="toggleDetails" @keydown.space.prevent="toggleDetails">
       <!-- Left: Branch info -->
       <div class="flex-1 min-w-0">
         <!-- Branch name and metadata -->
@@ -292,7 +293,7 @@ async function handleOpenAll() {
       <div class="flex-shrink-0" @click.stop>
         <Dropdown align="right">
           <template #trigger>
-            <button class="w-8 h-8 rounded-lg text-white flex items-center justify-center transition-colors" style="background-color: #334155" title="Actions">
+            <button class="w-8 h-8 rounded-lg text-text-secondary bg-surface-overlay hover:bg-surface-raised flex items-center justify-center transition-colors" aria-label="Worktree actions" title="Actions">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />

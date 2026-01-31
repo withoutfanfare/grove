@@ -1,4 +1,4 @@
-import { ref, readonly } from 'vue';
+import { ref, readonly, onUnmounted, getCurrentInstance } from 'vue';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { WorktreeChangedEvent } from '../types';
 import { useWt } from './useWt';
@@ -136,6 +136,15 @@ export function useWorktreeWatcher() {
     } catch {
       return false;
     }
+  }
+
+  // C1: Auto-unregister callbacks and stop watching on component unmount
+  if (getCurrentInstance()) {
+    onUnmounted(() => {
+      // Clear all callbacks registered by this component instance
+      changeCallbacks.length = 0;
+      stopWatching();
+    });
   }
 
   return {

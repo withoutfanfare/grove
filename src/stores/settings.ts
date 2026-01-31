@@ -46,7 +46,7 @@ const DEFAULT_SETTINGS: Settings = {
   terminal: 'terminal',
   gitClient: 'none',
   customGitClientPath: '',
-  defaultBaseBranch: 'origin/staging',
+  defaultBaseBranch: 'origin/main',
   enableNotifications: true,
 };
 

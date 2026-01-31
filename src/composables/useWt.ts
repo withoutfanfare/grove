@@ -20,6 +20,9 @@ import type {
   UnlockResult,
   LogResult,
   ChangesResult,
+  ConfigLayer,
+  ConfigFileContents,
+  ConfigKeyUpdate,
 } from '../types';
 import { isWtError } from '../types';
 
@@ -369,6 +372,20 @@ export function useWt() {
   }
 
   /**
+   * Read a config file by layer
+   */
+  async function readConfigFile(layer: ConfigLayer, repoName?: string): Promise<ConfigFileContents> {
+    return await invoke<ConfigFileContents>('read_config_file', { layer, repoName: repoName ?? null });
+  }
+
+  /**
+   * Update specific config keys in a layer
+   */
+  async function updateConfigKeys(layer: ConfigLayer, updates: ConfigKeyUpdate[], repoName?: string): Promise<ConfigFileContents> {
+    return await invoke<ConfigFileContents>('update_config_keys', { layer, updates, repoName: repoName ?? null });
+  }
+
+  /**
    * Generate a markdown health report for a repository
    */
   async function generateReport(repoName: string): Promise<string> {
@@ -445,6 +462,8 @@ export function useWt() {
     repairRepository,
     unlockRepository,
     openConfig,
+    readConfigFile,
+    updateConfigKeys,
     generateReport,
     saveReportToDesktop,
     deriveRepoName,

@@ -1,20 +1,20 @@
 <script setup lang="ts">
 /**
- * RepoManagementModal Component
+ * RepoManagementPanel Component
  *
- * Modal for managing repository configuration and lifecycle hooks.
+ * Sliding panel for managing repository configuration and lifecycle hooks.
  * Provides tabbed interface for Config and Hooks panels.
  */
 import { ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRepoConfigStore, useHooksStore, useWorktreeStore } from '../stores'
-import { Modal, Button } from './ui'
+import { Panel, Button } from './ui'
 import ConfigPanel from './repo/ConfigPanel.vue'
 import HooksPanel from './repo/HooksPanel.vue'
 
 const props = withDefaults(defineProps<{
   isOpen: boolean
-  /** Initial tab to show when modal opens */
+  /** Initial tab to show when panel opens */
   initialTab?: 'config' | 'hooks'
 }>(), {
   initialTab: 'config'
@@ -40,7 +40,7 @@ const tabs: { id: TabId; label: string; icon: string }[] = [
   { id: 'hooks', label: 'Hooks', icon: 'code' },
 ]
 
-// Load data when modal opens and set initial tab
+// Load data when panel opens and set initial tab
 watch(() => props.isOpen, async (open) => {
   if (open) {
     activeTab.value = props.initialTab
@@ -79,7 +79,7 @@ function handleRefresh() {
 </script>
 
 <template>
-  <Modal
+  <Panel
     :open="isOpen"
     title="Repository Management"
     size="xl"
@@ -111,7 +111,7 @@ function handleRefresh() {
             <!-- Config Icon -->
             <svg v-if="tab.icon === 'cog'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.11 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
@@ -192,5 +192,5 @@ function handleRefresh() {
         </Button>
       </div>
     </template>
-  </Modal>
+  </Panel>
 </template>

@@ -31,21 +31,23 @@ onMounted(async () => {
     }
     
     // Set up tray event listener
-    unlistenTray = await listen<TrayWorktreeSelectedEvent>(
-      'tray_worktree_selected',
-      (event) => {
-        const { repo, branch } = event.payload;
-        // Navigate to the selected repository and focus the worktree
-        store.selectRepository(repo);
-        // Set focus after a delay to allow worktrees to load
-        setTimeout(() => {
-          store.focusWorktree(branch);
-        }, 500);
-      }
-    );
+    try {
+      unlistenTray = await listen<TrayWorktreeSelectedEvent>(
+        'tray_worktree_selected',
+        (event) => {
+          const { repo, branch } = event.payload;
+          store.selectRepository(repo);
+          setTimeout(() => {
+            store.focusWorktree(branch);
+          }, 500);
+        }
+      );
+    } catch (e) {
+      console.error('[App] Failed to set up tray event listener:', e);
+    }
   } finally {
     // Minimum display time for loading screen (for smooth UX)
-    await new Promise(resolve => setTimeout(resolve, 1200));
+    await new Promise(resolve => setTimeout(resolve, 800));
     isInitialising.value = false;
   }
 });

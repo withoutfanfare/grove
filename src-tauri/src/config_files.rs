@@ -136,6 +136,9 @@ const SENSITIVE_KEYS: &[&str] = &[
     "PRIVATE_KEY",
 ];
 
+/// Maximum number of backup files to retain per config file.
+const MAX_BACKUP_FILES: usize = 5;
+
 fn is_sensitive_key(key: &str) -> bool {
     let upper = key.to_uppercase();
     SENSITIVE_KEYS.iter().any(|s| upper.contains(s))
@@ -398,7 +401,40 @@ pub fn write_config_file(
     // Write with restrictive permissions (0600) and backup
     write_text_file_atomic(&path, content, 0o600, true)?;
 
+    // Clean up old backup files (keep only MAX_BACKUP_FILES most recent)
+    cleanup_old_backups(&path);
+
     Ok(())
+}
+
+/// Remove old backup files, keeping only the most recent MAX_BACKUP_FILES.
+fn cleanup_old_backups(path: &std::path::Path) {
+    let Some(parent) = path.parent() else { return };
+    let Some(stem) = path.file_name().and_then(|n| n.to_str()) else { return };
+
+    let mut backups: Vec<_> = std::fs::read_dir(parent)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|e| {
+            e.file_name()
+                .to_str()
+                .map(|n| n.starts_with(stem) && n.contains(".bak"))
+                .unwrap_or(false)
+        })
+        .collect();
+
+    if backups.len() <= MAX_BACKUP_FILES {
+        return;
+    }
+
+    // Sort by modified time (oldest first)
+    backups.sort_by_key(|e| e.metadata().and_then(|m| m.modified()).unwrap_or(std::time::SystemTime::UNIX_EPOCH));
+
+    // Remove oldest backups
+    for entry in &backups[..backups.len() - MAX_BACKUP_FILES] {
+        let _ = std::fs::remove_file(entry.path());
+    }
 }
 
 /// Update specific keys in a config file while preserving formatting.

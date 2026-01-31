@@ -30,4 +30,19 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vue: ["vue", "pinia"],
+          tauri: ["@tauri-apps/api", "@tauri-apps/plugin-shell", "@tauri-apps/plugin-clipboard-manager", "@tauri-apps/plugin-opener"],
+        },
+      },
+    },
+  },
+
+  esbuild: {
+    drop: process.env.TAURI_ENV_DEBUG ? [] : ["console", "debugger"],
+  },
 }));

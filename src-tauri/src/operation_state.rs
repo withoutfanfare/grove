@@ -11,11 +11,33 @@ use crate::types::{
     OperationState, OperationStatus, ResumableOperationSummary, WtError, WtResult,
 };
 
+/// H11: Maximum number of cached operation states before eviction.
+const MAX_CACHE_ENTRIES: usize = 50;
+
 lazy_static::lazy_static! {
     /// Cache of operation states currently being tracked.
     /// Key is the operation ID, value is the state.
     static ref STATE_CACHE: Mutex<std::collections::HashMap<String, OperationState>> =
         Mutex::new(std::collections::HashMap::new());
+}
+
+/// H11: Evict oldest completed entries if cache exceeds MAX_CACHE_ENTRIES.
+fn evict_cache_if_needed(cache: &mut std::collections::HashMap<String, OperationState>) {
+    if cache.len() <= MAX_CACHE_ENTRIES {
+        return;
+    }
+    // Remove completed/failed operations first (keep in-progress ones)
+    let removable: Vec<String> = cache
+        .iter()
+        .filter(|(_, s)| matches!(s.status, OperationStatus::Completed | OperationStatus::Failed))
+        .map(|(k, _)| k.clone())
+        .collect();
+    for key in removable {
+        cache.remove(&key);
+        if cache.len() <= MAX_CACHE_ENTRIES {
+            break;
+        }
+    }
 }
 
 // ============================================================================
@@ -78,9 +100,17 @@ pub fn save_state(state: &OperationState) -> WtResult<()> {
         )
     })?;
 
-    // Update cache
-    if let Ok(mut cache) = STATE_CACHE.lock() {
-        cache.insert(state.id.clone(), state.clone());
+    // Update cache (recover from poisoned mutex)
+    match STATE_CACHE.lock() {
+        Ok(mut cache) => {
+            cache.insert(state.id.clone(), state.clone());
+            evict_cache_if_needed(&mut cache);
+        }
+        Err(e) => {
+            let mut cache = e.into_inner();
+            cache.insert(state.id.clone(), state.clone());
+            evict_cache_if_needed(&mut cache);
+        }
     }
 
     Ok(())
@@ -89,10 +119,12 @@ pub fn save_state(state: &OperationState) -> WtResult<()> {
 /// Load an operation state from disk by ID.
 pub fn load_state(operation_id: &str) -> WtResult<OperationState> {
     // Check cache first
-    if let Ok(cache) = STATE_CACHE.lock() {
-        if let Some(state) = cache.get(operation_id) {
-            return Ok(state.clone());
-        }
+    let cached = match STATE_CACHE.lock() {
+        Ok(cache) => cache.get(operation_id).cloned(),
+        Err(e) => e.into_inner().get(operation_id).cloned(),
+    };
+    if let Some(state) = cached {
+        return Ok(state);
     }
 
     let file_path = get_state_file_path(operation_id)?;
@@ -119,8 +151,9 @@ pub fn load_state(operation_id: &str) -> WtResult<OperationState> {
     })?;
 
     // Update cache
-    if let Ok(mut cache) = STATE_CACHE.lock() {
-        cache.insert(state.id.clone(), state.clone());
+    match STATE_CACHE.lock() {
+        Ok(mut cache) => { cache.insert(state.id.clone(), state.clone()); }
+        Err(e) => { e.into_inner().insert(state.id.clone(), state.clone()); }
     }
 
     Ok(state)
@@ -142,8 +175,9 @@ pub fn delete_state(operation_id: &str) -> WtResult<()> {
     }
 
     // Remove from cache
-    if let Ok(mut cache) = STATE_CACHE.lock() {
-        cache.remove(operation_id);
+    match STATE_CACHE.lock() {
+        Ok(mut cache) => { cache.remove(operation_id); }
+        Err(e) => { e.into_inner().remove(operation_id); }
     }
 
     Ok(())
@@ -281,34 +315,36 @@ pub fn complete_operation(operation_id: &str, delete_on_success: bool) -> WtResu
 /// Called when starting a new operation to track it in memory.
 #[allow(dead_code)]
 pub fn register_state(state: &OperationState) {
-    if let Ok(mut cache) = STATE_CACHE.lock() {
-        cache.insert(state.id.clone(), state.clone());
+    match STATE_CACHE.lock() {
+        Ok(mut cache) => { cache.insert(state.id.clone(), state.clone()); }
+        Err(e) => { e.into_inner().insert(state.id.clone(), state.clone()); }
     }
 }
 
 /// Get a cached state by ID (returns None if not cached).
 #[allow(dead_code)]
 pub fn get_cached_state(operation_id: &str) -> Option<OperationState> {
-    if let Ok(cache) = STATE_CACHE.lock() {
-        cache.get(operation_id).cloned()
-    } else {
-        None
+    match STATE_CACHE.lock() {
+        Ok(cache) => cache.get(operation_id).cloned(),
+        Err(e) => e.into_inner().get(operation_id).cloned(),
     }
 }
 
 /// Update a cached state.
 #[allow(dead_code)]
 pub fn update_cached_state(state: &OperationState) {
-    if let Ok(mut cache) = STATE_CACHE.lock() {
-        cache.insert(state.id.clone(), state.clone());
+    match STATE_CACHE.lock() {
+        Ok(mut cache) => { cache.insert(state.id.clone(), state.clone()); }
+        Err(e) => { e.into_inner().insert(state.id.clone(), state.clone()); }
     }
 }
 
 /// Remove an operation from the cache.
 #[allow(dead_code)]
 pub fn remove_from_cache(operation_id: &str) {
-    if let Ok(mut cache) = STATE_CACHE.lock() {
-        cache.remove(operation_id);
+    match STATE_CACHE.lock() {
+        Ok(mut cache) => { cache.remove(operation_id); }
+        Err(e) => { e.into_inner().remove(operation_id); }
     }
 }
 

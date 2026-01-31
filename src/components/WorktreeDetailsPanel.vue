@@ -162,18 +162,9 @@ const syncExplanation = computed(() => {
 </script>
 
 <template>
-  <div class="overflow-hidden">
-    <!-- Expandable content with animation -->
-    <Transition
-      enter-active-class="transition-all duration-200 ease-out"
-      leave-active-class="transition-all duration-150 ease-in"
-      enter-from-class="opacity-0 max-h-0"
-      enter-to-class="opacity-100 max-h-[1000px]"
-      leave-from-class="opacity-100 max-h-[1000px]"
-      leave-to-class="opacity-0 max-h-0"
-    >
+  <div class="details-grid" :class="{ 'is-expanded': isExpanded }">
+    <div class="details-inner">
       <div
-        v-show="isExpanded"
         class="border-t border-border-subtle bg-surface-base/50"
       >
         <div class="px-4 py-4 space-y-5 relative">
@@ -330,18 +321,51 @@ const syncExplanation = computed(() => {
           </section>
         </div>
       </div>
-    </Transition>
+    </div>
   </div>
 </template>
 
 <style scoped>
+/* CSS Grid expand/collapse - no max-height hack */
+.details-grid {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--duration-panel) var(--ease-spring);
+}
+
+.details-grid.is-expanded {
+  grid-template-rows: 1fr;
+}
+
+.details-inner {
+  overflow: hidden;
+}
+
+/* Fade content in after expansion begins */
+.details-inner > * {
+  opacity: 0;
+  transition: opacity var(--duration-slow) var(--ease-out);
+}
+
+.details-grid.is-expanded .details-inner > * {
+  opacity: 1;
+  transition-delay: 100ms;
+}
+
 /* Respect reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
-  .transition-all,
-  .transition-transform,
-  .transition-opacity,
-  .transition-colors {
+  .details-grid,
+  .details-inner > * {
     transition: none !important;
+    opacity: 1;
+  }
+
+  .details-grid {
+    grid-template-rows: 0fr;
+  }
+
+  .details-grid.is-expanded {
+    grid-template-rows: 1fr;
   }
 }
 </style>

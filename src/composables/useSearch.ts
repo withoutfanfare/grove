@@ -105,10 +105,25 @@ export function useSearch(): UseSearchReturn {
       return { before: text, match: '', after: '', hasMatch: false }
     }
 
+    // Use Array.from to get Unicode-safe character boundaries
+    const chars = Array.from(text)
+    const lowerChars = Array.from(lowerText)
+    
+    // Convert char index from toLowerCase'd string to original char array index
+    let charIndex = 0
+    let byteIndex = 0
+    for (let i = 0; i < lowerChars.length && byteIndex < index; i++) {
+      byteIndex += lowerChars[i].length
+      charIndex++
+    }
+    
+    const searchChars = Array.from(lowerSearch)
+    const matchLength = searchChars.length
+
     return {
-      before: text.slice(0, index),
-      match: text.slice(index, index + searchTerm.length),
-      after: text.slice(index + searchTerm.length),
+      before: chars.slice(0, charIndex).join(''),
+      match: chars.slice(charIndex, charIndex + matchLength).join(''),
+      after: chars.slice(charIndex + matchLength).join(''),
       hasMatch: true,
     }
   }

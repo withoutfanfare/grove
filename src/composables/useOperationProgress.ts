@@ -135,8 +135,9 @@ export function useOperationProgress() {
    */
   async function stopListening(): Promise<void> {
     if (unlisten) {
-      unlisten();
+      const fn = unlisten;
       unlisten = null;
+      await fn();
     }
   }
 

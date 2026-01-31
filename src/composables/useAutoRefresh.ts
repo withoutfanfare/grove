@@ -252,6 +252,8 @@ export function useAutoRefresh(): UseAutoRefreshReturn {
     isIntervalActive.value = true;
 
     // Schedule with current interval (15s active, 60s idle)
+    // Capture current interval to avoid stale closure
+    const interval = currentInterval.value;
     intervalTimeout = setTimeout(async () => {
       intervalTimeout = null;
 
@@ -264,7 +266,7 @@ export function useAutoRefresh(): UseAutoRefreshReturn {
       } else {
         isIntervalActive.value = false;
       }
-    }, currentInterval.value);
+    }, interval);
   }
 
   /**
