@@ -36,7 +36,7 @@ const hasAnyBadge = computed(() => showMerged.value || showStale.value || showMi
     <!-- MERGED badge - green tag -->
     <span
       v-if="showMerged"
-      class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide rounded bg-success-muted text-success ring-1 ring-inset ring-success/20 transition-colors duration-150"
+      class="inline-flex items-center gap-1 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide rounded bg-success-muted text-success ring-1 ring-inset ring-success/20 transition-colors duration-150"
       title="This branch has been merged into the base branch and can be safely removed"
       role="status"
       aria-label="Branch merged into base"
@@ -62,7 +62,7 @@ const hasAnyBadge = computed(() => showMerged.value || showStale.value || showMi
     <!-- STALE badge - orange with clock -->
     <span
       v-if="showStale"
-      class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide rounded bg-warning-muted text-warning ring-1 ring-inset ring-warning/20 transition-colors duration-150"
+      class="inline-flex items-center gap-1 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide rounded bg-warning-muted text-warning ring-1 ring-inset ring-warning/20 transition-colors duration-150"
       title="This worktree is significantly behind the base branch (>50 commits). Consider syncing or removing it."
       role="status"
       aria-label="Worktree is stale"
@@ -88,7 +88,7 @@ const hasAnyBadge = computed(() => showMerged.value || showStale.value || showMi
     <!-- MISMATCH badge - yellow warning -->
     <span
       v-if="showMismatch"
-      class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide rounded bg-accent-muted text-accent ring-1 ring-inset ring-accent/20 transition-colors duration-150"
+      class="inline-flex items-center gap-1 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide rounded bg-accent-muted text-accent ring-1 ring-inset ring-accent/20 transition-colors duration-150"
       title="The directory name does not match the branch name. This may cause confusion when navigating between worktrees."
       role="status"
       aria-label="Directory name mismatch"

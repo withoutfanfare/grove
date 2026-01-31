@@ -20,9 +20,7 @@ const props = defineProps<{
   isExpanded: boolean
 }>()
 
-const emit = defineEmits<{
-  toggle: []
-}>()
+// No emits needed - toggle is handled by parent card click
 
 const { getRecentCommits, getUncommittedFiles } = useWt()
 const { toast } = useToast()
@@ -165,46 +163,6 @@ const syncExplanation = computed(() => {
 
 <template>
   <div class="overflow-hidden">
-    <!-- Toggle button row -->
-    <button
-      class="w-full flex items-center justify-between px-4 py-2 text-xs text-text-muted hover:text-text-secondary hover:bg-surface-overlay/30 transition-colors"
-      @click="emit('toggle')"
-    >
-      <span class="flex items-center gap-2">
-        <!-- Chevron icon -->
-        <svg
-          class="w-4 h-4 transition-transform"
-          :class="{ 'rotate-90': isExpanded }"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-        </svg>
-        <span>Details</span>
-        <span v-if="!isExpanded && fileCount > 0" class="text-warning">
-          ({{ fileCount }} uncommitted file{{ fileCount === 1 ? '' : 's' }})
-        </span>
-      </span>
-
-      <!-- Refresh button (when expanded) -->
-      <IconButton
-        v-if="isExpanded"
-        tooltip="Refresh details"
-        size="sm"
-        @click.stop="refreshData"
-      >
-        <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-          />
-        </svg>
-      </IconButton>
-    </button>
-
     <!-- Expandable content with animation -->
     <Transition
       enter-active-class="transition-all duration-200 ease-out"
@@ -218,7 +176,25 @@ const syncExplanation = computed(() => {
         v-show="isExpanded"
         class="border-t border-border-subtle bg-surface-base/50"
       >
-        <div class="px-4 py-4 space-y-5">
+        <div class="px-4 py-4 space-y-5 relative">
+          <!-- Refresh button -->
+          <div class="absolute top-3 right-3">
+            <IconButton
+              tooltip="Refresh details"
+              size="sm"
+              @click="refreshData"
+            >
+              <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+            </IconButton>
+          </div>
+
           <!-- Path and URL section -->
           <section class="space-y-2">
             <h4 class="text-xs font-semibold text-text-muted uppercase tracking-wider">

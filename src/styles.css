@@ -5,28 +5,36 @@
    Inspired by: Linear, Raycast, Arc Browser, Tower
    ============================================================================ */
 
-@theme {
+@theme inline {
   /* -------------------------------------------------------------------------
-     Colour Palette - Refined dark theme with depth
+     Colour Palette - Refined Slate Theme (Cooler, Premium Dark)
      ------------------------------------------------------------------------- */
 
-  /* Surface layers (from deepest to highest elevation) */
-  --color-surface-base: #09090b;
-  --color-surface-raised: #18181b;
-  --color-surface-overlay: #27272a;
-  --color-surface-elevated: #3f3f46;
+  /* Surface layers (Ultra Dark - Black base) */
+  --color-surface-base: #000000;
+  /* Pure Black */
+  --color-surface-raised: #020617;
+  /* Slate 950 */
+  --color-surface-overlay: #0f172a;
+  /* Slate 900 */
+  --color-surface-elevated: #1e293b;
+  /* Slate 800 */
 
   /* Border colours with subtle visibility */
-  --color-border-subtle: rgba(255, 255, 255, 0.06);
-  --color-border-default: rgba(255, 255, 255, 0.1);
-  --color-border-strong: rgba(255, 255, 255, 0.16);
+  --color-border-subtle: rgba(255, 255, 255, 0.08);
+  --color-border-default: rgba(255, 255, 255, 0.12);
+  --color-border-strong: rgba(255, 255, 255, 0.12);
   --color-border-focus: rgba(99, 102, 241, 0.5);
 
-  /* Text hierarchy */
-  --color-text-primary: #fafafa;
-  --color-text-secondary: #a1a1aa;
-  --color-text-tertiary: #71717a;
-  --color-text-muted: #52525b;
+  /* Text hierarchy (Slate scale) */
+  --color-text-primary: #f8fafc;
+  /* slate-50 */
+  --color-text-secondary: #cbd5e1;
+  /* slate-300 */
+  --color-text-tertiary: #94a3b8;
+  /* slate-400 */
+  --color-text-muted: #64748b;
+  /* slate-500 */
 
   /* Accent - refined indigo (Linear-inspired) */
   --color-accent: #6366f1;
@@ -34,7 +42,7 @@
   --color-accent-muted: rgba(99, 102, 241, 0.15);
   --color-accent-strong: rgba(99, 102, 241, 0.25);
 
-  /* Semantic colours (desaturated for sophistication) */
+  /* Semantic colours */
   --color-success: #22c55e;
   --color-success-muted: rgba(34, 197, 94, 0.15);
   --color-success-strong: rgba(34, 197, 94, 0.25);
@@ -58,13 +66,20 @@
   --font-mono: "SF Mono", "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
 
   /* Font sizes with optical sizing */
-  --text-2xs: 0.625rem;   /* 10px */
-  --text-xs: 0.6875rem;   /* 11px */
-  --text-sm: 0.8125rem;   /* 13px */
-  --text-base: 0.875rem;  /* 14px */
-  --text-lg: 1rem;        /* 16px */
-  --text-xl: 1.125rem;    /* 18px */
-  --text-2xl: 1.375rem;   /* 22px */
+  --text-2xs: 0.75rem;
+  /* 12px */
+  --text-xs: 0.8125rem;
+  /* 13px */
+  --text-sm: 0.875rem;
+  /* 14px */
+  --text-base: 0.9375rem;
+  /* 15px */
+  --text-lg: 1.0625rem;
+  /* 17px */
+  --text-xl: 1.1875rem;
+  /* 18px */
+  --text-2xl: 1.375rem;
+  /* 22px */
 
   /* Letter spacing for headings */
   --tracking-tight: -0.02em;
@@ -77,28 +92,40 @@
 
   --spacing-px: 1px;
   --spacing-0: 0;
-  --spacing-0\.5: 0.125rem;  /* 2px */
-  --spacing-1: 0.25rem;      /* 4px */
-  --spacing-1\.5: 0.375rem;  /* 6px */
-  --spacing-2: 0.5rem;       /* 8px */
-  --spacing-2\.5: 0.625rem;  /* 10px */
-  --spacing-3: 0.75rem;      /* 12px */
-  --spacing-4: 1rem;         /* 16px */
-  --spacing-5: 1.25rem;      /* 20px */
-  --spacing-6: 1.5rem;       /* 24px */
-  --spacing-8: 2rem;         /* 32px */
-  --spacing-10: 2.5rem;      /* 40px */
-  --spacing-12: 3rem;        /* 48px */
+  --spacing-0\.5: 0.125rem;
+  /* 2px */
+  --spacing-1: 0.25rem;
+  /* 4px */
+  --spacing-1\.5: 0.375rem;
+  /* 6px */
+  --spacing-2: 0.5rem;
+  /* 8px */
+  --spacing-2\.5: 0.625rem;
+  /* 10px */
+  --spacing-3: 0.75rem;
+  /* 12px */
+  --spacing-4: 1rem;
+  /* 16px */
+  --spacing-5: 1.25rem;
+  /* 20px */
+  --spacing-6: 1.5rem;
+  /* 24px */
+  --spacing-8: 2rem;
+  /* 32px */
+  --spacing-10: 2.5rem;
+  /* 40px */
+  --spacing-12: 3rem;
+  /* 48px */
 
   /* -------------------------------------------------------------------------
      Shadows - Refined depth for premium feel
      ------------------------------------------------------------------------- */
 
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.4), 0 4px 6px rgba(0, 0, 0, 0.3);
-  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.5), 0 10px 10px rgba(0, 0, 0, 0.3);
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5), 0 4px 6px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.6), 0 10px 10px rgba(0, 0, 0, 0.4);
   --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.25);
   --shadow-glow-success: 0 0 20px rgba(34, 197, 94, 0.2);
   --shadow-glow-danger: 0 0 20px rgba(239, 68, 68, 0.2);
@@ -108,22 +135,20 @@
      Border Radius - Consistent rounding
      ------------------------------------------------------------------------- */
 
-  --radius-sm: 0.25rem;   /* 4px */
-  --radius-md: 0.375rem;  /* 6px */
-  --radius-lg: 0.5rem;    /* 8px */
-  --radius-xl: 0.75rem;   /* 12px */
-  --radius-2xl: 1rem;     /* 16px */
+  --radius-sm: 0.25rem;
+  /* 4px */
+  --radius-md: 0.375rem;
+  /* 6px */
+  --radius-lg: 0.5rem;
+  /* 8px */
+  --radius-xl: 0.75rem;
+  /* 12px */
+  --radius-2xl: 1rem;
+  /* 16px */
   --radius-full: 9999px;
 
   /* -------------------------------------------------------------------------
-     Transitions - Smooth, purposeful animations (L11)
-
-     All animation durations are defined as CSS variables for consistency.
-     Components should always use these variables (e.g., var(--duration-modal))
-     rather than hard-coded values. This ensures:
-     - Consistent timing across the application
-     - Easy global adjustments if needed
-     - Proper reduced-motion support (see @media query below)
+     Transitions - Smooth, purposeful animations
      ------------------------------------------------------------------------- */
 
   /* Easing functions */
@@ -132,22 +157,22 @@
   --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-out: cubic-bezier(0.4, 0, 1, 1);
 
-  /* Base durations - use for general transitions */
-  --duration-fast: 100ms;     /* Micro-interactions (hover states, focus rings) */
-  --duration-normal: 150ms;   /* Standard transitions (buttons, inputs) */
-  --duration-slow: 250ms;     /* Enter/leave animations */
-  --duration-slower: 350ms;   /* Complex animations */
+  /* Base durations */
+  --duration-fast: 100ms;
+  --duration-normal: 150ms;
+  --duration-slow: 250ms;
+  --duration-slower: 350ms;
 
-  /* Component-specific durations - use for consistency within component types */
-  --duration-modal: 200ms;    /* Modal enter/leave */
-  --duration-toast: 300ms;    /* Toast notifications */
-  --duration-panel: 300ms;    /* Side panels */
-  --duration-progress: 300ms; /* Progress indicators */
+  /* Component-specific durations */
+  --duration-modal: 200ms;
+  --duration-toast: 300ms;
+  --duration-panel: 300ms;
+  --duration-progress: 300ms;
 
-  /* Animation durations (longer, continuous) */
-  --duration-spin: 1s;        /* Loading spinners */
-  --duration-shimmer: 1.5s;   /* Skeleton loaders */
-  --duration-pulse: 2s;       /* Status indicators */
+  /* Animation durations */
+  --duration-spin: 1s;
+  --duration-shimmer: 1.5s;
+  --duration-pulse: 2s;
 
   /* -------------------------------------------------------------------------
      Z-Index Scale
@@ -189,6 +214,7 @@ body {
 
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {
@@ -288,50 +314,85 @@ button:disabled {
    ============================================================================ */
 
 /* Text utilities */
-.text-primary { color: var(--color-text-primary); }
-.text-secondary { color: var(--color-text-secondary); }
-.text-tertiary { color: var(--color-text-tertiary); }
-.text-muted { color: var(--color-text-muted); }
+.text-primary {
+  color: var(--color-text-primary);
+}
+
+.text-secondary {
+  color: var(--color-text-secondary);
+}
+
+.text-tertiary {
+  color: var(--color-text-tertiary);
+}
+
+.text-muted {
+  color: var(--color-text-muted);
+}
 
 /* Surface utilities */
-.surface-base { background-color: var(--color-surface-base); }
-.surface-raised { background-color: var(--color-surface-raised); }
-.surface-overlay { background-color: var(--color-surface-overlay); }
-.surface-elevated { background-color: var(--color-surface-elevated); }
+.surface-base {
+  background-color: var(--color-surface-base);
+}
+
+.surface-raised {
+  background-color: var(--color-surface-raised);
+}
+
+.surface-overlay {
+  background-color: var(--color-surface-overlay);
+}
+
+.surface-elevated {
+  background-color: var(--color-surface-elevated);
+}
 
 /* Border utilities */
-.border-subtle { border-color: var(--color-border-subtle); }
-.border-default { border-color: var(--color-border-default); }
-.border-strong { border-color: var(--color-border-strong); }
+.border-subtle {
+  border-color: var(--color-border-subtle);
+}
+
+.border-default {
+  border-color: var(--color-border-default);
+}
+
+.border-strong {
+  border-color: var(--color-border-strong);
+}
 
 /* Gradient backgrounds for premium feel */
 .gradient-subtle {
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.03) 0%,
-    rgba(255, 255, 255, 0) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(255, 255, 255, 0.03) 0%,
+      rgba(255, 255, 255, 0) 100%);
 }
 
 .gradient-accent {
-  background: linear-gradient(
-    135deg,
-    var(--color-accent-muted) 0%,
-    transparent 50%
-  );
+  background: linear-gradient(135deg,
+      var(--color-accent-muted) 0%,
+      transparent 50%);
+}
+
+/* Tab with subtle highlight (Linear-style) */
+.gradient-tab {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 /* Glassmorphism for overlays */
 .glass {
-  background: rgba(24, 24, 27, 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(2, 6, 12, 0.85);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .glass-heavy {
-  background: rgba(24, 24, 27, 0.95);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(2, 6, 12, 0.95);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* ============================================================================
@@ -339,34 +400,46 @@ button:disabled {
    ============================================================================ */
 
 @keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes fade-out {
-  from { opacity: 1; }
-  to { opacity: 0; }
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
 }
 
 @keyframes slide-up {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(12px) scale(0.98);
   }
+
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
 @keyframes slide-down {
   from {
     opacity: 0;
-    transform: translateY(-8px);
+    transform: translateY(-12px) scale(0.98);
   }
+
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -375,6 +448,7 @@ button:disabled {
     opacity: 0;
     transform: translateX(100%);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -386,6 +460,7 @@ button:disabled {
     opacity: 1;
     transform: translateX(0);
   }
+
   to {
     opacity: 0;
     transform: translateX(100%);
@@ -397,6 +472,7 @@ button:disabled {
     opacity: 0;
     transform: scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -404,18 +480,47 @@ button:disabled {
 }
 
 @keyframes pulse-subtle {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes border-glow {
+
+  0%,
+  100% {
+    border-color: rgba(99, 102, 241, 0.3);
+  }
+
+  50% {
+    border-color: rgba(99, 102, 241, 0.6);
+  }
 }
 
 /* Animation utilities */
@@ -444,12 +549,10 @@ button:disabled {
 }
 
 .animate-shimmer {
-  background: linear-gradient(
-    90deg,
-    var(--color-surface-raised) 0%,
-    var(--color-surface-overlay) 50%,
-    var(--color-surface-raised) 100%
-  );
+  background: linear-gradient(90deg,
+      var(--color-surface-raised) 0%,
+      var(--color-surface-overlay) 50%,
+      var(--color-surface-raised) 100%);
   background-size: 200% 100%;
   animation: shimmer var(--duration-shimmer) infinite;
 }
@@ -474,11 +577,19 @@ button:disabled {
    ============================================================================ */
 
 /* Card pattern */
+/* Card pattern - Premium Linear/Raycast Style (Flat + Top Light) */
 .card {
-  background-color: var(--color-surface-raised);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-sm);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.03);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s cubic-bezier(0.25, 0.4, 0.55, 1.4);
+}
+
+.card::after {
+  display: none;
 }
 
 .card:hover {
@@ -487,19 +598,31 @@ button:disabled {
 
 /* Interactive card */
 .card-interactive {
-  transition: all var(--duration-normal) var(--ease-smooth);
+  cursor: pointer;
 }
 
 .card-interactive:hover {
-  background-color: var(--color-surface-overlay);
-  box-shadow: var(--shadow-md);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
   transform: translateY(-1px);
+}
+
+.card-interactive.card-expanded {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
 }
 
 /* Panel pattern (sidebars, slide-outs) */
 .panel {
   background-color: var(--color-surface-raised);
   border: 1px solid var(--color-border-subtle);
+}
+
+/* Premium Surface Utility - Subtle Noise or Gradient */
+.surface-premium {
+  background: rgba(255, 255, 255, 0.02);
 }
 
 /* Modal backdrop */

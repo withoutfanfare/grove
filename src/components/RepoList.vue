@@ -169,17 +169,17 @@ function handleOpenRecentBrowser(url: string) {
 async function handleNavigateToRecent(repoName: string, branch: string) {
   // Switch to Repositories tab first
   activeTab.value = 'repos'
-  
+
   // Check if we need to switch repos
   const needsRepoSwitch = selectedRepoName.value !== repoName
-  
+
   if (needsRepoSwitch) {
     // Select the repository and fetch worktrees
     selectRepository(repoName)
     // Wait for worktrees to load before focusing
     await fetchWorktrees()
   }
-  
+
   // Focus the worktree with details expansion flag
   store.focusWorktree(branch, true)
 }
@@ -300,33 +300,26 @@ onMounted(() => {
 </script>
 
 <template>
-  <aside
-    class="bg-surface-raised border-r border-border-subtle flex flex-col h-full"
-    :style="{ width: `${props.width}px` }"
-  >
+  <aside class="bg-surface-raised border-r border-border-subtle flex flex-col h-full"
+    :style="{ width: `${props.width}px` }">
     <!-- Tab header -->
-    <div class="flex-shrink-0 border-b border-border-subtle">
-      <div class="flex">
-        <button
-          v-for="tab in [
-            { id: 'repos' as TabType, label: 'Repositories' },
-            { id: 'recent' as TabType, label: 'Recent' },
-          ]"
-          :key="tab.id"
-          @click="switchTab(tab.id)"
-          :class="[
-            'flex-1 px-4 py-3 text-xs font-medium tracking-wide transition-all duration-150 relative',
-            activeTab === tab.id
-              ? 'text-text-primary'
-              : 'text-text-tertiary hover:text-text-secondary hover:bg-surface-overlay/50'
-          ]"
-        >
+    <div class="flex-shrink-0 border-b border-border-subtle p-3">
+      <div class="flex p-1 bg-surface-overlay/40 rounded-lg relative isolate">
+        <!-- Sliding background pill -->
+        <div class="absolute inset-y-1 transition-all duration-200 ease-out gradient-tab rounded-md" :class="[
+          activeTab === 'repos' ? 'left-1 right-1/2' : 'left-1/2 right-1'
+        ]" />
+
+        <button v-for="tab in [
+          { id: 'repos' as TabType, label: 'Repositories' },
+          { id: 'recent' as TabType, label: 'Recent' },
+        ]" :key="tab.id" @click="switchTab(tab.id)" :class="[
+          'flex-1 px-3 py-1.5 text-xs font-medium tracking-wide transition-colors duration-200 relative z-10 rounded-md',
+          activeTab === tab.id
+            ? 'text-text-primary'
+            : 'text-text-tertiary hover:text-text-secondary'
+        ]">
           {{ tab.label }}
-          <!-- Active indicator -->
-          <span
-            v-if="activeTab === tab.id"
-            class="absolute bottom-0 left-3 right-3 h-0.5 bg-accent rounded-full"
-          />
         </button>
       </div>
 
@@ -344,29 +337,22 @@ onMounted(() => {
         <!-- Action buttons for repos tab -->
         <div v-if="activeTab === 'repos'" class="flex items-center gap-1">
           <!-- Clone button -->
-          <IconButton
-            size="sm"
-            tooltip="Clone Repository"
-            @click="handleClone"
-          >
+          <IconButton size="sm" tooltip="Clone Repository" @click="handleClone">
             <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
           </IconButton>
 
           <!-- Settings dropdown -->
           <Dropdown align="right">
             <template #trigger>
-              <IconButton
-                size="sm"
-                tooltip="Settings"
-              >
+              <IconButton size="sm" tooltip="Settings">
                 <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </IconButton>
             </template>
@@ -375,7 +361,7 @@ onMounted(() => {
               <DropdownItem @click="handleOpenConfig(); close()">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 Open Config
               </DropdownItem>
@@ -387,25 +373,16 @@ onMounted(() => {
       <!-- Repository search input -->
       <!-- M10: Debounce set to 150ms for responsive filtering -->
       <div v-if="activeTab === 'repos' && repositories.length > 0" class="px-2 pb-2">
-        <SearchInput
-          v-model="repoSearchQuery"
-          placeholder="Search repositories..."
-          :debounce-ms="150"
-        />
+        <SearchInput v-model="repoSearchQuery" placeholder="Search repositories..." :debounce-ms="150" />
       </div>
     </div>
 
     <!-- Repositories Tab -->
     <template v-if="activeTab === 'repos'">
       <!-- L4: Loading state with fade transition and skeleton loaders -->
-      <Transition
-        enter-active-class="transition ease-out duration-200"
-        enter-from-class="opacity-0"
-        enter-to-class="opacity-100"
-        leave-active-class="transition ease-in duration-150"
-        leave-from-class="opacity-100"
-        leave-to-class="opacity-0"
-      >
+      <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0"
+        enter-to-class="opacity-100" leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100"
+        leave-to-class="opacity-0">
         <div v-if="loading" class="flex-1 overflow-y-auto py-2 px-2">
           <ul class="space-y-0.5">
             <li v-for="i in 4" :key="i">
@@ -421,7 +398,7 @@ onMounted(() => {
           <div class="w-12 h-12 mx-auto mb-3 rounded-xl bg-surface-overlay flex items-center justify-center">
             <svg class="w-6 h-6 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                    d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
             </svg>
           </div>
           <p class="text-sm text-text-secondary font-medium">No repositories found</p>
@@ -432,30 +409,26 @@ onMounted(() => {
             <p class="text-2xs text-text-muted mb-2">Quick start:</p>
             <code class="text-2xs font-mono text-accent block">wt add &lt;repo&gt; &lt;branch&gt;</code>
           </div>
-          <a
-            href="https://github.com/your-repo/wt#getting-started"
-            target="_blank"
-            class="inline-flex items-center gap-1 text-2xs text-accent hover:text-accent-hover mt-3 transition-colors"
-          >
+          <a href="https://github.com/your-repo/wt#getting-started" target="_blank"
+            class="inline-flex items-center gap-1 text-2xs text-accent hover:text-accent-hover mt-3 transition-colors">
             <span>View documentation</span>
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
           </a>
         </div>
       </div>
 
       <!-- No search results -->
-      <div
-        v-if="!loading && repositories.length > 0 && filteredRepositories.length === 0 && repoSearchQuery.trim()"
-        class="flex-1 flex items-center justify-center p-4"
-      >
+      <div v-if="!loading && repositories.length > 0 && filteredRepositories.length === 0 && repoSearchQuery.trim()"
+        class="flex-1 flex items-center justify-center p-4">
         <!-- L5: Standardised empty state icon size (48px/w-12) for sidebar consistency -->
         <div class="text-center">
           <div class="w-12 h-12 mx-auto mb-3 rounded-xl bg-surface-overlay flex items-center justify-center">
             <svg class="w-6 h-6 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
           <p class="text-sm text-text-secondary">No results for '{{ repoSearchQuery }}'</p>
@@ -463,86 +436,65 @@ onMounted(() => {
       </div>
 
       <!-- Repository list -->
-      <nav v-if="!loading && repositories.length > 0 && (filteredRepositories.length > 0 || !repoSearchQuery.trim())" class="flex-1 overflow-y-auto py-2 px-2">
+      <nav v-if="!loading && repositories.length > 0 && (filteredRepositories.length > 0 || !repoSearchQuery.trim())"
+        class="flex-1 overflow-y-auto py-2 px-2">
         <ul class="space-y-0.5">
           <li v-for="(repo, index) in filteredRepositories" :key="repo.name" class="relative">
-            <button
-              @click="handleSelectRepo(repo.name)"
-              :disabled="loadingRepoName === repo.name"
-              :class="[
-                'group w-full text-left px-3 py-2.5 rounded-lg transition-all duration-150',
-                'flex items-center gap-3',
-                repo.name === selectedRepoName
-                  ? 'bg-accent-muted border border-accent/20'
-                  : index === focusedIndex && repo.name !== selectedRepoName
-                  ? 'bg-surface-overlay/70 border border-border-subtle ring-1 ring-accent/30'
-                  : 'hover:bg-surface-overlay border border-transparent',
-                loadingRepoName === repo.name ? 'cursor-wait' : ''
-              ]"
-            >
+            <button @click="handleSelectRepo(repo.name)" :disabled="loadingRepoName === repo.name" :class="[
+              'group w-full text-left px-3 py-2.5 rounded-lg transition-all duration-150',
+              'flex items-center gap-3',
+              repo.name === selectedRepoName
+                ? 'bg-accent/10 border border-accent/20'
+                : index === focusedIndex && repo.name !== selectedRepoName
+                  ? 'bg-white/5 border border-white/10 ring-1 ring-accent/30'
+                  : 'hover:bg-white/5 border border-transparent',
+              loadingRepoName === repo.name ? 'cursor-wait' : ''
+            ]">
               <!-- Icon/Avatar with loading spinner -->
-              <div
-                :class="[
-                  'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors',
-                  repo.name === selectedRepoName
-                    ? 'bg-accent text-white'
-                    : 'bg-surface-overlay text-text-tertiary group-hover:text-text-secondary'
-                ]"
-              >
+              <div :class="[
+                'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors',
+                repo.name === selectedRepoName
+                  ? 'bg-accent text-white'
+                  : 'bg-surface-overlay text-text-tertiary group-hover:text-text-secondary'
+              ]">
                 <!-- Loading spinner -->
-                <svg
-                  v-if="loadingRepoName === repo.name"
-                  class="w-4 h-4 animate-spin"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
+                <svg v-if="loadingRepoName === repo.name" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
                 <!-- Folder icon -->
                 <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
               </div>
 
               <!-- Content -->
               <div class="flex-1 min-w-0">
-                <span
-                  :class="[
-                    'block text-sm font-medium truncate transition-colors',
-                    repo.name === selectedRepoName ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary'
-                  ]"
-                >
+                <span :class="[
+                  'block text-sm font-semibold truncate transition-colors',
+                  repo.name === selectedRepoName ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary'
+                ]">
                   {{ repo.name }}
                 </span>
-                <span
-                  :class="[
-                    'block text-2xs transition-colors',
-                    repo.name === selectedRepoName ? 'text-accent' : 'text-text-muted'
-                  ]"
-                >
+                <span :class="[
+                  'block text-2xs transition-colors',
+                  repo.name === selectedRepoName ? 'text-accent' : 'text-text-muted'
+                ]">
                   {{ repo.worktrees }} worktree{{ repo.worktrees === 1 ? '' : 's' }}
                 </span>
               </div>
 
               <!-- Quick select shortcut hint (for first 9 repos) -->
-              <span
-                v-if="index < 9"
+              <span v-if="index < 9"
                 class="text-2xs text-text-muted font-mono opacity-0 group-hover:opacity-60 transition-opacity flex-shrink-0"
-                :title="tooltipWithShortcut(`Select ${repo.name}`, String(index + 1))"
-              >
+                :title="tooltipWithShortcut(`Select ${repo.name}`, String(index + 1))">
                 {{ index + 1 }}
               </span>
 
               <!-- Chevron -->
-              <svg
-                v-if="repo.name === selectedRepoName"
-                class="w-4 h-4 text-accent flex-shrink-0"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
+              <svg v-if="repo.name === selectedRepoName" class="w-4 h-4 text-accent flex-shrink-0" fill="none"
+                stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
               </svg>
             </button>
@@ -552,46 +504,39 @@ onMounted(() => {
               <Dropdown align="right">
                 <template #trigger>
                   <button
-                    class="p-1.5 rounded-md text-text-tertiary hover:text-text-primary hover:bg-surface-overlay transition-colors"
-                    title="Repository actions"
-                    @contextmenu.prevent
-                  >
+                    class="p-1.5 rounded-md text-white transition-colors"
+                    style="background-color: #334155"
+                    title="Repository actions" @contextmenu.prevent>
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                        d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
                     </svg>
                   </button>
                 </template>
 
                 <template #default="{ close }">
                   <!-- Primary actions group -->
-                  <DropdownItem
-                    @click="handleEditConfig(); close()"
-                  >
+                  <DropdownItem @click="handleEditConfig(); close()">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
                     Edit Config
                   </DropdownItem>
 
-                  <DropdownItem
-                    @click="handleManageHooks(); close()"
-                  >
+                  <DropdownItem @click="handleManageHooks(); close()">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                        d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                     </svg>
                     Manage Hooks
                   </DropdownItem>
 
-                  <DropdownItem
-                    @click="handleRefreshRepo(repo.name); close()"
-                    :disabled="refreshingRepo === repo.name"
-                  >
-                    <svg class="w-4 h-4" :class="{ 'animate-spin': refreshingRepo === repo.name }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <DropdownItem @click="handleRefreshRepo(repo.name); close()" :disabled="refreshingRepo === repo.name">
+                    <svg class="w-4 h-4" :class="{ 'animate-spin': refreshingRepo === repo.name }" fill="none"
+                      stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                     {{ refreshingRepo === repo.name ? 'Refreshing...' : 'Refresh' }}
                   </DropdownItem>
@@ -600,36 +545,29 @@ onMounted(() => {
                   <div class="my-1 h-px bg-border-subtle mx-2" />
 
                   <!-- Maintenance actions group -->
-                  <DropdownItem
-                    @click="handleRepair(repo.name); close()"
-                    :disabled="repairingRepo === repo.name"
-                  >
+                  <DropdownItem @click="handleRepair(repo.name); close()" :disabled="repairingRepo === repo.name">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                     {{ repairingRepo === repo.name ? 'Repairing...' : 'Repair' }}
                   </DropdownItem>
 
-                  <DropdownItem
-                    @click="handleUnlock(repo.name); close()"
-                    :disabled="unlockingRepo === repo.name"
-                  >
+                  <DropdownItem @click="handleUnlock(repo.name); close()" :disabled="unlockingRepo === repo.name">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                        d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
                     </svg>
                     {{ unlockingRepo === repo.name ? 'Unlocking...' : 'Unlock' }}
                   </DropdownItem>
 
-                  <DropdownItem
-                    @click="handleGenerateReport(repo.name); close()"
-                    :disabled="generatingReport === repo.name"
-                  >
+                  <DropdownItem @click="handleGenerateReport(repo.name); close()"
+                    :disabled="generatingReport === repo.name">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                     {{ generatingReport === repo.name ? 'Generating...' : 'Export Report' }}
                   </DropdownItem>
@@ -676,7 +614,7 @@ onMounted(() => {
           <div class="w-12 h-12 mx-auto mb-3 rounded-xl bg-surface-overlay flex items-center justify-center">
             <svg class="w-6 h-6 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
           <p class="text-sm text-text-secondary">No recent worktrees</p>
@@ -690,18 +628,13 @@ onMounted(() => {
           <li v-for="recent in recentWorktrees" :key="recent.path">
             <div class="group px-3 py-2.5 rounded-lg bg-surface-overlay/50 hover:bg-surface-overlay transition-colors">
               <!-- Header - clickable to navigate to worktree -->
-              <button
-                class="flex items-start gap-2 w-full text-left"
-                @click="handleNavigateToRecent(recent.repo, recent.branch)"
-              >
+              <button class="flex items-start gap-2 w-full text-left"
+                @click="handleNavigateToRecent(recent.repo, recent.branch)">
                 <!-- Status dot -->
-                <span
-                  :class="[
-                    'mt-1.5 w-2 h-2 rounded-full flex-shrink-0 transition-colors',
-                    recent.dirty ? 'bg-warning' : 'bg-success'
-                  ]"
-                  :title="recent.dirty ? 'Uncommitted changes' : 'Clean'"
-                />
+                <span :class="[
+                  'mt-1.5 w-2 h-2 rounded-full flex-shrink-0 transition-colors',
+                  recent.dirty ? 'bg-warning' : 'bg-success'
+                ]" :title="recent.dirty ? 'Uncommitted changes' : 'Clean'" />
 
                 <!-- Content -->
                 <div class="flex-1 min-w-0">
@@ -719,38 +652,26 @@ onMounted(() => {
 
               <!-- Action buttons -->
               <div class="flex items-center gap-1 mt-2.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                <IconButton
-                  size="sm"
-                  variant="secondary"
-                  tooltip="Open in Editor"
-                  @click="handleOpenRecent(recent.path)"
-                >
+                <IconButton size="sm" variant="secondary" tooltip="Open in Editor"
+                  @click="handleOpenRecent(recent.path)">
                   <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                      d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                   </svg>
                 </IconButton>
 
-                <IconButton
-                  size="sm"
-                  tooltip="Open Terminal"
-                  @click="handleOpenRecentTerminal(recent.path)"
-                >
+                <IconButton size="sm" tooltip="Open Terminal" @click="handleOpenRecentTerminal(recent.path)">
                   <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </IconButton>
 
-                <IconButton
-                  v-if="recent.url"
-                  size="sm"
-                  tooltip="Open in Browser"
-                  @click="handleOpenRecentBrowser(recent.url)"
-                >
+                <IconButton v-if="recent.url" size="sm" tooltip="Open in Browser"
+                  @click="handleOpenRecentBrowser(recent.url)">
                   <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                      d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
                   </svg>
                 </IconButton>
               </div>
@@ -771,9 +692,5 @@ onMounted(() => {
   </aside>
 
   <!-- Clone Repository Modal -->
-  <CloneRepositoryModal
-    :is-open="showCloneModal"
-    @close="showCloneModal = false"
-    @cloned="handleCloneComplete"
-  />
+  <CloneRepositoryModal :is-open="showCloneModal" @close="showCloneModal = false" @cloned="handleCloneComplete" />
 </template>

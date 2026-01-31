@@ -39,55 +39,40 @@ const commitStatusTooltip = computed(() => {
 </script>
 
 <template>
-  <div class="flex items-center gap-1.5">
+  <div class="flex items-center gap-2">
     <!-- Clean/Dirty badge -->
-    <span
-      :class="[
-        'inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium rounded-md',
-        'transition-colors duration-150',
+    <span :class="[
+      'inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium rounded-full border',
+      'transition-colors duration-150',
+      dirty
+        ? 'border-warning/20 text-warning bg-warning/5'
+        : 'border-success/20 text-success bg-success/5'
+    ]" role="status" :aria-label="dirty ? 'Worktree has uncommitted changes' : 'Worktree is clean'">
+      <!-- Status dot -->
+      <span :class="[
+        'w-1.5 h-1.5 rounded-full flex-shrink-0',
         dirty
-          ? 'bg-warning-muted text-warning'
-          : 'bg-success-muted text-success'
-      ]"
-      role="status"
-      :aria-label="dirty ? 'Worktree has uncommitted changes' : 'Worktree is clean'"
-    >
-      <!-- Status dot with subtle pulse for dirty -->
-      <span
-        :class="[
-          'w-1.5 h-1.5 rounded-full flex-shrink-0',
-          dirty
-            ? 'bg-warning animate-pulse-subtle'
-            : 'bg-success'
-        ]"
-        aria-hidden="true"
-      />
+          ? 'bg-warning animate-pulse-subtle'
+          : 'bg-success'
+      ]" aria-hidden="true" />
       {{ statusLabel }}
     </span>
 
-    <!-- Combined ahead/behind indicator with arrow format -->
-    <span
-      v-if="hasCommitStatus"
-      class="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded-md bg-surface-overlay transition-colors duration-150"
-      :title="commitStatusTooltip"
-      role="status"
-      :aria-label="commitStatusTooltip"
-    >
-      <!-- Ahead (up arrow, green) -->
-      <span
-        v-if="hasAhead"
-        class="inline-flex items-center text-success"
-      >
-        <span aria-hidden="true">&#8593;</span>
+    <!-- Combined ahead/behind indicator -->
+    <span v-if="hasCommitStatus"
+      class="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium rounded-full border border-border-default bg-surface-base/50 text-text-secondary transition-colors duration-150"
+      :title="commitStatusTooltip" role="status" :aria-label="commitStatusTooltip">
+      <!-- Ahead -->
+      <span v-if="hasAhead" class="flex items-center gap-0.5 text-text-primary">
+        <span aria-hidden="true" class="opacity-70">↑</span>
         <span class="tabular-nums">{{ ahead }}</span>
       </span>
 
-      <!-- Behind (down arrow, orange/warning) -->
-      <span
-        v-if="hasBehind"
-        class="inline-flex items-center text-warning"
-      >
-        <span aria-hidden="true">&#8595;</span>
+      <span v-if="hasAhead && hasBehind" class="text-border-default">|</span>
+
+      <!-- Behind -->
+      <span v-if="hasBehind" class="flex items-center gap-0.5 text-text-primary">
+        <span aria-hidden="true" class="opacity-70">↓</span>
         <span class="tabular-nums">{{ behind }}</span>
       </span>
     </span>
