@@ -11,6 +11,7 @@ interface Props {
   open: boolean
   title?: string
   description?: string
+  subtitle?: string
   size?: 'sm' | 'md' | 'lg' | 'xl'
   closable?: boolean
   overlay?: boolean
@@ -32,7 +33,7 @@ const sizeClasses = {
   sm: 'max-w-sm',
   md: 'max-w-md',
   lg: 'max-w-lg',
-  xl: 'max-w-xl',
+  xl: 'max-w-2xl',
 }
 
 // Handle open/close with animation
@@ -107,14 +108,20 @@ onUnmounted(() => {
         <div
           class="flex-shrink-0 flex items-start justify-between gap-4 px-6 py-5 border-b border-border-subtle"
         >
-          <div class="flex-1 min-w-0">
+          <div class="flex items-start gap-3 flex-1 min-w-0">
+            <slot name="icon" />
             <slot name="header">
-              <h2 class="text-lg font-semibold tracking-tight text-text-primary">
-                {{ title }}
-              </h2>
-              <p v-if="description" class="mt-1 text-sm text-text-tertiary">
-                {{ description }}
-              </p>
+              <div class="flex-1 min-w-0">
+                <h2 class="text-lg font-semibold tracking-tight text-text-primary">
+                  {{ title }}
+                </h2>
+                <p v-if="subtitle" class="mt-0.5 text-sm text-text-tertiary">
+                  {{ subtitle }}
+                </p>
+                <p v-if="description" class="mt-1 text-sm text-text-tertiary">
+                  {{ description }}
+                </p>
+              </div>
             </slot>
           </div>
 
@@ -135,7 +142,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Content -->
-        <div class="flex-1 overflow-y-auto px-6 py-6">
+        <div :class="['flex-1 overflow-y-auto px-6 py-6 panel-content', open ? 'panel-content-visible' : '']">
           <slot />
         </div>
 
@@ -165,5 +172,35 @@ onUnmounted(() => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* Panel content stagger - children fade in after panel slides open */
+.panel-content > :deep(*) {
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity var(--duration-normal) var(--ease-out),
+    transform var(--duration-normal) var(--ease-out);
+}
+
+.panel-content-visible > :deep(*) {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.panel-content-visible > :deep(*:nth-child(1)) { transition-delay: 100ms; }
+.panel-content-visible > :deep(*:nth-child(2)) { transition-delay: 130ms; }
+.panel-content-visible > :deep(*:nth-child(3)) { transition-delay: 160ms; }
+.panel-content-visible > :deep(*:nth-child(4)) { transition-delay: 190ms; }
+.panel-content-visible > :deep(*:nth-child(5)) { transition-delay: 220ms; }
+.panel-content-visible > :deep(*:nth-child(6)) { transition-delay: 250ms; }
+.panel-content-visible > :deep(*:nth-child(7)) { transition-delay: 280ms; }
+.panel-content-visible > :deep(*:nth-child(n+8)) { transition-delay: 310ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-content > :deep(*) {
+    transition: none !important;
+    opacity: 1;
+    transform: none;
+  }
 }
 </style>

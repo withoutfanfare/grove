@@ -36,7 +36,7 @@ const handleClick = (event: MouseEvent) => {
 const baseClasses = `
   inline-flex items-center justify-center
   rounded-lg
-  transition-all duration-150 ease-out
+  transition-all
   focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-base focus-visible:ring-accent
   disabled:opacity-50 disabled:cursor-not-allowed
   select-none
@@ -97,6 +97,7 @@ const iconSizeClasses = {
     ]"
     :disabled="disabled || loading"
     :title="tooltip"
+    :aria-label="tooltip"
     @click="handleClick"
   >
     <!-- Loading spinner -->
@@ -127,3 +128,11 @@ const iconSizeClasses = {
     </span>
   </button>
 </template>
+
+<style scoped>
+button {
+  transition-property: all;
+  transition-duration: var(--duration-normal);
+  transition-timing-function: var(--ease-out);
+}
+</style>

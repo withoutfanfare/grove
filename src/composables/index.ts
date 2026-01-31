@@ -25,3 +25,5 @@ export { useResizableSidebar } from './useResizableSidebar';
 export type { ResizableSidebarOptions } from './useResizableSidebar';
 export { useRelativeTime, formatRelativeTime } from './useRelativeTime';
 export type { RelativeTimeResult } from './useRelativeTime';
+export { useCommandRegistry } from './useCommandRegistry';
+export type { Command, CommandHandlers } from './useCommandRegistry';

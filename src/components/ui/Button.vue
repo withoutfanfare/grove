@@ -36,7 +36,7 @@ const handleClick = (event: MouseEvent) => {
 const baseClasses = `
   inline-flex items-center justify-center gap-2
   font-medium rounded-lg
-  transition-all duration-150 ease-out
+  transition-all
   focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-base
   disabled:opacity-50 disabled:cursor-not-allowed
   select-none
@@ -45,7 +45,7 @@ const baseClasses = `
 const variantClasses = {
   primary: `
     bg-accent text-white
-    hover:bg-accent-hover shadow-sm
+    hover:bg-accent-hover hover:shadow-md hover:scale-[1.02] shadow-sm
     focus-visible:ring-accent
     active:scale-[0.98]
     border border-transparent
@@ -109,3 +109,11 @@ const sizeClasses = {
     </kbd>
   </button>
 </template>
+
+<style scoped>
+button {
+  transition-property: all;
+  transition-duration: var(--duration-normal);
+  transition-timing-function: var(--ease-out);
+}
+</style>

@@ -63,6 +63,16 @@ const overallGradeStyle = computed(() => {
   return grade ? gradeStyles[grade] : { text: 'text-text-muted', bg: 'bg-surface-overlay', ring: 'ring-border-subtle' }
 })
 
+// Derive issue counts from the actual issues array so the summary
+// matches the issues list displayed below it.
+const issueCounts = computed(() => {
+  const issues = health.value?.issues ?? []
+  const warning = issues.filter(i => i.severity === 'warning').length
+  const critical = issues.filter(i => i.severity === 'critical').length
+  const healthy = (health.value?.worktree_count ?? 0) - warning - critical
+  return { healthy: Math.max(0, healthy), warning, critical }
+})
+
 function handleClose() {
   emit('close')
 }
@@ -189,15 +199,15 @@ function getSeverityStyle(severity: string) {
       <!-- Summary Stats -->
       <div class="grid grid-cols-3 gap-3">
         <div class="bg-success-muted/50 rounded-lg p-4 text-center ring-1 ring-inset ring-success/10">
-          <p class="text-2xl font-bold text-success tabular-nums">{{ health.summary.healthy }}</p>
+          <p class="text-2xl font-bold text-success tabular-nums">{{ issueCounts.healthy }}</p>
           <p class="text-2xs text-text-muted uppercase tracking-wider mt-1">Healthy</p>
         </div>
         <div class="bg-warning-muted/50 rounded-lg p-4 text-center ring-1 ring-inset ring-warning/10">
-          <p class="text-2xl font-bold text-warning tabular-nums">{{ health.summary.warning }}</p>
+          <p class="text-2xl font-bold text-warning tabular-nums">{{ issueCounts.warning }}</p>
           <p class="text-2xs text-text-muted uppercase tracking-wider mt-1">Warning</p>
         </div>
         <div class="bg-danger-muted/50 rounded-lg p-4 text-center ring-1 ring-inset ring-danger/10">
-          <p class="text-2xl font-bold text-danger tabular-nums">{{ health.summary.critical }}</p>
+          <p class="text-2xl font-bold text-danger tabular-nums">{{ issueCounts.critical }}</p>
           <p class="text-2xs text-text-muted uppercase tracking-wider mt-1">Critical</p>
         </div>
       </div>

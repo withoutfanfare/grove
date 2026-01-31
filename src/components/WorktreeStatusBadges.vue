@@ -4,6 +4,7 @@
  *
  * Displays status badges for worktree conditions:
  * - MERGED: Branch has been merged into the base branch (green tag)
+ * - UNMERGED: Branch has not been merged into the base branch (orange warning)
  * - STALE: Worktree is >50 commits behind (orange clock icon)
  * - MISMATCH: Directory name doesn't match branch slug (yellow warning)
  *
@@ -21,9 +22,10 @@ const props = defineProps<{
 }>()
 
 const showMerged = computed(() => props.merged === true)
+const showUnmerged = computed(() => props.merged === false)
 const showStale = computed(() => props.stale === true)
 const showMismatch = computed(() => props.mismatch === true)
-const hasAnyBadge = computed(() => showMerged.value || showStale.value || showMismatch.value)
+const hasAnyBadge = computed(() => showMerged.value || showUnmerged.value || showStale.value || showMismatch.value)
 </script>
 
 <template>
@@ -57,6 +59,32 @@ const hasAnyBadge = computed(() => showMerged.value || showStale.value || showMi
         />
       </svg>
       Merged
+    </span>
+
+    <!-- UNMERGED badge - subtle warning -->
+    <span
+      v-if="showUnmerged"
+      class="inline-flex items-center gap-1 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide rounded bg-warning-muted text-warning ring-1 ring-inset ring-warning/20 transition-colors duration-150"
+      title="This branch has not been merged into the base branch"
+      role="status"
+      aria-label="Branch not merged"
+    >
+      <!-- Branch icon -->
+      <svg
+        class="w-3 h-3"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M13 10V3L4 14h7v7l9-11h-7z"
+        />
+      </svg>
+      Unmerged
     </span>
 
     <!-- STALE badge - orange with clock -->

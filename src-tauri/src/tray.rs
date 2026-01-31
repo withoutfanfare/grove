@@ -72,8 +72,9 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         .build(app)?;
 
     // Store tray ID for later menu updates
-    if let Ok(mut id) = TRAY_ID.lock() {
-        *id = Some(tray.id().0.clone());
+    match TRAY_ID.lock() {
+        Ok(mut id) => { *id = Some(tray.id().0.clone()); }
+        Err(e) => { *e.into_inner() = Some(tray.id().0.clone()); }
     }
 
     Ok(())
@@ -83,8 +84,14 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
 fn build_tray_menu(app: &AppHandle) -> Result<Menu<Wry>, Box<dyn std::error::Error>> {
     let mut menu_builder = MenuBuilder::new(app);
 
+    // Fetch repositories on a blocking thread to avoid nested runtime panic
+    let app_clone = app.clone();
+    let repos_result = std::thread::spawn(move || wt::get_repositories(&app_clone))
+        .join()
+        .map_err(|_| "Failed to fetch repositories on background thread")?;
+
     // Try to fetch repositories and their worktrees
-    if let Ok(repos) = wt::get_repositories(app) {
+    if let Ok(repos) = repos_result {
         if repos.is_empty() {
             // No repositories - show a placeholder
             let no_repos = MenuItemBuilder::with_id("no_repos", "No repositories")
@@ -135,7 +142,13 @@ fn build_repo_submenu(
     let mut submenu_builder = SubmenuBuilder::new(app, &repo.name);
 
     // Fetch worktrees for this repo
-    if let Ok(worktrees) = wt::get_worktrees(app, &repo.name) {
+    let app_clone = app.clone();
+    let repo_name = repo.name.clone();
+    let worktrees_result = std::thread::spawn(move || wt::get_worktrees(&app_clone, &repo_name))
+        .join()
+        .map_err(|_| "Failed to fetch worktrees on background thread")?;
+
+    if let Ok(worktrees) = worktrees_result {
         if worktrees.is_empty() {
             let no_worktrees =
                 MenuItemBuilder::with_id(format!("{}:empty", repo.name), "No worktrees")
@@ -286,11 +299,9 @@ pub fn setup_window_close_handler(app: &AppHandle) {
 
 /// Refresh the tray menu with current worktree data.
 pub fn refresh_tray_menu(app: &AppHandle) {
-    let tray_id = {
-        TRAY_ID
-            .lock()
-            .ok()
-            .and_then(|guard| guard.clone())
+    let tray_id = match TRAY_ID.lock() {
+        Ok(guard) => guard.clone(),
+        Err(e) => e.into_inner().clone(),
     };
 
     if let Some(id) = tray_id {

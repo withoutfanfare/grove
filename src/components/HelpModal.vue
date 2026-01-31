@@ -37,7 +37,7 @@ const shortcuts = [
   { keys: ['⌘', 'R'], action: 'Refresh worktrees' },
   { keys: ['⌘', ','], action: 'Open settings' },
   { keys: ['⌘', 'M'], action: 'Repository management' },
-  { keys: ['⌘', 'K'], action: 'Focus search' },
+  { keys: ['⌘', 'K'], action: 'Command palette' },
   { keys: ['⌘', 'P'], action: 'Pull all worktrees' },
   { keys: ['⌘', '⏎'], action: 'Quick Launch (editor, terminal, browser)' },
   { keys: ['Esc'], action: 'Close modal / Clear search' },
@@ -203,7 +203,7 @@ wt setup</code></pre>
           </ul>
 
           <h3>Search</h3>
-          <p>Press <kbd>⌘K</kbd> to focus the search bar. Both the sidebar and main panel have search:</p>
+          <p>Press <kbd>⌘K</kbd> to open the command palette for quick access to any action. Use <kbd>⌘F</kbd> or <kbd>/</kbd> to focus the search bar. Both the sidebar and main panel have search:</p>
           <ul>
             <li><strong>Repository search</strong> — Filter the sidebar list by repository name</li>
             <li><strong>Worktree search</strong> — Filter worktree cards by branch name, path, or status</li>

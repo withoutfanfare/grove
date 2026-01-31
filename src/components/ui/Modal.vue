@@ -4,7 +4,9 @@
  *
  * A premium modal dialog with backdrop blur, animations, and focus trap.
  */
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+
+let _uid = 0
 
 interface Props {
   open: boolean
@@ -24,6 +26,10 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   close: []
 }>()
+
+
+const modalUid = ++_uid
+const titleId = computed(() => props.title ? `modal-title-${modalUid}` : undefined)
 
 const modalRef = ref<HTMLElement | null>(null)
 const isVisible = ref(false)
@@ -45,6 +51,15 @@ watch(
       isAnimating.value = true
       setTimeout(() => {
         isAnimating.value = false
+        // Focus first focusable element in modal
+        nextTick(() => {
+          if (modalRef.value) {
+            const focusable = modalRef.value.querySelector<HTMLElement>(
+              'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            )
+            focusable?.focus()
+          }
+        })
       }, 250)
     } else {
       isAnimating.value = true
@@ -57,10 +72,34 @@ watch(
   { immediate: true }
 )
 
-// Handle escape key
+// Handle escape key and focus trap
 const handleKeydown = (event: KeyboardEvent) => {
-  if (event.key === 'Escape' && props.open && props.closable) {
+  if (!props.open) return
+
+  if (event.key === 'Escape' && props.closable) {
     emit('close')
+    return
+  }
+
+  // Focus trap: keep Tab within the modal
+  if (event.key === 'Tab' && modalRef.value) {
+    const focusable = modalRef.value.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )
+    if (focusable.length === 0) return
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (event.shiftKey) {
+      if (document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      }
+    } else {
+      if (document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
   }
 }
 
@@ -107,7 +146,9 @@ onUnmounted(() => {
               ? 'opacity-100 scale-100 translate-y-0'
               : 'opacity-0 scale-95 translate-y-2',
           ]"
+          :style="{ transitionDelay: props.open ? '75ms' : '0ms' }"
           role="dialog"
+          :aria-labelledby="titleId"
           aria-modal="true"
         >
           <!-- Header -->
@@ -125,6 +166,8 @@ onUnmounted(() => {
                     'text-lg font-semibold tracking-tight',
                     danger ? 'text-danger' : 'text-text-primary',
                   ]"
+                
+                  :id="titleId"
                 >
                   {{ title }}
                 </h2>

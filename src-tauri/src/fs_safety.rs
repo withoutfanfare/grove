@@ -16,9 +16,21 @@ use crate::types::WtError;
 
 /// Characters that could be used for shell injection attacks.
 /// These must never appear in paths passed to external commands.
+/// Characters that could be used for shell injection attacks.
 const DANGEROUS_CHARS: &[char] = &[
     ';', '&', '|', '$', '`', '(', ')', '{', '}', '<', '>', '\n', '\r', '\0',
 ];
+
+/// Maximum file size for config/hook files (256KB).
+const MAX_FILE_SIZE: u64 = 256 * 1024;
+
+/// Unix permission mode for config files (owner read/write only).
+#[allow(dead_code)]
+pub const CONFIG_FILE_MODE: u32 = 0o600;
+
+/// Unix permission mode for hook scripts (owner rwx, group/other rx).
+#[allow(dead_code)]
+pub const HOOK_FILE_MODE: u32 = 0o755;
 
 /// Validate that a string contains no shell metacharacters.
 ///
@@ -183,10 +195,6 @@ pub fn get_allowed_roots(herd_root: Option<&str>) -> Result<Vec<PathBuf>, WtErro
 // ============================================================================
 // Atomic File Operations
 // ============================================================================
-
-/// Maximum file size for config/hook files (256KB).
-/// Prevents memory issues with accidentally large files.
-const MAX_FILE_SIZE: u64 = 256 * 1024;
 
 /// Read a text file with size limit.
 ///

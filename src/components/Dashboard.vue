@@ -9,7 +9,7 @@ import { onMounted, onUnmounted, watch, ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useDebounceFn } from '@vueuse/core'
 import { useWorktreeStore } from '../stores'
-import { useRepos, useWorktrees, useOperationProgress, useAutoRefresh, useSearch, useKeyboardShortcuts, useShortcutTooltip, useToast, useWorktreeWatcher, useResizableSidebar } from '../composables'
+import { useRepos, useWorktrees, useOperationProgress, useAutoRefresh, useSearch, useKeyboardShortcuts, useShortcutTooltip, useToast, useWorktreeWatcher, useResizableSidebar, useCommandRegistry } from '../composables'
 import type { Worktree } from '../types'
 
 // Components
@@ -18,16 +18,21 @@ import WorktreeCard from './WorktreeCard.vue'
 import VirtualWorktreeList from './VirtualWorktreeList.vue'
 import CreateWorktreeModal from './CreateWorktreeModal.vue'
 import DeleteWorktreeDialog from './DeleteWorktreeDialog.vue'
-import SettingsModal from './SettingsModal.vue'
+import SettingsPanel from './SettingsPanel.vue'
 import HelpModal from './HelpModal.vue'
-import RepoManagementModal from './RepoManagementModal.vue'
+import RepoManagementPanel from './RepoManagementPanel.vue'
 import HealthPanel from './HealthPanel.vue'
 import OperationProgressPanel from './OperationProgressPanel.vue'
 import ErrorBoundary from './ErrorBoundary.vue'
 import SearchInput from './SearchInput.vue'
+import CommandPalette from './CommandPalette.vue'
 import { Button, IconButton, SkeletonCard, ResizeHandle } from './ui'
 
-// Threshold for enabling virtual scrolling (50+ items)
+/**
+ * L4: Number of worktrees above which the list switches from animated
+ * TransitionGroup to a virtualised scroller for performance.
+ * Below this count, smooth enter/leave animations provide better UX.
+ */
 const VIRTUALISATION_THRESHOLD = 50
 
 // Store and composables
@@ -44,7 +49,7 @@ const {
 } = storeToRefs(store)
 
 const { fetchRepositories } = useRepos()
-const { fetchWorktrees, pruneRepo, pullAllWorktrees, pullSelectedWorktrees, cancelOperation, openInEditor, openInTerminal, cleanup: cleanupWorktrees } = useWorktrees()
+const { fetchWorktrees, pruneRepo, pullAllWorktrees, pullSelectedWorktrees, cancelOperation, openInEditor, openInTerminal, pullWorktree, syncWorktree, cleanup: cleanupWorktrees } = useWorktrees()
 const {
   isRefreshing: isAutoRefreshing,
   lastUpdatedText,
@@ -64,7 +69,26 @@ const searchInputRef = ref<{ focus: () => void } | null>(null)
 // Filtered worktrees based on search
 const filteredWorktrees = computed(() => filterWorktrees(worktrees.value))
 
-// Determine whether to use virtual scrolling based on list size
+// Content key for crossfade transitions when switching states
+const contentKey = computed(() => {
+  if (!selectedRepo.value) return 'empty'
+  if (loadingWorktrees.value) return 'loading'
+  return `repo-${selectedRepoName.value}`
+})
+
+// List stagger animation hooks
+function onListBeforeEnter(el: Element) {
+  const element = el as HTMLElement
+  const index = Number(element.dataset.index) || 0
+  const delay = Math.min(index * 40, 400)
+  element.style.transitionDelay = `${delay}ms`
+}
+
+function onListAfterEnter(el: Element) {
+  ;(el as HTMLElement).style.transitionDelay = ''
+}
+
+// M7: Use virtual scrolling based on filtered count, not total
 const useVirtualScroll = computed(() => filteredWorktrees.value.length >= VIRTUALISATION_THRESHOLD)
 
 // Shortcut tooltip helper
@@ -117,12 +141,14 @@ onMounted(async () => {
   }
 })
 
-// Cleanup on unmount (C4 fix: prevent memory leaks)
+// Cleanup on unmount
 onUnmounted(() => {
   stopAutoRefresh()
   stopWatching()
   unregisterWatcher()
   cleanupWorktrees()
+  // H3: Debounced handler is 500ms; unregisterWatcher() above prevents new
+  // triggers, and cleanupWorktrees() clears state, so pending calls are harmless.
 })
 
 // Watch for repo selection changes with race condition protection
@@ -134,10 +160,12 @@ watch(selectedRepoName, async (newName, oldName) => {
     await stopWatching()
     const currentFetch = ++fetchCounter.value
     await fetchWorktrees()
+    // H2: Guard against stale fetch — abort if another switch occurred during await
     if (currentFetch !== fetchCounter.value) return
     // Start auto-refresh for the new repository
     startAutoRefresh()
     // Start file watching for real-time updates
+    if (currentFetch !== fetchCounter.value) return
     await startWatching(newName)
   } else if (!newName) {
     // Stop auto-refresh and watching when no repository is selected
@@ -207,8 +235,8 @@ const handleRefresh = useDebounceFn(async () => {
 // Modal state
 const showCreateModal = ref(false)
 const showDeleteDialog = ref(false)
-const showSettingsModal = ref(false)
-const showRepoManagementModal = ref(false)
+const showSettingsPanel = ref(false)
+const showRepoManagementPanel = ref(false)
 const repoManagementInitialTab = ref<'config' | 'hooks'>('config')
 const showHelpModal = ref(false)
 const showHealthPanel = ref(false)
@@ -230,17 +258,36 @@ function openCreateModal() {
   showCreateModal.value = true
 }
 
-function openSettingsModal() {
-  showSettingsModal.value = true
+function closeAllPanels() {
+  showSettingsPanel.value = false
+  showRepoManagementPanel.value = false
+  showHealthPanel.value = false
+  if (showProgressPanel.value) {
+    handleProgressPanelClose()
+  }
 }
 
-function openRepoManagementModal(tab: 'config' | 'hooks' = 'config') {
+function openSettingsPanel() {
+  if (showSettingsPanel.value) {
+    showSettingsPanel.value = false
+    return
+  }
+  closeAllPanels()
+  showSettingsPanel.value = true
+}
+
+function openRepoManagementPanel(tab: 'config' | 'hooks' = 'config') {
+  if (showRepoManagementPanel.value) {
+    showRepoManagementPanel.value = false
+    return
+  }
+  closeAllPanels()
   repoManagementInitialTab.value = tab
-  showRepoManagementModal.value = true
+  showRepoManagementPanel.value = true
 }
 
 function openHelpModal() {
-  showHelpModal.value = true
+  showHelpModal.value = !showHelpModal.value
 }
 
 function handleDeleteWorktree(worktree: Worktree) {
@@ -249,12 +296,14 @@ function handleDeleteWorktree(worktree: Worktree) {
 }
 
 function openHealthPanel() {
+  closeAllPanels()
   showHealthPanel.value = true
 }
 
 async function handlePrune() {
   if (!selectedRepoName.value || isPruning.value) return
 
+  closeAllPanels()
   progressTitle.value = 'Pruning Branches'
   await startListening('prune', [])
   showProgressPanel.value = true
@@ -300,6 +349,7 @@ async function handlePullAll() {
 
   // Don't pre-populate expected items - let the backend's progress events
   // tell us what's being processed (ensures we show the correct repo's worktrees)
+  closeAllPanels()
   progressTitle.value = 'Pulling All Worktrees'
   await startListening('pull_all', [], worktreePathMap)
   showProgressPanel.value = true
@@ -322,6 +372,22 @@ function handleProgressPanelClose() {
   showProgressPanel.value = false
   resetProgress()
 }
+
+// M16: Auto-close progress panel after successful completion (no failures/conflicts)
+watch(progressValue, (val) => {
+  if (!val || !showProgressPanel.value) return
+  const allDone = val.items.length > 0 && val.items.every(
+    (item) => item.status === 'success' || item.status === 'skipped'
+  )
+  if (allDone && val.current >= val.total) {
+    setTimeout(() => {
+      // Re-check in case user interacted
+      if (showProgressPanel.value && !hasFailures() && !hasConflicts()) {
+        handleProgressPanelClose()
+      }
+    }, 2000)
+  }
+})
 
 async function handleCancelOperation() {
   await cancelOperation()
@@ -376,14 +442,16 @@ async function handleOpenInTerminal(path: string) {
 
 // Close all modals/panels (for Escape key)
 function closeAllModals() {
-  if (showProgressPanel.value) {
+  if (showCommandPalette.value) {
+    showCommandPalette.value = false
+  } else if (showProgressPanel.value) {
     handleProgressPanelClose()
   } else if (showHealthPanel.value) {
     showHealthPanel.value = false
-  } else if (showRepoManagementModal.value) {
-    showRepoManagementModal.value = false
-  } else if (showSettingsModal.value) {
-    showSettingsModal.value = false
+  } else if (showRepoManagementPanel.value) {
+    showRepoManagementPanel.value = false
+  } else if (showSettingsPanel.value) {
+    showSettingsPanel.value = false
   } else if (showHelpModal.value) {
     showHelpModal.value = false
   } else if (showDeleteDialog.value) {
@@ -401,6 +469,49 @@ function focusSearch() {
   }
 }
 
+// Command palette state
+const showCommandPalette = ref(false)
+
+function toggleCommandPalette() {
+  showCommandPalette.value = !showCommandPalette.value
+}
+
+// Helper to get the currently focused worktree object
+function getFocusedWorktree() {
+  return worktrees.value.find((wt) => wt.branch === focusedBranch.value) ?? null
+}
+
+// Command registry for palette
+const { commands: paletteCommands } = useCommandRegistry({
+  onRefresh: () => handleRefresh(),
+  onCreateWorktree: () => { if (selectedRepo.value) openCreateModal() },
+  onOpenSettings: () => openSettingsPanel(),
+  onOpenRepoManagement: () => { if (selectedRepo.value) openRepoManagementPanel() },
+  onOpenHelp: () => openHelpModal(),
+  onFocusSearch: () => focusSearch(),
+  onPullAll: () => handlePullAll(),
+  onPrune: () => handlePrune(),
+  onOpenHealthPanel: () => openHealthPanel(),
+  onOpenEditor: () => { const wt = getFocusedWorktree(); if (wt) openInEditor(wt.path) },
+  onOpenTerminal: () => { const wt = getFocusedWorktree(); if (wt) openInTerminal(wt.path) },
+  onOpenBrowser: () => { const wt = getFocusedWorktree(); if (wt?.url) wt.url },
+  onOpenAll: () => {},
+  onCopyPath: () => { const wt = getFocusedWorktree(); if (wt) navigator.clipboard.writeText(wt.path) },
+  onCopyBranch: () => { const wt = getFocusedWorktree(); if (wt) navigator.clipboard.writeText(wt.branch) },
+  onCopyUrl: () => { const wt = getFocusedWorktree(); if (wt?.url) navigator.clipboard.writeText(wt.url) },
+  onCopyCdCommand: () => { const wt = getFocusedWorktree(); if (wt) navigator.clipboard.writeText(`cd ${wt.path}`) },
+  onPullWorktree: () => {
+    const wt = getFocusedWorktree()
+    if (wt && selectedRepoName.value) pullWorktree(selectedRepoName.value, wt.branch)
+  },
+  onSyncWorktree: () => {
+    const wt = getFocusedWorktree()
+    if (wt && selectedRepoName.value) syncWorktree(selectedRepoName.value, wt.branch)
+  },
+  onDeleteWorktree: () => { const wt = getFocusedWorktree(); if (wt) handleDeleteWorktree(wt) },
+  onSelectRepo: (index: number) => store.selectRepository(store.repositories[index]?.name),
+})
+
 // Keyboard shortcuts
 useKeyboardShortcuts({
   onRefresh: () => handleRefresh(),
@@ -409,15 +520,16 @@ useKeyboardShortcuts({
       openCreateModal()
     }
   },
-  onOpenSettings: () => openSettingsModal(),
+  onOpenSettings: () => openSettingsPanel(),
   onOpenRepoManagement: () => {
     if (selectedRepo.value) {
-      openRepoManagementModal()
+      openRepoManagementPanel()
     }
   },
   onOpenHelp: () => openHelpModal(),
   onCloseModal: () => closeAllModals(),
   onFocusSearch: () => focusSearch(),  // L12
+  onCommandPalette: () => toggleCommandPalette(),
 })
 </script>
 
@@ -454,7 +566,7 @@ useKeyboardShortcuts({
     <template v-else>
       <div class="flex-1 flex min-h-0" :class="{ 'select-none': isSidebarResizing }">
         <!-- Sidebar -->
-        <RepoList class="flex-shrink-0" :width="sidebarWidth" @open-repo-management="openRepoManagementModal" />
+        <RepoList class="flex-shrink-0" :width="sidebarWidth" @open-repo-management="openRepoManagementPanel" />
 
         <!-- Resize handle -->
         <ResizeHandle :is-resizing="isSidebarResizing" @drag-start="startSidebarResize" @reset="resetSidebarWidth" />
@@ -535,19 +647,20 @@ useKeyboardShortcuts({
                   </svg>
                 </IconButton>
                 <IconButton :tooltip="tooltipWithShortcut('Repository Management', 'M')"
-                  @click="() => openRepoManagementModal()">
+                  :active="showRepoManagementPanel"
+                  @click="() => openRepoManagementPanel()">
                   <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
                   </svg>
                 </IconButton>
-                <IconButton tooltip="Help" @click="openHelpModal">
+                <IconButton tooltip="Help" :active="showHelpModal" @click="openHelpModal">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </IconButton>
-                <IconButton :tooltip="tooltipWithShortcut('Settings', ',')" @click="openSettingsModal">
+                <IconButton :tooltip="tooltipWithShortcut('Settings', ',')" :active="showSettingsPanel" @click="openSettingsPanel">
                   <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -588,8 +701,9 @@ useKeyboardShortcuts({
           <div class="flex-1">
             <ErrorBoundary title="Failed to display worktrees"
               description="There was an error displaying the worktree list. Please try again." @retry="handleRefresh">
+              <Transition name="crossfade" mode="out-in">
               <!-- No repo selected -->
-              <div v-if="!selectedRepo" class="h-full flex items-center justify-center p-8">
+              <div v-if="!selectedRepo" :key="contentKey" class="h-full flex items-center justify-center p-8">
                 <div class="text-center animate-fade-in">
                   <div class="w-20 h-20 mx-auto mb-6 rounded-2xl bg-surface-overlay flex items-center justify-center">
                     <svg class="w-10 h-10 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -603,12 +717,12 @@ useKeyboardShortcuts({
               </div>
 
               <!-- Loading worktrees with skeleton cards -->
-              <div v-else-if="loadingWorktrees" class="p-6 space-y-3">
+              <div v-else-if="loadingWorktrees" key="loading" class="p-6 space-y-3">
                 <SkeletonCard v-for="i in 6" :key="i" />
               </div>
 
               <!-- No worktrees -->
-              <div v-else-if="worktrees.length === 0" class="h-full flex items-center justify-center p-8">
+              <div v-else-if="worktrees.length === 0" key="no-worktrees" class="h-full flex items-center justify-center p-8">
                 <div class="text-center animate-fade-in max-w-md">
                   <!-- Illustration -->
                   <div class="w-24 h-24 mx-auto mb-8 rounded-2xl bg-accent/10 flex items-center justify-center">
@@ -633,7 +747,7 @@ useKeyboardShortcuts({
               </div>
 
               <!-- Worktree list -->
-              <div v-else class="p-6 space-y-4">
+              <div v-else :key="contentKey" class="p-6 space-y-4">
                 <!-- No search results -->
                 <div v-if="filteredWorktrees.length === 0 && worktreeSearchQuery.trim()"
                   class="py-12 text-center animate-fade-in">
@@ -644,7 +758,7 @@ useKeyboardShortcuts({
                     </svg>
                   </div>
                   <p class="text-sm font-medium text-text-secondary">No results for '{{ worktreeSearchQuery }}'</p>
-                  <p class="text-xs text-text-muted mt-1 mb-4">Try a different search term</p>
+                  <p class="text-xs text-text-muted mt-1 mb-4">No matches in {{ worktrees.length }} worktree{{ worktrees.length !== 1 ? 's' : '' }}</p>
                   <Button variant="ghost" size="sm" @click="clearWorktreeSearch">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -662,8 +776,9 @@ useKeyboardShortcuts({
 
                   <!-- Animated list for smaller lists (better UX with transitions) -->
                   <div v-else class="space-y-3">
-                    <TransitionGroup name="list" appear>
-                      <WorktreeCard v-for="wt in filteredWorktrees" :id="`worktree-${wt.branch}`" :key="wt.path"
+                    <TransitionGroup name="list" appear @before-enter="onListBeforeEnter" @after-enter="onListAfterEnter">
+                      <WorktreeCard v-for="(wt, index) in filteredWorktrees" :id="`worktree-${wt.branch}`" :key="wt.path"
+                        :data-index="index"
                         :worktree="wt" :repo-name="selectedRepoName!" :focused="focusedBranch === wt.branch"
                         :initially-expanded="expandOnFocus && focusedBranch === wt.branch"
                         @delete="handleDeleteWorktree" />
@@ -671,6 +786,7 @@ useKeyboardShortcuts({
                   </div>
                 </template>
               </div>
+              </Transition>
             </ErrorBoundary>
           </div>
         </main>
@@ -683,19 +799,25 @@ useKeyboardShortcuts({
     <DeleteWorktreeDialog :is-open="showDeleteDialog" :worktree="worktreeToDelete" :repo-name="selectedRepoName || ''"
       @close="showDeleteDialog = false" />
 
-    <SettingsModal :is-open="showSettingsModal" @close="showSettingsModal = false" />
+    <SettingsPanel :is-open="showSettingsPanel" @close="showSettingsPanel = false" />
 
-    <RepoManagementModal :is-open="showRepoManagementModal" :initial-tab="repoManagementInitialTab"
-      @close="showRepoManagementModal = false" />
+    <RepoManagementPanel :is-open="showRepoManagementPanel" :initial-tab="repoManagementInitialTab"
+      @close="showRepoManagementPanel = false" />
 
     <HelpModal :is-open="showHelpModal" @close="showHelpModal = false" />
 
+    <CommandPalette :is-open="showCommandPalette" :commands="paletteCommands"
+      @close="showCommandPalette = false" />
+
     <HealthPanel :is-open="showHealthPanel" :repo-name="selectedRepoName || ''" @close="showHealthPanel = false" />
 
-    <OperationProgressPanel :is-open="showProgressPanel" :title="progressTitle" :progress="progressValue"
-      :has-failures="progressHasFailures" :has-conflicts="progressHasConflicts" @close="handleProgressPanelClose"
-      @cancel="handleCancelOperation" @retry="handleRetryFailed" @open-in-editor="handleOpenInEditor"
-      @open-in-terminal="handleOpenInTerminal" />
+    <!-- M6: ErrorBoundary around progress panel to prevent malformed data crashing app -->
+    <ErrorBoundary>
+      <OperationProgressPanel :is-open="showProgressPanel" :title="progressTitle" :progress="progressValue"
+        :has-failures="progressHasFailures" :has-conflicts="progressHasConflicts" @close="handleProgressPanelClose"
+        @cancel="handleCancelOperation" @retry="handleRetryFailed" @open-in-editor="handleOpenInEditor"
+        @open-in-terminal="handleOpenInTerminal" />
+    </ErrorBoundary>
   </div>
 </template>
 
@@ -725,23 +847,34 @@ useKeyboardShortcuts({
   transform: translateY(-100%);
 }
 
-/* List animation for worktree cards */
+/* List animation for worktree cards with stagger support */
 .list-enter-active,
 .list-leave-active {
-  transition: all var(--duration-slow) var(--ease-out);
+  transition: all var(--duration-slow) var(--ease-spring);
 }
 
 .list-enter-from {
   opacity: 0;
-  transform: translateY(10px);
+  transform: translateY(10px) scale(0.98);
 }
 
 .list-leave-to {
   opacity: 0;
-  transform: translateX(-10px);
+  transform: translateX(-10px) scale(0.95);
 }
 
 .list-move {
-  transition: transform var(--duration-slow) var(--ease-out);
+  transition: transform var(--duration-slow) var(--ease-spring);
+}
+
+/* Crossfade animation for content switching */
+.crossfade-enter-active,
+.crossfade-leave-active {
+  transition: opacity var(--duration-slow) var(--ease-out);
+}
+
+.crossfade-enter-from,
+.crossfade-leave-to {
+  opacity: 0;
 }
 </style>

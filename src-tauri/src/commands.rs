@@ -136,8 +136,7 @@ fn validate_template_name(name: &str) -> Result<(), WtError> {
 /// Callable from frontend as: invoke('list_repositories')
 #[command]
 pub async fn list_repositories(app: tauri::AppHandle) -> Result<Vec<Repository>, WtError> {
-    let handle = app.clone();
-    spawn_blocking(move || wt::get_repositories(&handle))
+    spawn_blocking(move || wt::get_repositories(&app))
         .await
         .map_err(|e| WtError {
             code: "SPAWN_ERROR".to_string(),
@@ -155,9 +154,7 @@ pub async fn list_worktrees(
     repo_name: String,
     app: tauri::AppHandle,
 ) -> Result<Vec<Worktree>, WtError> {
-    let repo = repo_name.clone();
-    let handle = app.clone();
-    spawn_blocking(move || wt::get_worktrees(&handle, &repo))
+    spawn_blocking(move || wt::get_worktrees(&app, &repo_name))
         .await
         .map_err(|e| WtError {
             code: "SPAWN_ERROR".to_string(),
@@ -175,9 +172,7 @@ pub async fn get_worktree_status(
     repo_name: String,
     app: tauri::AppHandle,
 ) -> Result<Vec<Worktree>, WtError> {
-    let repo = repo_name.clone();
-    let handle = app.clone();
-    spawn_blocking(move || wt::get_worktree_status(&handle, &repo))
+    spawn_blocking(move || wt::get_worktree_status(&app, &repo_name))
         .await
         .map_err(|e| WtError {
             code: "SPAWN_ERROR".to_string(),
@@ -189,8 +184,11 @@ pub async fn get_worktree_status(
 ///
 /// Callable from frontend as: invoke('check_wt_available')
 #[command]
-pub fn check_wt_available(app: tauri::AppHandle) -> bool {
-    wt::is_wt_available(&app)
+pub async fn check_wt_available(app: tauri::AppHandle) -> bool {
+    let handle = app.clone();
+    spawn_blocking(move || wt::is_wt_available(&handle))
+        .await
+        .unwrap_or(false)
 }
 
 /// Get wt CLI version
@@ -199,8 +197,7 @@ pub fn check_wt_available(app: tauri::AppHandle) -> bool {
 /// Callable from frontend as: invoke('get_wt_version')
 #[command]
 pub async fn get_wt_version(app: tauri::AppHandle) -> Result<String, WtError> {
-    let handle = app.clone();
-    spawn_blocking(move || wt::get_version(&handle))
+    spawn_blocking(move || wt::get_version(&app))
         .await
         .map_err(|e| WtError {
             code: "SPAWN_ERROR".to_string(),
@@ -696,8 +693,14 @@ pub fn open_in_finder(path: String) -> Result<(), WtError> {
 ///
 /// Callable from frontend as: invoke('get_config')
 #[command]
-pub fn get_config(app: tauri::AppHandle) -> Result<Config, WtError> {
-    wt::get_config(&app)
+pub async fn get_config(app: tauri::AppHandle) -> Result<Config, WtError> {
+    let handle = app.clone();
+    spawn_blocking(move || wt::get_config(&handle))
+        .await
+        .map_err(|e| WtError {
+            code: "SPAWN_ERROR".to_string(),
+            message: format!("Failed to spawn blocking task: {}", e),
+        })?
 }
 
 // ============================================================================
@@ -723,19 +726,13 @@ pub async fn create_worktree(
         validate_template_name(t)?;
     }
 
-    let repo_clone = repo.clone();
-    let branch_clone = branch.clone();
-    let base_clone = base.clone();
-    let template_clone = template.clone();
-    let handle = app.clone();
-
     spawn_blocking(move || {
         wt::create_worktree(
-            &handle,
-            &repo_clone,
-            &branch_clone,
-            base_clone.as_deref(),
-            template_clone.as_deref(),
+            &app,
+            &repo,
+            &branch,
+            base.as_deref(),
+            template.as_deref(),
             force,
         )
     })
@@ -761,15 +758,11 @@ pub async fn remove_worktree(
     force: bool,
     app: tauri::AppHandle,
 ) -> Result<RemoveWorktreeResult, WtError> {
-    let repo_clone = repo.clone();
-    let branch_clone = branch.clone();
-    let handle = app.clone();
-
     spawn_blocking(move || {
         wt::remove_worktree(
-            &handle,
-            &repo_clone,
-            &branch_clone,
+            &app,
+            &repo,
+            &branch,
             delete_branch,
             drop_db,
             skip_backup,
@@ -794,11 +787,7 @@ pub async fn pull_worktree(
     branch: String,
     app: tauri::AppHandle,
 ) -> Result<PullResult, WtError> {
-    let repo_clone = repo.clone();
-    let branch_clone = branch.clone();
-    let handle = app.clone();
-
-    spawn_blocking(move || wt::pull_worktree(&handle, &repo_clone, &branch_clone))
+    spawn_blocking(move || wt::pull_worktree(&app, &repo, &branch))
         .await
         .map_err(|e| WtError {
             code: "SPAWN_ERROR".to_string(),
@@ -817,11 +806,7 @@ pub async fn sync_worktree(
     branch: String,
     app: tauri::AppHandle,
 ) -> Result<SyncResult, WtError> {
-    let repo_clone = repo.clone();
-    let branch_clone = branch.clone();
-    let handle = app.clone();
-
-    spawn_blocking(move || wt::sync_worktree(&handle, &repo_clone, &branch_clone))
+    spawn_blocking(move || wt::sync_worktree(&app, &repo, &branch))
         .await
         .map_err(|e| WtError {
             code: "SPAWN_ERROR".to_string(),
@@ -839,8 +824,7 @@ pub async fn get_recent_worktrees(
     count: Option<u32>,
     app: tauri::AppHandle,
 ) -> Result<Vec<RecentWorktree>, WtError> {
-    let handle = app.clone();
-    spawn_blocking(move || wt::get_recent_worktrees(&handle, count))
+    spawn_blocking(move || wt::get_recent_worktrees(&app, count))
         .await
         .map_err(|e| WtError {
             code: "SPAWN_ERROR".to_string(),
@@ -862,10 +846,7 @@ pub async fn list_branches(
     repo_name: String,
     app: tauri::AppHandle,
 ) -> Result<BranchesResult, WtError> {
-    let repo = repo_name.clone();
-    let handle = app.clone();
-
-    spawn_blocking(move || wt::get_branches(&handle, &repo))
+    spawn_blocking(move || wt::get_branches(&app, &repo_name))
         .await
         .map_err(|e| WtError {
             code: "SPAWN_ERROR".to_string(),
@@ -883,10 +864,7 @@ pub async fn get_repo_health(
     repo_name: String,
     app: tauri::AppHandle,
 ) -> Result<HealthResult, WtError> {
-    let repo = repo_name.clone();
-    let handle = app.clone();
-
-    spawn_blocking(move || wt::get_health(&handle, &repo))
+    spawn_blocking(move || wt::get_health(&app, &repo_name))
         .await
         .map_err(|e| WtError {
             code: "SPAWN_ERROR".to_string(),
@@ -906,11 +884,7 @@ pub async fn get_recent_commits(
     count: Option<u32>,
     app: tauri::AppHandle,
 ) -> Result<LogResult, WtError> {
-    let repo = repo_name.clone();
-    let branch_clone = branch.clone();
-    let handle = app.clone();
-
-    spawn_blocking(move || wt::get_recent_commits(&handle, &repo, &branch_clone, count))
+    spawn_blocking(move || wt::get_recent_commits(&app, &repo_name, &branch, count))
         .await
         .map_err(|e| WtError {
             code: "SPAWN_ERROR".to_string(),
@@ -929,11 +903,7 @@ pub async fn get_uncommitted_files(
     branch: String,
     app: tauri::AppHandle,
 ) -> Result<ChangesResult, WtError> {
-    let repo = repo_name.clone();
-    let branch_clone = branch.clone();
-    let handle = app.clone();
-
-    spawn_blocking(move || wt::get_uncommitted_files(&handle, &repo, &branch_clone))
+    spawn_blocking(move || wt::get_uncommitted_files(&app, &repo_name, &branch))
         .await
         .map_err(|e| WtError {
             code: "SPAWN_ERROR".to_string(),
@@ -953,12 +923,7 @@ pub async fn prune_repo(
     force: bool,
     app: tauri::AppHandle,
 ) -> Result<PruneResult, WtError> {
-    // Clone values for the background thread
-    let repo = repo_name.clone();
-    let handle = app.clone();
-
-    // Run the blocking CLI operation on a background thread
-    spawn_blocking(move || wt::prune_with_progress(&repo, force, &handle))
+    spawn_blocking(move || wt::prune_with_progress(&repo_name, force, &app))
         .await
         .map_err(|e| WtError {
             code: "SPAWN_ERROR".to_string(),
@@ -977,12 +942,7 @@ pub async fn pull_all_worktrees(
     repo_name: String,
     app: tauri::AppHandle,
 ) -> Result<PullAllResult, WtError> {
-    // Clone values for the background thread
-    let repo = repo_name.clone();
-    let handle = app.clone();
-
-    // Run the blocking CLI operation on a background thread
-    spawn_blocking(move || wt::pull_all_with_progress(&repo, &handle))
+    spawn_blocking(move || wt::pull_all_with_progress(&repo_name, &app))
         .await
         .map_err(|e| WtError {
             code: "SPAWN_ERROR".to_string(),
@@ -1002,13 +962,7 @@ pub async fn pull_selected_worktrees(
     branches: Vec<String>,
     app: tauri::AppHandle,
 ) -> Result<PullAllResult, WtError> {
-    // Clone values for the background thread
-    let repo = repo_name.clone();
-    let branch_list = branches.clone();
-    let handle = app.clone();
-
-    // Run the blocking CLI operation on a background thread
-    spawn_blocking(move || wt::pull_selected_with_progress(&repo, branch_list, &handle))
+    spawn_blocking(move || wt::pull_selected_with_progress(&repo_name, branches, &app))
         .await
         .map_err(|e| WtError {
             code: "SPAWN_ERROR".to_string(),
@@ -1055,10 +1009,7 @@ pub async fn resume_operation(
     operation_id: String,
     app: tauri::AppHandle,
 ) -> Result<PullAllResult, WtError> {
-    let id = operation_id.clone();
-    let handle = app.clone();
-
-    spawn_blocking(move || wt::resume_pull_all_operation(&id, &handle))
+    spawn_blocking(move || wt::resume_pull_all_operation(&operation_id, &app))
         .await
         .map_err(|e| WtError {
             code: "SPAWN_ERROR".to_string(),
@@ -1073,9 +1024,7 @@ pub async fn resume_operation(
 /// Callable from frontend as: invoke('dismiss_operation', { operationId })
 #[command]
 pub async fn dismiss_operation(operation_id: String) -> Result<(), WtError> {
-    let id = operation_id.clone();
-
-    spawn_blocking(move || operation_state::delete_state(&id))
+    spawn_blocking(move || operation_state::delete_state(&operation_id))
         .await
         .map_err(|e| WtError {
             code: "SPAWN_ERROR".to_string(),
@@ -1114,17 +1063,12 @@ pub async fn clone_repository(
     default_branch: Option<String>,
     app: tauri::AppHandle,
 ) -> Result<CloneResult, WtError> {
-    let url_clone = url.clone();
-    let name_clone = name.clone();
-    let branch_clone = default_branch.clone();
-    let handle = app.clone();
-
     spawn_blocking(move || {
         wt::clone_repository(
-            &handle,
-            &url_clone,
-            name_clone.as_deref(),
-            branch_clone.as_deref(),
+            &app,
+            &url,
+            name.as_deref(),
+            default_branch.as_deref(),
         )
     })
     .await
@@ -1143,10 +1087,7 @@ pub async fn repair_repository(
     repo_name: String,
     app: tauri::AppHandle,
 ) -> Result<RepairResult, WtError> {
-    let repo = repo_name.clone();
-    let handle = app.clone();
-
-    spawn_blocking(move || wt::repair_repository(&handle, &repo))
+    spawn_blocking(move || wt::repair_repository(&app, &repo_name))
         .await
         .map_err(|e| WtError {
             code: "SPAWN_ERROR".to_string(),
@@ -1163,10 +1104,7 @@ pub async fn unlock_repository(
     repo_name: String,
     app: tauri::AppHandle,
 ) -> Result<UnlockResult, WtError> {
-    let repo = repo_name.clone();
-    let handle = app.clone();
-
-    spawn_blocking(move || wt::unlock_repository(&handle, &repo))
+    spawn_blocking(move || wt::unlock_repository(&app, &repo_name))
         .await
         .map_err(|e| WtError {
             code: "SPAWN_ERROR".to_string(),
@@ -1224,10 +1162,7 @@ pub async fn generate_report(
     repo_name: String,
     app: tauri::AppHandle,
 ) -> Result<String, WtError> {
-    let repo = repo_name.clone();
-    let handle = app.clone();
-
-    spawn_blocking(move || wt::generate_health_report(&handle, &repo))
+    spawn_blocking(move || wt::generate_health_report(&app, &repo_name))
         .await
         .map_err(|e| WtError {
             code: "SPAWN_ERROR".to_string(),
@@ -1246,11 +1181,10 @@ pub async fn save_report_to_desktop(
     repo_name: String,
     app: tauri::AppHandle,
 ) -> Result<String, WtError> {
-    let repo = repo_name.clone();
-    let handle = app.clone();
+    let repo_for_report = repo_name.clone();
 
     // Generate the report
-    let report = spawn_blocking(move || wt::generate_health_report(&handle, &repo))
+    let report = spawn_blocking(move || wt::generate_health_report(&app, &repo_for_report))
         .await
         .map_err(|e| WtError {
             code: "SPAWN_ERROR".to_string(),
@@ -1569,7 +1503,7 @@ mod tests {
     #[test]
     fn test_check_wt_available_does_not_panic() {
         // Just ensure the function doesn't panic
-        let _ = check_wt_available();
+        // Requires AppHandle - tested via integration tests
     }
 
     #[test]

@@ -1,15 +1,15 @@
 <script setup lang="ts">
 /**
- * SettingsModal Component
+ * SettingsPanel Component
  *
- * Application settings modal with preferences for editor, terminal,
+ * Application settings panel with preferences for editor, terminal,
  * Git client, default base branch, and notification settings.
  */
 import { ref, watch, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useSettingsStore, EDITOR_OPTIONS, TERMINAL_OPTIONS, GIT_CLIENT_OPTIONS } from '../stores'
 import type { EditorChoice, TerminalChoice, GitClientChoice } from '../stores'
-import { Modal, Button, Input, Select, Toggle } from './ui'
+import { Panel, Button, Input, Select, Toggle } from './ui'
 
 const props = defineProps<{
   isOpen: boolean
@@ -69,7 +69,7 @@ const isFormValid = computed(() => {
   return !customEditorPathError.value && !customGitClientPathError.value && !baseBranchError.value
 })
 
-// Reset local values when modal opens
+// Reset local values when panel opens
 watch(() => props.isOpen, (open) => {
   if (open) {
     editor.value = settings.value.editor
@@ -121,7 +121,7 @@ const gitClientDescription = computed(() => {
 </script>
 
 <template>
-  <Modal
+  <Panel
     :open="isOpen"
     title="Settings"
     size="lg"
@@ -272,5 +272,5 @@ const gitClientDescription = computed(() => {
         </div>
       </div>
     </template>
-  </Modal>
+  </Panel>
 </template>
