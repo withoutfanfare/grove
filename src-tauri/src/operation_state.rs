@@ -44,7 +44,7 @@ fn evict_cache_if_needed(cache: &mut std::collections::HashMap<String, Operation
 // Directory Management
 // ============================================================================
 
-/// Get the operations directory path (~/.wt/operations/).
+/// Get the operations directory path (~/.grove/operations/).
 ///
 /// Creates the directory if it doesn't exist.
 pub fn get_operations_dir() -> WtResult<PathBuf> {
@@ -55,7 +55,7 @@ pub fn get_operations_dir() -> WtResult<PathBuf> {
         )
     })?;
 
-    let ops_dir = home.join(".wt").join("operations");
+    let ops_dir = home.join(".grove").join("operations");
 
     if !ops_dir.exists() {
         fs::create_dir_all(&ops_dir).map_err(|e| {
@@ -82,7 +82,7 @@ fn get_state_file_path(operation_id: &str) -> WtResult<PathBuf> {
 /// Save an operation state to disk.
 ///
 /// This is called after each item completes to checkpoint progress.
-/// The state is saved as JSON to `~/.wt/operations/<operation_id>.json`.
+/// The state is saved as JSON to `~/.grove/operations/<operation_id>.json`.
 pub fn save_state(state: &OperationState) -> WtResult<()> {
     let file_path = get_state_file_path(&state.id)?;
 

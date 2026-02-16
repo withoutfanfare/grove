@@ -1,18 +1,18 @@
 // Tauri IPC command handlers
 //
 // These commands are callable from the Vue frontend via Tauri's invoke API.
-// Each command wraps the wt CLI executor and returns typed results.
+// Each command wraps the grove CLI executor and returns typed results.
 
 use std::path::PathBuf;
 use std::process::Command;
 
-use tauri::command;
+use tauri::{command, Emitter, Manager};
 use tokio::task::spawn_blocking;
 
 use crate::operation_state;
 use crate::types::{
-    BranchesResult, ChangesResult, CloneResult, Config, CreateWorktreeResult, HealthResult,
-    LogResult, PruneResult, PullAllResult, PullResult, RecentWorktree, RemoveWorktreeResult,
+    BranchesResult, ChangesResult, CloneResult, Config, CreateWorktreeResponse, HealthResult,
+    LogResult, PruneResult, PullAllResult, PullResult, RecentWorktree, RemoveWorktreeResponse,
     RepairResult, Repository, ResumableOperationSummary, SyncResult, UnlockResult, Worktree,
     WtError,
 };
@@ -129,7 +129,7 @@ fn validate_template_name(name: &str) -> Result<(), WtError> {
 // Repository and Worktree Commands
 // ============================================================================
 
-/// List all repositories managed by wt
+/// List all repositories managed by grove
 ///
 /// Returns a list of repositories with their worktree counts.
 /// Runs on a background thread to keep the UI responsive.
@@ -180,7 +180,7 @@ pub async fn get_worktree_status(
         })?
 }
 
-/// Check if wt CLI is available
+/// Check if grove CLI is available
 ///
 /// Callable from frontend as: invoke('check_wt_available')
 #[command]
@@ -191,7 +191,7 @@ pub async fn check_wt_available(app: tauri::AppHandle) -> bool {
         .unwrap_or(false)
 }
 
-/// Get wt CLI version
+/// Get grove CLI version
 ///
 /// Runs on a background thread to keep the UI responsive.
 /// Callable from frontend as: invoke('get_wt_version')
@@ -685,22 +685,30 @@ pub fn open_in_finder(path: String) -> Result<(), WtError> {
 // Configuration Commands
 // ============================================================================
 
-/// Get the wt configuration
+/// Get the grove configuration with layered overrides.
 ///
-/// Returns a structured Config object with wt configuration values.
-/// L2: Updated to return typed Config struct instead of raw String.
-/// M20: Returns structured type for type-safe frontend consumption.
+/// Returns a structured Config object with grove configuration values.
+/// When `repo_name` is provided, overlays project and repo config layers
+/// on top of the CLI's global config, so "Resolved Values" reflects the
+/// effective configuration for that repository.
 ///
-/// Callable from frontend as: invoke('get_config')
-#[command]
-pub async fn get_config(app: tauri::AppHandle) -> Result<Config, WtError> {
+/// Callable from frontend as: invoke('get_config', { repoName })
+#[command(rename_all = "camelCase")]
+pub async fn get_config(
+    repo_name: Option<String>,
+    app: tauri::AppHandle,
+) -> Result<Config, WtError> {
     let handle = app.clone();
-    spawn_blocking(move || wt::get_config(&handle))
-        .await
-        .map_err(|e| WtError {
-            code: "SPAWN_ERROR".to_string(),
-            message: format!("Failed to spawn blocking task: {}", e),
-        })?
+    spawn_blocking(move || {
+        let mut config = wt::get_config(&handle)?;
+        config_files::apply_all_config_layers(&mut config, repo_name.as_deref())?;
+        Ok(config)
+    })
+    .await
+    .map_err(|e| WtError {
+        code: "SPAWN_ERROR".to_string(),
+        message: format!("Failed to spawn blocking task: {}", e),
+    })?
 }
 
 // ============================================================================
@@ -720,7 +728,7 @@ pub async fn create_worktree(
     template: Option<String>,
     force: bool,
     app: tauri::AppHandle,
-) -> Result<CreateWorktreeResult, WtError> {
+) -> Result<CreateWorktreeResponse, WtError> {
     // H4: Validate template name if provided (stricter than repo name validation)
     if let Some(ref t) = template {
         validate_template_name(t)?;
@@ -757,7 +765,7 @@ pub async fn remove_worktree(
     skip_backup: bool,
     force: bool,
     app: tauri::AppHandle,
-) -> Result<RemoveWorktreeResult, WtError> {
+) -> Result<RemoveWorktreeResponse, WtError> {
     spawn_blocking(move || {
         wt::remove_worktree(
             &app,
@@ -1053,7 +1061,7 @@ pub async fn mark_interrupted_operations() -> Result<u32, WtError> {
 
 /// Clone a git repository
 ///
-/// Clones a git repository using the wt CLI.
+/// Clones a git repository using the grove CLI.
 /// Supports HTTPS and SSH URLs.
 /// Callable from frontend as: invoke('clone_repository', { url, name, defaultBranch })
 #[command(rename_all = "camelCase")]
@@ -1112,9 +1120,9 @@ pub async fn unlock_repository(
         })?
 }
 
-/// Open the wt config file in the default editor
+/// Open the grove config file in the default editor
 ///
-/// Opens ~/.wt/config in the system default text editor.
+/// Opens the grove config in the system default text editor.
 /// Callable from frontend as: invoke('open_config')
 #[command]
 pub fn open_config() -> Result<(), WtError> {
@@ -1494,6 +1502,152 @@ pub async fn set_hook_executable(
 #[command]
 pub fn refresh_tray_menu(app: tauri::AppHandle) {
     crate::tray::refresh_tray_menu(&app);
+}
+
+// ============================================================================
+// Context Menus (Phase 4.2)
+// ============================================================================
+
+use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder, PredefinedMenuItem};
+
+/// Show a native context menu for a worktree card.
+///
+/// Creates a native right-click context menu with actions for the specified worktree.
+/// Callable from frontend as: invoke('show_worktree_context_menu', { repoName, branch, path, url })
+#[command(rename_all = "camelCase")]
+pub async fn show_worktree_context_menu(
+    app: tauri::AppHandle,
+    repo_name: String,
+    branch: String,
+    path: String,
+    url: Option<String>,
+) -> Result<(), WtError> {
+    let webview_window = app.get_webview_window("main").ok_or_else(|| WtError {
+        code: "WINDOW_ERROR".to_string(),
+        message: "Main window not found".to_string(),
+    })?;
+
+    let menu = build_worktree_context_menu(&app, &repo_name, &branch, &path, url.as_deref())
+        .map_err(|e| WtError {
+            code: "MENU_ERROR".to_string(),
+            message: format!("Failed to build context menu: {}", e),
+        })?;
+
+    let app_handle = app.clone();
+    let repo = repo_name.clone();
+    let br = branch.clone();
+    let p = path.clone();
+    let u = url.clone();
+
+    webview_window.popup_menu(&menu).map_err(|e| WtError {
+        code: "MENU_ERROR".to_string(),
+        message: format!("Failed to show context menu: {}", e),
+    })?;
+
+    // Handle menu events via the app-level menu event handler
+    app_handle.on_menu_event(move |app, event| {
+        let id = event.id.0.as_str();
+        match id {
+            "ctx_open_editor" => {
+                let _ = std::process::Command::new("open")
+                    .args(["-a", "Visual Studio Code", &p])
+                    .spawn();
+            }
+            "ctx_open_terminal" => {
+                let _ = std::process::Command::new("open")
+                    .args(["-a", "Terminal", &p])
+                    .spawn();
+            }
+            "ctx_open_browser" => {
+                if let Some(ref url) = u {
+                    let _ = std::process::Command::new("open").arg(url).spawn();
+                }
+            }
+            "ctx_copy_path" => {
+                let _ = app.emit("context_menu_action", serde_json::json!({
+                    "action": "copy_path",
+                    "value": &p,
+                }));
+            }
+            "ctx_copy_branch" => {
+                let _ = app.emit("context_menu_action", serde_json::json!({
+                    "action": "copy_branch",
+                    "value": &br,
+                }));
+            }
+            "ctx_copy_url" => {
+                if let Some(ref url) = u {
+                    let _ = app.emit("context_menu_action", serde_json::json!({
+                        "action": "copy_url",
+                        "value": url,
+                    }));
+                }
+            }
+            "ctx_pull" => {
+                let _ = app.emit("context_menu_action", serde_json::json!({
+                    "action": "pull",
+                    "repo": &repo,
+                    "branch": &br,
+                }));
+            }
+            "ctx_delete" => {
+                let _ = app.emit("context_menu_action", serde_json::json!({
+                    "action": "delete",
+                    "repo": &repo,
+                    "branch": &br,
+                }));
+            }
+            _ => {}
+        }
+    });
+
+    Ok(())
+}
+
+/// Build a native context menu for a worktree card.
+fn build_worktree_context_menu(
+    app: &tauri::AppHandle,
+    _repo_name: &str,
+    _branch: &str,
+    _path: &str,
+    url: Option<&str>,
+) -> Result<Menu<tauri::Wry>, Box<dyn std::error::Error>> {
+    let mut builder = MenuBuilder::new(app);
+
+    // Open actions
+    let open_editor = MenuItemBuilder::with_id("ctx_open_editor", "Open in Editor").build(app)?;
+    let open_terminal = MenuItemBuilder::with_id("ctx_open_terminal", "Open in Terminal").build(app)?;
+    builder = builder.item(&open_editor).item(&open_terminal);
+
+    if url.is_some() {
+        let open_browser = MenuItemBuilder::with_id("ctx_open_browser", "Open in Browser").build(app)?;
+        builder = builder.item(&open_browser);
+    }
+
+    // Separator
+    let sep1 = PredefinedMenuItem::separator(app)?;
+    builder = builder.item(&sep1);
+
+    // Copy actions
+    let copy_path = MenuItemBuilder::with_id("ctx_copy_path", "Copy Path").build(app)?;
+    let copy_branch = MenuItemBuilder::with_id("ctx_copy_branch", "Copy Branch Name").build(app)?;
+    builder = builder.item(&copy_path).item(&copy_branch);
+
+    if url.is_some() {
+        let copy_url = MenuItemBuilder::with_id("ctx_copy_url", "Copy URL").build(app)?;
+        builder = builder.item(&copy_url);
+    }
+
+    // Separator
+    let sep2 = PredefinedMenuItem::separator(app)?;
+    builder = builder.item(&sep2);
+
+    // Worktree actions
+    let pull = MenuItemBuilder::with_id("ctx_pull", "Pull").build(app)?;
+    let delete = MenuItemBuilder::with_id("ctx_delete", "Delete\u{2026}").build(app)?;
+    builder = builder.item(&pull).item(&delete);
+
+    Ok(builder.build()?)
 }
 
 #[cfg(test)]

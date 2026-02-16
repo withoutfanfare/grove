@@ -207,6 +207,13 @@ export function useAutoRefresh(): UseAutoRefreshReturn {
       // Try getWorktreeStatus first for richer information
       try {
         const worktrees = await wt.getWorktreeStatus(repoName);
+
+        // Guard against stale responses if repo changed during await
+        if (store.selectedRepoName !== repoName) {
+          console.debug(`[useAutoRefresh] Stale refresh response for ${repoName}, discarding`);
+          return;
+        }
+
         store.setWorktrees(worktrees);
         lastRefreshTime.value = Date.now();
       } catch (primaryError) {
@@ -215,6 +222,13 @@ export function useAutoRefresh(): UseAutoRefreshReturn {
         // Fall back to list_worktrees if status fails
         try {
           const worktrees = await wt.listWorktrees(repoName);
+
+          // Guard against stale fallback responses
+          if (store.selectedRepoName !== repoName) {
+            console.debug(`[useAutoRefresh] Stale fallback response for ${repoName}, discarding`);
+            return;
+          }
+
           store.setWorktrees(worktrees);
           lastRefreshTime.value = Date.now();
         } catch (fallbackError) {

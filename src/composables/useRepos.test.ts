@@ -29,7 +29,7 @@ describe('useRepos', () => {
     })
 
     it('should handle errors', async () => {
-      const error = { code: 'CLI_NOT_FOUND', message: 'wt CLI not found' }
+      const error = { code: 'CLI_NOT_FOUND', message: 'grove CLI not found' }
       mockTauriInvoke.mockRejectedValue(error)
 
       const { fetchRepositories } = useRepos()

@@ -188,13 +188,13 @@ export const mockScenarios = {
   },
 
   /**
-   * Error state - wt CLI not available
+   * Error state - grove CLI not available
    */
   wtNotAvailable: () => {
     return new TauriInvokeMock()
-      .givenError('list_repositories', createMockWtError({ 
+      .givenError('list_repositories', createMockWtError({
         code: 'CLI_NOT_FOUND',
-        message: 'wt CLI not found'
+        message: 'grove CLI not found'
       }))
   },
 

@@ -1,9 +1,12 @@
 import { ref } from 'vue';
 import { useWorktreeStore, useSettingsStore } from '../stores';
 import { useWt } from './useWt';
+import { useNotifications } from './useNotifications';
 import type {
   CreateWorktreeOptions,
+  CreateWorktreeResponse,
   RemoveWorktreeOptions,
+  RemoveWorktreeResponse,
   PullResult,
   SyncResult,
   BranchesResult,
@@ -78,6 +81,7 @@ function isWorktreeBusy(repo: string, branch: string): boolean {
  */
 export function useWorktrees() {
   const store = useWorktreeStore();
+  const notifications = useNotifications();
   const settingsStore = useSettingsStore();
   const wt = useWt();
 
@@ -216,61 +220,71 @@ export function useWorktrees() {
   /**
    * Open a worktree in the configured editor
    */
-  async function openInEditor(path: string): Promise<void> {
+  async function openInEditor(path: string): Promise<boolean> {
     try {
       const { editor, customEditorPath } = settingsStore.settings;
       await wt.openInEditor(path, editor, customEditorPath || undefined);
+      return true;
     } catch (error) {
       store.setError(wt.toWtError(error));
+      return false;
     }
   }
 
   /**
    * Open a terminal at the worktree path using the configured terminal
    */
-  async function openInTerminal(path: string): Promise<void> {
+  async function openInTerminal(path: string): Promise<boolean> {
     try {
       const { terminal } = settingsStore.settings;
       await wt.openInTerminal(path, terminal);
+      return true;
     } catch (error) {
       store.setError(wt.toWtError(error));
+      return false;
     }
   }
 
   /**
    * Open the worktree in the configured Git client
    */
-  async function openInGitClient(path: string): Promise<void> {
+  async function openInGitClient(path: string): Promise<boolean> {
     try {
       const { gitClient, customGitClientPath } = settingsStore.settings;
       if (gitClient === 'none') {
         throw new Error('No Git client configured. Please set a Git client in Settings.');
       }
       await wt.openInGitClient(path, gitClient, customGitClientPath || undefined);
+      return true;
     } catch (error) {
       store.setError(wt.toWtError(error));
+      return false;
     }
   }
 
   /**
    * Open the worktree URL in the browser
    */
-  async function openInBrowser(url: string): Promise<void> {
+  async function openInBrowser(url: string): Promise<boolean> {
     try {
       await wt.openInBrowser(url);
+      return true;
     } catch (error) {
       store.setError(wt.toWtError(error));
+      return false;
     }
   }
 
   /**
    * Open the worktree path in Finder
    */
-  async function openInFinder(path: string): Promise<void> {
+  async function openInFinder(path: string): Promise<boolean> {
     try {
       await wt.openInFinder(path);
+      return true;
     } catch (error) {
       store.setError(wt.toWtError(error));
+      return false;
     }
   }
 
@@ -294,46 +308,44 @@ export function useWorktrees() {
     };
 
     // Fire all open operations in parallel for speed
-    const promises: Promise<void>[] = [
-      openInTerminal(path).then(() => {
-        results.terminal = true;
-      }),
-      openInEditor(path).then(() => {
-        results.editor = true;
-      }),
+    const promises: Promise<boolean>[] = [
+      openInTerminal(path),
+      openInEditor(path),
     ];
 
     // Only open browser if URL is available
     if (url) {
-      promises.push(
-        openInBrowser(url).then(() => {
-          results.browser = true;
-        })
-      );
+      promises.push(openInBrowser(url));
     }
 
-    // Wait for all operations to complete
-    await Promise.allSettled(promises);
+    const settled = await Promise.allSettled(promises);
+    const outcomes = settled.map((result) => (result.status === 'fulfilled' ? result.value : false));
+
+    results.terminal = outcomes[0] ?? false;
+    results.editor = outcomes[1] ?? false;
+    if (url) {
+      results.browser = outcomes[2] ?? false;
+    }
 
     return results;
   }
 
   /**
    * Create a new worktree
-   * Returns true on success, false on failure
+   * Returns the CreateWorktreeResponse on success, null on failure
    */
-  async function createWorktree(options: CreateWorktreeOptions): Promise<boolean> {
+  async function createWorktree(options: CreateWorktreeOptions): Promise<CreateWorktreeResponse | null> {
     store.setLoadingWorktrees(true);
     store.clearError();
 
     try {
-      await wt.createWorktree(options);
+      const response = await wt.createWorktree(options);
       // Refresh the worktree list after creation
       await fetchWorktrees();
-      return true;
+      return response;
     } catch (error) {
       store.setError(wt.toWtError(error));
-      return false;
+      return null;
     } finally {
       store.setLoadingWorktrees(false);
     }
@@ -341,20 +353,20 @@ export function useWorktrees() {
 
   /**
    * Remove a worktree
-   * Returns true on success, false on failure
+   * Returns the RemoveWorktreeResponse on success, null on failure
    */
-  async function removeWorktree(options: RemoveWorktreeOptions): Promise<boolean> {
+  async function removeWorktree(options: RemoveWorktreeOptions): Promise<RemoveWorktreeResponse | null> {
     store.setLoadingWorktrees(true);
     store.clearError();
 
     try {
-      await wt.removeWorktree(options);
+      const response = await wt.removeWorktree(options);
       // Refresh the worktree list after removal
       await fetchWorktrees();
-      return true;
+      return response;
     } catch (error) {
       store.setError(wt.toWtError(error));
-      return false;
+      return null;
     } finally {
       store.setLoadingWorktrees(false);
     }
@@ -437,6 +449,10 @@ export function useWorktrees() {
       const result = await wt.pruneRepo(repoName, force);
       // Refresh the worktree list after pruning
       await fetchWorktrees();
+      // Notify if window not focused
+      if (result?.summary) {
+        notifications.notifyPruneComplete(result.summary.branches_deleted, repoName);
+      }
       return result;
     } catch (error) {
       store.setError(wt.toWtError(error));
@@ -453,6 +469,10 @@ export function useWorktrees() {
       const result = await wt.pullAllWorktrees(repoName);
       // Refresh the worktree list after pulling all (debounced to prevent flicker)
       fetchWorktreesDebounced();
+      // Notify if window not focused
+      if (result?.summary) {
+        notifications.notifyPullAllComplete(result.summary.succeeded, result.summary.failed);
+      }
       return result;
     } catch (error) {
       store.setError(wt.toWtError(error));

@@ -36,11 +36,13 @@ export const useRepoConfigStore = defineStore('repoConfig', () => {
   );
 
   // Actions
-  async function loadEffectiveConfig(): Promise<void> {
+  async function loadEffectiveConfig(repoName?: string): Promise<void> {
     loading.value = true;
     error.value = null;
     try {
-      effectiveConfig.value = await invoke<Config>('get_config');
+      effectiveConfig.value = await invoke<Config>('get_config', {
+        repoName: repoName ?? null,
+      });
     } catch (e) {
       error.value = isWtError(e) ? e : { code: 'UNKNOWN', message: String(e) };
       throw e;
@@ -97,8 +99,8 @@ export const useRepoConfigStore = defineStore('repoConfig', () => {
       });
       // Reload the file to get updated metadata
       await openConfigFile(layer, repoName);
-      // Also refresh the effective config
-      await loadEffectiveConfig();
+      // Also refresh the effective config (with repo context for proper resolution)
+      await loadEffectiveConfig(repoName);
     } catch (e) {
       error.value = isWtError(e) ? e : { code: 'UNKNOWN', message: String(e) };
       throw e;
@@ -121,8 +123,8 @@ export const useRepoConfigStore = defineStore('repoConfig', () => {
         updates,
       });
       openFile.value = contents;
-      // Also refresh the effective config
-      await loadEffectiveConfig();
+      // Also refresh the effective config (with repo context for proper resolution)
+      await loadEffectiveConfig(repoName);
       return contents;
     } catch (e) {
       error.value = isWtError(e) ? e : { code: 'UNKNOWN', message: String(e) };

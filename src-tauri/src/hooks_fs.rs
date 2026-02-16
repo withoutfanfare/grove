@@ -155,8 +155,8 @@ pub struct HookScriptContents {
 /// Get the hooks directory path.
 ///
 /// Checks in order:
-/// 1. WT_HOOKS_DIR environment variable
-/// 2. ~/.wt/hooks (default)
+/// 1. GROVE_HOOKS_DIR environment variable
+/// 2. ~/.grove/hooks (default)
 pub fn get_hooks_dir(config_hooks_dir: Option<&str>) -> Result<PathBuf, WtError> {
     // First check config-provided hooks dir
     if let Some(dir) = config_hooks_dir {
@@ -169,7 +169,7 @@ pub fn get_hooks_dir(config_hooks_dir: Option<&str>) -> Result<PathBuf, WtError>
     }
 
     // Check environment variable
-    if let Ok(dir) = std::env::var("WT_HOOKS_DIR") {
+    if let Ok(dir) = std::env::var("GROVE_HOOKS_DIR") {
         let path = PathBuf::from(dir);
         if path.exists() {
             return path.canonicalize().map_err(|e| {
@@ -178,7 +178,7 @@ pub fn get_hooks_dir(config_hooks_dir: Option<&str>) -> Result<PathBuf, WtError>
         }
     }
 
-    // Default to ~/.wt/hooks
+    // Default to ~/.grove/hooks
     let default = get_wt_config_dir()?.join("hooks");
     Ok(default)
 }
@@ -533,6 +533,8 @@ pub fn create_hook(
 
     // Write the hook with executable permissions
     write_text_file_atomic(&path, content, 0o755, false)?;
+
+    log::info!("Created hook: {} (scope: {}, event: {})", path.display(), scope, event);
 
     // Return the new hook's metadata
     create_hook_meta(&path, event, scope, repo_name.map(|s| s.to_string()))

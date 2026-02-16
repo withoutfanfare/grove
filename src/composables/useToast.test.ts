@@ -251,15 +251,15 @@ describe('useToast', () => {
       
       const wtError = {
         code: 'CLI_NOT_FOUND',
-        message: 'wt CLI not found in PATH',
+        message: 'grove CLI not found in PATH',
       }
-      
+
       showWtError(wtError)
-      
+
       expect(toasts.value).toHaveLength(1)
       expect(toasts.value[0].variant).toBe('error')
       expect(toasts.value[0].message).toContain('CLI Not Installed')
-      expect(toasts.value[0].message).toContain('wt CLI not found in PATH')
+      expect(toasts.value[0].message).toContain('grove CLI not found in PATH')
     })
 
     it('should show fallback message for non-WtError', () => {

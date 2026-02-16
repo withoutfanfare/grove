@@ -5,8 +5,9 @@
  * A clean search input with magnifying glass icon, clear button,
  * and debounced input for filtering lists.
  */
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
+import { usePlatform } from '../composables/useKeyboardShortcuts'
 
 interface Props {
   modelValue: string
@@ -23,6 +24,8 @@ const props = withDefaults(defineProps<Props>(), {
 
 // Focus state for shortcut visibility
 const isFocused = ref(false)
+const { formatShortcut } = usePlatform()
+const shortcutHint = computed(() => formatShortcut('F'))
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
@@ -84,7 +87,7 @@ function clearSearch() {
       class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none">
       <kbd
         class="hidden sm:inline-flex h-5 items-center gap-0.5 px-1.5 text-[10px] font-medium text-text-tertiary bg-white/5 border border-white/10 rounded font-sans">
-        <span class="text-xs">⌘</span>F
+        {{ shortcutHint }}
       </kbd>
     </div>
 

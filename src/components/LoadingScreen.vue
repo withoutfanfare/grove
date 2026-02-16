@@ -6,6 +6,7 @@
  * Features micro-animations, gradient effects, and a polished design.
  */
 import { ref, onMounted, onUnmounted } from 'vue'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 
 defineProps<{
   /** Loading message to display */
@@ -30,7 +31,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="loading-screen">
+  <div class="loading-screen" @mousedown.left="getCurrentWindow().startDragging()">
     <!-- Animated background gradient -->
     <div class="loading-bg" />
     
@@ -124,6 +125,8 @@ onUnmounted(() => {
   background: var(--color-surface-base);
   overflow: hidden;
   z-index: 9999;
+  -webkit-app-region: drag;
+  app-region: drag;
 }
 
 /* Animated gradient background */

@@ -34,7 +34,7 @@ export function useRepos() {
   }
 
   /**
-   * Check if wt CLI is available and store the result
+   * Check if grove CLI is available and store the result
    */
   async function checkAvailability(): Promise<boolean> {
     const available = await wt.checkWtAvailable();

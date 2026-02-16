@@ -3,9 +3,9 @@ import type {
   Repository,
   Worktree,
   WtError,
-  CreateWorktreeResult,
+  CreateWorktreeResponse,
   CreateWorktreeOptions,
-  RemoveWorktreeResult,
+  RemoveWorktreeResponse,
   RemoveWorktreeOptions,
   PullResult,
   SyncResult,
@@ -27,12 +27,12 @@ import type {
 import { isWtError } from '../types';
 
 /**
- * Low-level wrapper for Tauri invoke calls to the wt backend.
- * Provides type-safe access to all wt CLI commands.
+ * Low-level wrapper for Tauri invoke calls to the grove backend.
+ * Provides type-safe access to all grove CLI commands.
  */
 export function useWt() {
   /**
-   * Check if the wt CLI is available on the system
+   * Check if the grove CLI is available on the system
    */
   async function checkWtAvailable(): Promise<boolean> {
     try {
@@ -43,7 +43,7 @@ export function useWt() {
   }
 
   /**
-   * Get the wt CLI version string
+   * Get the grove CLI version string
    */
   async function getWtVersion(): Promise<string | null> {
     try {
@@ -54,7 +54,7 @@ export function useWt() {
   }
 
   /**
-   * List all repositories managed by wt
+   * List all repositories managed by grove
    */
   async function listRepositories(): Promise<Repository[]> {
     return await invoke<Repository[]>('list_repositories');
@@ -133,8 +133,8 @@ export function useWt() {
    */
   async function createWorktree(
     options: CreateWorktreeOptions
-  ): Promise<CreateWorktreeResult> {
-    return await invoke<CreateWorktreeResult>('create_worktree', {
+  ): Promise<CreateWorktreeResponse> {
+    return await invoke<CreateWorktreeResponse>('create_worktree', {
       repo: options.repo,
       branch: options.branch,
       base: options.base ?? null,
@@ -148,8 +148,8 @@ export function useWt() {
    */
   async function removeWorktree(
     options: RemoveWorktreeOptions
-  ): Promise<RemoveWorktreeResult> {
-    return await invoke<RemoveWorktreeResult>('remove_worktree', {
+  ): Promise<RemoveWorktreeResponse> {
+    return await invoke<RemoveWorktreeResponse>('remove_worktree', {
       repo: options.repo,
       branch: options.branch,
       deleteBranch: options.deleteBranch ?? false,
@@ -365,7 +365,7 @@ export function useWt() {
   }
 
   /**
-   * Open the wt config file in the default editor
+   * Open the grove config file in the default editor
    */
   async function openConfig(): Promise<void> {
     await invoke('open_config');
@@ -404,6 +404,23 @@ export function useWt() {
    */
   async function deriveRepoName(url: string): Promise<string | null> {
     return await invoke<string | null>('derive_repo_name', { url });
+  }
+
+  /**
+   * Show a native context menu for a worktree card
+   */
+  async function showWorktreeContextMenu(
+    repoName: string,
+    branch: string,
+    path: string,
+    url?: string
+  ): Promise<void> {
+    await invoke('show_worktree_context_menu', {
+      repoName,
+      branch,
+      path,
+      url: url ?? null,
+    });
   }
 
   /**
@@ -467,6 +484,7 @@ export function useWt() {
     generateReport,
     saveReportToDesktop,
     deriveRepoName,
+    showWorktreeContextMenu,
     toWtError,
   };
 }

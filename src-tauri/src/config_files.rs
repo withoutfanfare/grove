@@ -1,8 +1,8 @@
-// Configuration file operations for wt config management
+// Configuration file operations for grove config management
 //
-// This module handles reading, writing, and parsing wt configuration files
-// at the three configuration layers: Global (~/.wtrc), Project ($HERD_ROOT/.wtconfig),
-// and Repo ($HERD_ROOT/<repo>.git/.wtconfig).
+// This module handles reading, writing, and parsing grove configuration files
+// at the three configuration layers: Global (~/.groverc), Project ($HERD_ROOT/.groveconfig),
+// and Repo ($HERD_ROOT/<repo>.git/.groveconfig).
 
 use std::path::PathBuf;
 
@@ -22,11 +22,11 @@ use crate::types::WtError;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ConfigLayer {
-    /// Global config: ~/.wtrc
+    /// Global config: ~/.groverc
     Global,
-    /// Project config: $HERD_ROOT/.wtconfig
+    /// Project config: $HERD_ROOT/.groveconfig
     Project,
-    /// Repo-specific config: $HERD_ROOT/<repo>.git/.wtconfig
+    /// Repo-specific config: $HERD_ROOT/<repo>.git/.groveconfig
     Repo,
 }
 
@@ -148,16 +148,16 @@ fn is_sensitive_key(key: &str) -> bool {
 // Config Path Resolution
 // ============================================================================
 
-/// Get the path to the global config file (~/.wtrc).
+/// Get the path to the global config file (~/.groverc).
 pub fn get_global_config_path() -> Result<PathBuf, WtError> {
     let home = get_home_dir()?;
-    Ok(home.join(".wtrc"))
+    Ok(home.join(".groverc"))
 }
 
-/// Get the path to the project config file ($HERD_ROOT/.wtconfig).
+/// Get the path to the project config file ($HERD_ROOT/.groveconfig).
 pub fn get_project_config_path(herd_root: &str) -> Result<PathBuf, WtError> {
     let root = canonicalise_existing(herd_root)?;
-    Ok(root.join(".wtconfig"))
+    Ok(root.join(".groveconfig"))
 }
 
 /// Get the path to a repo-specific config file.
@@ -171,7 +171,7 @@ pub fn get_repo_config_path(herd_root: &str, repo_name: &str) -> Result<PathBuf,
     }
 
     let root = canonicalise_existing(herd_root)?;
-    Ok(root.join(format!("{}.git", repo_name)).join(".wtconfig"))
+    Ok(root.join(format!("{}.git", repo_name)).join(".groveconfig"))
 }
 
 /// Get metadata for all config files.
@@ -533,6 +533,119 @@ pub fn update_config_keys(
 }
 
 // ============================================================================
+// Config Overlay: Merge file entries onto a typed Config struct
+// ============================================================================
+
+/// Apply config file entries onto a typed Config struct.
+///
+/// This enables "Resolved Values" to reflect entries from all config layers
+/// (global, project, repo) by overlaying non-commented key=value pairs onto
+/// the base Config returned by the CLI.
+///
+/// Key mapping:
+///   DEFAULT_BASE          → default_base_branch
+///   PROTECTED_BRANCHES    → protected_branches (space-separated)
+///   GROVE_HOOKS_ENABLED   → hooks_enabled (boolean)
+///   GROVE_HOOKS_DIR       → hooks_dir
+///   DB_CREATE             → database.enabled (boolean)
+///   DB_HOST               → database.host
+///   DB_USER               → database.user
+///   GROVE_URL_SUBDOMAIN   → url_subdomain
+///   HERD_ROOT             → herd_root
+pub fn apply_config_entries(config: &mut crate::types::Config, entries: &[ConfigEntry]) {
+    for entry in entries {
+        // Skip commented-out entries — they don't contribute to resolved config
+        if entry.commented {
+            continue;
+        }
+
+        match entry.key.as_str() {
+            "DEFAULT_BASE" => {
+                config.default_base_branch = Some(entry.value.clone());
+            }
+            "PROTECTED_BRANCHES" => {
+                config.protected_branches = entry
+                    .value
+                    .split_whitespace()
+                    .map(|s| s.to_string())
+                    .collect();
+            }
+            "GROVE_HOOKS_ENABLED" => {
+                config.hooks_enabled = parse_bool(&entry.value);
+            }
+            "GROVE_HOOKS_DIR" => {
+                config.hooks_dir = Some(entry.value.clone());
+            }
+            "DB_CREATE" => {
+                let db = config.database.get_or_insert_with(Default::default);
+                db.enabled = parse_bool(&entry.value);
+            }
+            "DB_HOST" => {
+                let db = config.database.get_or_insert_with(Default::default);
+                db.host = Some(entry.value.clone());
+            }
+            "DB_USER" => {
+                let db = config.database.get_or_insert_with(Default::default);
+                db.user = Some(entry.value.clone());
+            }
+            "GROVE_URL_SUBDOMAIN" => {
+                config.url_subdomain = Some(entry.value.clone());
+            }
+            "HERD_ROOT" => {
+                config.herd_root = Some(entry.value.clone());
+            }
+            _ => {
+                // Unknown keys are ignored for the typed Config struct
+                // (they still appear in the raw config file view)
+            }
+        }
+    }
+}
+
+/// Parse a string as a boolean (true/1/yes → true, everything else → false).
+fn parse_bool(value: &str) -> bool {
+    matches!(value.to_lowercase().as_str(), "true" | "1" | "yes")
+}
+
+/// Read all config layers and overlay entries onto a Config struct.
+///
+/// Reads global, project (if herd_root available), and repo (if repo_name provided)
+/// config files in order, applying non-commented entries from each layer.
+/// Later layers override earlier ones, matching the CLI's own precedence:
+/// global → project → repo.
+pub fn apply_all_config_layers(
+    config: &mut crate::types::Config,
+    repo_name: Option<&str>,
+) -> Result<(), WtError> {
+    log::debug!("Resolving config layers (repo: {:?})", repo_name);
+    let herd_root = config.herd_root.clone();
+
+    // Layer 1: Global (~/.groverc)
+    if let Ok(global) = read_config_file(ConfigLayer::Global, None, None) {
+        log::debug!("Applied {} global config entries", global.entries.len());
+        apply_config_entries(config, &global.entries);
+    }
+
+    // Layer 2: Project ($HERD_ROOT/.groveconfig)
+    if let Some(ref herd) = herd_root {
+        if let Ok(project) = read_config_file(ConfigLayer::Project, Some(herd), None) {
+            log::debug!("Applied {} project config entries", project.entries.len());
+            apply_config_entries(config, &project.entries);
+        }
+    }
+
+    // Layer 3: Repo ($HERD_ROOT/<repo>.git/.groveconfig)
+    if let (Some(ref herd), Some(repo)) = (&herd_root, repo_name) {
+        if let Ok(repo_cfg) = read_config_file(ConfigLayer::Repo, Some(herd), Some(repo)) {
+            log::debug!("Applied {} repo config entries for '{}'", repo_cfg.entries.len(), repo);
+            apply_config_entries(config, &repo_cfg.entries);
+        }
+    }
+
+    Ok(())
+}
+
+// ============================================================================
 // Tests
 // ============================================================================
 
@@ -613,5 +726,106 @@ ACTIVE=true
         assert_eq!(ConfigLayer::Global.to_string(), "global");
         assert_eq!(ConfigLayer::Project.to_string(), "project");
         assert_eq!(ConfigLayer::Repo.to_string(), "repo");
+    }
+
+    // ========================================================================
+    // Config overlay tests
+    // ========================================================================
+
+    #[test]
+    fn test_apply_config_entries_url_subdomain() {
+        let mut config = crate::types::Config::default();
+        let entries = parse_config_file("GROVE_URL_SUBDOMAIN=charity-meals");
+        apply_config_entries(&mut config, &entries);
+        assert_eq!(config.url_subdomain, Some("charity-meals".to_string()));
+    }
+
+    #[test]
+    fn test_apply_config_entries_default_base() {
+        let mut config = crate::types::Config::default();
+        let entries = parse_config_file("DEFAULT_BASE=origin/staging");
+        apply_config_entries(&mut config, &entries);
+        assert_eq!(
+            config.default_base_branch,
+            Some("origin/staging".to_string())
+        );
+    }
+
+    #[test]
+    fn test_apply_config_entries_protected_branches() {
+        let mut config = crate::types::Config::default();
+        let entries =
+            parse_config_file("PROTECTED_BRANCHES=\"main staging production\"");
+        apply_config_entries(&mut config, &entries);
+        assert_eq!(
+            config.protected_branches,
+            vec!["main", "staging", "production"]
+        );
+    }
+
+    #[test]
+    fn test_apply_config_entries_hooks_enabled() {
+        let mut config = crate::types::Config::default();
+        let entries = parse_config_file("GROVE_HOOKS_ENABLED=true");
+        apply_config_entries(&mut config, &entries);
+        assert!(config.hooks_enabled);
+    }
+
+    #[test]
+    fn test_apply_config_entries_database() {
+        let mut config = crate::types::Config::default();
+        let entries = parse_config_file(
+            "DB_CREATE=true\nDB_HOST=127.0.0.1\nDB_USER=root",
+        );
+        apply_config_entries(&mut config, &entries);
+        let db = config.database.unwrap();
+        assert!(db.enabled);
+        assert_eq!(db.host, Some("127.0.0.1".to_string()));
+        assert_eq!(db.user, Some("root".to_string()));
+    }
+
+    #[test]
+    fn test_apply_config_entries_skips_commented() {
+        let mut config = crate::types::Config::default();
+        let entries = parse_config_file(
+            "GROVE_URL_SUBDOMAIN=active\n# GROVE_URL_SUBDOMAIN=commented-out",
+        );
+        apply_config_entries(&mut config, &entries);
+        // The active entry wins; the commented entry is ignored
+        assert_eq!(config.url_subdomain, Some("active".to_string()));
+    }
+
+    #[test]
+    fn test_apply_config_entries_later_wins() {
+        let mut config = crate::types::Config::default();
+
+        // Simulate global layer
+        let global = parse_config_file("DEFAULT_BASE=origin/main");
+        apply_config_entries(&mut config, &global);
+        assert_eq!(
+            config.default_base_branch,
+            Some("origin/main".to_string())
+        );
+
+        // Simulate repo layer overriding
+        let repo = parse_config_file("DEFAULT_BASE=origin/staging");
+        apply_config_entries(&mut config, &repo);
+        assert_eq!(
+            config.default_base_branch,
+            Some("origin/staging".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_bool() {
+        assert!(parse_bool("true"));
+        assert!(parse_bool("1"));
+        assert!(parse_bool("yes"));
+        assert!(parse_bool("TRUE"));
+        assert!(parse_bool("Yes"));
+        assert!(!parse_bool("false"));
+        assert!(!parse_bool("0"));
+        assert!(!parse_bool("no"));
+        assert!(!parse_bool(""));
     }
 }

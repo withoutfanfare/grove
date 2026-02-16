@@ -8,7 +8,7 @@
 // ============================================================================
 
 /**
- * Error codes from CLI - matches UPPER_SNAKE_CASE codes from wt CLI.
+ * Error codes from CLI - matches UPPER_SNAKE_CASE codes from grove CLI.
  *
  * These codes enable context-specific error handling in the frontend.
  * The backend (wt.rs) extracts these from structured CLI JSON errors.
@@ -158,6 +158,27 @@ export interface CreateWorktreeResult {
 }
 
 /**
+ * A hook that was executed during worktree creation
+ */
+export interface HookExecution {
+  /** Hook name (e.g. "post-add", "post-add.d/01-setup.sh") */
+  name: string;
+  /** Execution status */
+  status: 'success' | 'failed';
+}
+
+/**
+ * Response from creating a worktree, including hook execution results.
+ * Wraps the CLI JSON output with parsed hook information from stderr.
+ */
+export interface CreateWorktreeResponse {
+  /** The CLI's JSON output (path, url, branch, database) */
+  result: CreateWorktreeResult;
+  /** Hooks that ran during creation (parsed from stderr) */
+  hooks: HookExecution[];
+}
+
+/**
  * Result from removing a worktree
  */
 export interface RemoveWorktreeResult {
@@ -173,6 +194,17 @@ export interface RemoveWorktreeResult {
   branch_deleted: boolean;
   /** Whether the database was dropped */
   db_dropped: boolean;
+}
+
+/**
+ * Response from removing a worktree, including hook execution results.
+ * Wraps the CLI JSON output with parsed hook information from stderr.
+ */
+export interface RemoveWorktreeResponse {
+  /** The CLI's JSON output (success, repo, branch, path, etc.) */
+  result: RemoveWorktreeResult;
+  /** Hooks that ran during removal (parsed from stderr) */
+  hooks: HookExecution[];
 }
 
 /**
@@ -808,6 +840,8 @@ export interface Config {
   hooks_enabled: boolean;
   /** Database configuration */
   database?: ConfigDatabase;
+  /** URL subdomain prefix (e.g., "api" turns feature.test into api.feature.test) */
+  url_subdomain?: string;
 }
 
 /**
@@ -992,9 +1026,9 @@ export function getHookScopeLabel(scope: HookScope): string {
 export function getConfigLayerLabel(layer: ConfigLayer): string {
   switch (layer) {
     case 'global':
-      return 'Global (~/.wtrc)';
+      return 'Global (~/.groverc)';
     case 'project':
-      return 'Project (.wtconfig)';
+      return 'Project (.groveconfig)';
     case 'repo':
       return 'Repository';
     default:

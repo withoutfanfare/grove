@@ -59,13 +59,13 @@ export function isRetryableError(code: WtErrorCode | string): boolean {
  */
 export function getErrorAction(code: WtErrorCode | string): string | null {
   const actions: Record<string, string> = {
-    CLI_NOT_FOUND: "Install the wt CLI tool and ensure it's in your PATH",
+    CLI_NOT_FOUND: "Install the grove CLI tool and ensure it's in your PATH",
     REPO_NOT_FOUND: 'Check the repository name and try again',
     BRANCH_NOT_FOUND: 'Fetch the latest branches and try again',
     WORKTREE_NOT_FOUND: 'The worktree may have been removed. Refresh the list.',
     PROTECTED_BRANCH: 'Use the force option to operate on this branch',
     WORKTREE_EXISTS: 'A worktree already exists for this branch',
-    CONFIG_NOT_FOUND: 'Run wt setup to configure the tool',
+    CONFIG_NOT_FOUND: 'Run grove setup to configure the tool',
     INVALID_BRANCH: 'Branch names must not start with - or contain special characters',
     INVALID_REPO: 'Repository names must be alphanumeric with hyphens, underscores, or dots',
     OUTPUT_TOO_LARGE: 'The operation produced too much output. Try a more specific command.',

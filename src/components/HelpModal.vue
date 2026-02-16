@@ -46,6 +46,12 @@ const shortcuts = [
   { keys: ['Enter'], action: 'Select focused repository' },
 ]
 
+// Global shortcuts (work even when Grove is not focused)
+const globalShortcuts = [
+  { keys: ['⌃', '⇧', 'G'], action: 'Toggle Grove window (show/hide)' },
+  { keys: ['⌃', '⇧', 'W'], action: 'Quick worktree switcher' },
+]
+
 async function openExternalDocs() {
   try {
     await wt.openInBrowser('https://github.com/your-org/grove#readme')
@@ -92,7 +98,7 @@ async function openExternalDocs() {
         <!-- Getting Started -->
         <div v-if="activeTab === 'getting-started'" class="prose-help">
           <h2>Welcome to Grove</h2>
-          <p>Grove is a desktop application for managing git worktrees. It provides a visual interface for the <code>wt</code> CLI tool, letting you work on multiple branches simultaneously without switching.</p>
+          <p>Grove is a desktop application for managing git worktrees. It provides a visual interface for the <code>grove</code> CLI tool, letting you work on multiple branches simultaneously without switching.</p>
 
           <h3>Quick Start</h3>
           <ol>
@@ -103,10 +109,10 @@ async function openExternalDocs() {
           </ol>
 
           <h3>Prerequisites</h3>
-          <p>Before using Grove, you need at least one repository registered with <code>wt</code>:</p>
+          <p>Before using Grove, you need at least one repository registered with <code>grove</code>:</p>
           <pre><code>cd /path/to/your/repo
-wt setup</code></pre>
-          <p>The <code>wt</code> CLI is bundled with the app — no separate installation required.</p>
+grove setup</code></pre>
+          <p>The <code>grove</code> CLI is bundled with the app — no separate installation required.</p>
 
           <h3>Health Grades</h3>
           <p>Each worktree displays a health grade based on its state:</p>
@@ -138,9 +144,9 @@ wt setup</code></pre>
           <h3>Troubleshooting</h3>
           <p><strong>No repositories showing?</strong></p>
           <ul>
-            <li>Register repositories using <code>wt setup</code> in each repo's directory</li>
+            <li>Register repositories using <code>grove setup</code> in each repo's directory</li>
             <li>Click the refresh button in the header or press <kbd>⌘R</kbd></li>
-            <li>Run <code>wt repos</code> in your terminal to verify registered repositories</li>
+            <li>Run <code>grove repos</code> in your terminal to verify registered repositories</li>
           </ul>
           <p><strong>Worktree operations failing?</strong></p>
           <ul>
@@ -194,7 +200,7 @@ wt setup</code></pre>
           <h3>Repository Management</h3>
           <p>Access via the three-dot menu on a selected repository in the sidebar, or press <kbd>⌘M</kbd>:</p>
           <ul>
-            <li><strong>Edit Config</strong> — View and edit wt configuration files (see Configuration tab)</li>
+            <li><strong>Edit Config</strong> — View and edit grove configuration files (see Configuration tab)</li>
             <li><strong>Manage Hooks</strong> — Create, edit, and manage lifecycle hooks (see Hooks tab)</li>
             <li><strong>Refresh</strong> — Reload worktree data for the repository</li>
             <li><strong>Repair</strong> — Fix common repository issues automatically</li>
@@ -222,13 +228,13 @@ wt setup</code></pre>
         <!-- Configuration -->
         <div v-if="activeTab === 'configuration'" class="prose-help">
           <h2>Configuration</h2>
-          <p>The <code>wt</code> CLI uses a layered configuration system. Settings cascade from global defaults down to repository-specific overrides.</p>
+          <p>The <code>grove</code> CLI uses a layered configuration system. Settings cascade from global defaults down to repository-specific overrides.</p>
 
           <h3>Configuration Layers</h3>
           <p>Configuration is loaded in order, with later layers overriding earlier ones:</p>
           <ol>
-            <li><strong>Global config</strong> — <code>~/.wt/config.toml</code> — applies to all repositories</li>
-            <li><strong>Repository config</strong> — <code>.wt/config.toml</code> in each repo — overrides for that repository</li>
+            <li><strong>Global config</strong> — <code>~/.groverc</code> — applies to all repositories</li>
+            <li><strong>Repository config</strong> — <code>.groveconfig</code> in each repo — overrides for that repository</li>
           </ol>
 
           <h3>Viewing Configuration</h3>
@@ -292,8 +298,8 @@ wt setup</code></pre>
           <h3>Hook Scopes</h3>
           <p>Hooks can be defined at different levels, letting you share common setup across all projects while adding project-specific steps:</p>
           <ul>
-            <li><strong>Global (.d)</strong> — Scripts in <code>~/.wt/hooks/&lt;event&gt;.d/</code> that run for all repositories. Multiple scripts run in filename order.</li>
-            <li><strong>Repository (.d)</strong> — Scripts in <code>.wt/hooks/&lt;event&gt;.d/</code> within a specific repo. Run after global scripts.</li>
+            <li><strong>Global (.d)</strong> — Scripts in <code>~/.grove/hooks/&lt;event&gt;.d/</code> that run for all repositories. Multiple scripts run in filename order.</li>
+            <li><strong>Repository (.d)</strong> — Scripts in <code>.grove/hooks/&lt;event&gt;.d/</code> within a specific repo. Run after global scripts.</li>
             <li><strong>Single</strong> — A single hook file that replaces all .d scripts for that event.</li>
           </ul>
           <p>For example, you might have a global post-add hook that opens the worktree in your editor, plus a repo-specific one that runs <code>composer install</code> for PHP projects.</p>
@@ -377,6 +383,27 @@ echo "Docker services removed for $WT_BRANCH"</code></pre>
           <div class="space-y-2">
             <div
               v-for="shortcut in shortcuts"
+              :key="shortcut.action"
+              class="flex items-center justify-between py-2 px-3 rounded-lg bg-surface-overlay/50"
+            >
+              <span class="text-sm text-text-secondary">{{ shortcut.action }}</span>
+              <div class="flex items-center gap-1">
+                <kbd
+                  v-for="key in shortcut.keys"
+                  :key="key"
+                  class="px-2 py-1 text-xs font-mono bg-surface-base border border-border-subtle rounded"
+                >
+                  {{ key }}
+                </kbd>
+              </div>
+            </div>
+          </div>
+
+          <h3 class="text-sm font-semibold text-text-primary mt-6 mb-2">Global Shortcuts</h3>
+          <p class="text-xs text-text-muted mb-3">These work even when Grove is not focused.</p>
+          <div class="space-y-2">
+            <div
+              v-for="shortcut in globalShortcuts"
               :key="shortcut.action"
               class="flex items-center justify-between py-2 px-3 rounded-lg bg-surface-overlay/50"
             >

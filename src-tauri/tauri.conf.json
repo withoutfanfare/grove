@@ -10,15 +10,20 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "Grove",
         "width": 1440,
         "height": 900,
         "center": true,
+        "visible": false,
         "resizable": true,
         "minWidth": 900,
-        "minHeight": 650
+        "minHeight": 650,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "transparent": true
       }
     ],
     "security": {
@@ -35,6 +40,6 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": ["binaries/wt"]
+    "externalBin": ["binaries/grove"]
   }
 }

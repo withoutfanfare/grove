@@ -2,13 +2,17 @@
 /**
  * DeleteWorktreeDialog Component
  *
- * Confirmation dialog for deleting worktrees with options for
- * branch deletion, database removal, and backup preferences.
+ * Multi-phase modal for deleting worktrees with progress feedback:
+ * 1. Confirm - branch deletion, database removal, and backup preferences
+ * 2. Deleting - progress view while CLI runs hooks
+ * 3. Results - summary of deletion with hook execution details
  */
-import { ref, watch, nextTick } from 'vue'
-import type { Worktree } from '../types'
+import { ref, computed, watch, nextTick } from 'vue'
+import type { Worktree, RemoveWorktreeResponse } from '../types'
 import { useWorktrees, useToast } from '../composables'
 import { Modal, Button, Checkbox } from './ui'
+
+type ModalPhase = 'confirm' | 'deleting' | 'results'
 
 const props = defineProps<{
   isOpen: boolean
@@ -30,22 +34,77 @@ const skipBackup = ref(false)
 const isSubmitting = ref(false)
 const error = ref<string | null>(null)
 
+// Multi-phase state
+const phase = ref<ModalPhase>('confirm')
+const deletionResult = ref<RemoveWorktreeResponse | null>(null)
+const requestedDropDb = ref(false)
+
+// Deleting phase elapsed timer
+const elapsedSeconds = ref(0)
+let elapsedInterval: ReturnType<typeof setInterval> | null = null
+
 // M9: Ref for cancel button focus management
 const cancelButtonRef = ref<InstanceType<typeof Button> | null>(null)
+
+// Computed helpers for results phase
+const hasHooks = computed(() => (deletionResult.value?.hooks.length ?? 0) > 0)
+const failedHooks = computed(() => deletionResult.value?.hooks.filter(h => h.status === 'failed') ?? [])
+const hasFailedHooks = computed(() => failedHooks.value.length > 0)
+
+// Modal title based on phase
+const modalTitle = computed(() => {
+  switch (phase.value) {
+    case 'confirm': return 'Delete Worktree'
+    case 'deleting': return 'Deleting Worktree'
+    case 'results': return 'Worktree Deleted'
+  }
+})
+
+// Modal size: wider for results phase to show full paths
+const modalSize = computed(() => {
+  return phase.value === 'results' ? 'xl' as const : 'md' as const
+})
+
+// Elapsed time display
+const elapsedDisplay = computed(() => {
+  if (elapsedSeconds.value < 5) return ''
+  const mins = Math.floor(elapsedSeconds.value / 60)
+  const secs = elapsedSeconds.value % 60
+  if (mins > 0) return `${mins}m ${secs}s`
+  return `${secs}s`
+})
+
+function startElapsedTimer() {
+  elapsedSeconds.value = 0
+  elapsedInterval = setInterval(() => {
+    elapsedSeconds.value++
+  }, 1000)
+}
+
+function stopElapsedTimer() {
+  if (elapsedInterval) {
+    clearInterval(elapsedInterval)
+    elapsedInterval = null
+  }
+}
 
 // Reset options when dialog opens
 watch(() => props.isOpen, async (open) => {
   if (open) {
-    deleteBranch.value = false
+    deleteBranch.value = true
     dropDatabase.value = false
     skipBackup.value = false
     error.value = null
+    phase.value = 'confirm'
+    deletionResult.value = null
+    requestedDropDb.value = false
 
     // M9: Focus cancel button when dialog opens for safer default
     await nextTick()
-    // Access the button element through the component's $el
     const buttonEl = cancelButtonRef.value?.$el as HTMLButtonElement | undefined
     buttonEl?.focus()
+  } else {
+    stopElapsedTimer()
   }
 })
 
@@ -59,9 +118,12 @@ async function handleDelete() {
 
   isSubmitting.value = true
   error.value = null
+  requestedDropDb.value = dropDatabase.value
+  phase.value = 'deleting'
+  startElapsedTimer()
 
   try {
-    const success = await removeWorktree({
+    const response = await removeWorktree({
       repo: repoName,
       branch: worktree.branch,
       deleteBranch: deleteBranch.value,
@@ -70,49 +132,67 @@ async function handleDelete() {
       force: true, // Always force in GUI to avoid prompts
     })
 
-    if (success) {
-      toast.success(`Worktree deleted: ${worktree.branch}`)
+    if (response) {
+      deletionResult.value = response
+      phase.value = 'results'
       emit('deleted')
-      emit('close')
+    } else {
+      error.value = 'Failed to delete worktree'
+      phase.value = 'confirm'
     }
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : 'Failed to delete worktree'
     error.value = errorMessage
     toast.error(errorMessage)
+    phase.value = 'confirm'
   } finally {
     isSubmitting.value = false
+    stopElapsedTimer()
   }
 }
 
 function handleClose() {
-  if (!isSubmitting.value) {
-    emit('close')
-  }
+  if (phase.value === 'deleting') return
+  emit('close')
 }
 </script>
 
 <template>
   <Modal
     :open="isOpen && !!worktree"
-    title="Delete Worktree"
-    size="md"
-    :closable="!isSubmitting"
+    :title="modalTitle"
+    :size="modalSize"
+    :closable="phase !== 'deleting'"
     @close="handleClose"
   >
     <template #icon>
-      <div class="text-danger">
+      <!-- Confirm phase: trash icon -->
+      <div v-if="phase === 'confirm'" class="text-danger">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
         </svg>
       </div>
+      <!-- Deleting phase: spinner icon -->
+      <svg v-else-if="phase === 'deleting'" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+      </svg>
+      <!-- Results phase: check icon -->
+      <svg v-else class="w-5 h-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
     </template>
 
-    <template #subtitle>
+    <template v-if="phase === 'confirm'" #subtitle>
       <code class="font-mono text-text-primary">{{ worktree?.branch }}</code>
     </template>
 
-    <div class="space-y-5">
+    <!-- ============================================================ -->
+    <!-- Phase 1: Confirm -->
+    <!-- ============================================================ -->
+    <div v-if="phase === 'confirm'" class="space-y-5">
       <!-- Warning text -->
       <p class="text-text-secondary text-sm leading-relaxed">
         Are you sure you want to delete this worktree? This action cannot be undone.
@@ -197,8 +277,144 @@ function handleClose() {
       </Transition>
     </div>
 
+    <!-- ============================================================ -->
+    <!-- Phase 2: Deleting (progress) -->
+    <!-- ============================================================ -->
+    <div v-else-if="phase === 'deleting'" class="py-8 text-center space-y-4">
+      <div class="flex justify-center">
+        <div class="relative">
+          <svg class="w-12 h-12 text-accent animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        </div>
+      </div>
+      <div>
+        <p class="text-text-primary font-medium">Deleting worktree...</p>
+        <p class="text-text-muted text-sm mt-1">Running hooks and removing worktree files</p>
+        <p v-if="elapsedDisplay" class="text-text-muted text-xs mt-2 tabular-nums">{{ elapsedDisplay }} elapsed</p>
+      </div>
+      <!-- Animated progress steps -->
+      <div class="mt-4 mx-auto max-w-[220px] text-left space-y-2">
+        <div class="flex items-center gap-2 text-xs text-text-muted">
+          <svg class="w-3.5 h-3.5 text-success flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+          </svg>
+          <span>Running pre-remove hooks</span>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-text-muted animate-pulse">
+          <svg class="w-3.5 h-3.5 text-accent flex-shrink-0 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <span>Removing worktree files...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Phase 3: Results -->
+    <!-- ============================================================ -->
+    <div v-else-if="phase === 'results' && deletionResult" class="space-y-5">
+      <!-- Success header -->
+      <div class="flex items-center gap-3 p-3 bg-success-muted/50 rounded-lg border border-success/20">
+        <svg class="w-5 h-5 text-success flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <div>
+          <p class="text-text-primary font-medium text-sm">Worktree deleted successfully</p>
+          <p class="text-text-muted text-xs font-mono mt-0.5">{{ deletionResult.result.branch }}</p>
+        </div>
+      </div>
+
+      <!-- Deletion details -->
+      <div class="space-y-2">
+        <h4 class="text-xs font-medium text-text-muted uppercase tracking-wider">Details</h4>
+        <div class="bg-surface-overlay rounded-lg border border-border-subtle divide-y divide-border-subtle">
+          <!-- Path -->
+          <div class="px-3 py-2.5 flex items-center gap-3">
+            <span class="text-text-muted text-xs flex-shrink-0 w-20">Path</span>
+            <span class="text-text-secondary text-xs font-mono truncate">
+              {{ deletionResult.result.path }}
+            </span>
+          </div>
+
+          <!-- Branch deleted -->
+          <div class="px-3 py-2.5 flex items-center gap-3">
+            <span class="text-text-muted text-xs flex-shrink-0 w-20">Branch deleted</span>
+            <span
+              class="text-2xs font-medium px-1.5 py-0.5 rounded"
+              :class="deletionResult.result.branch_deleted
+                ? 'bg-success-muted text-success'
+                : 'bg-surface-base text-text-muted'"
+            >
+              {{ deletionResult.result.branch_deleted ? 'yes' : 'no' }}
+            </span>
+          </div>
+
+          <!-- Database dropped (only show if drop was requested) -->
+          <div
+            v-if="requestedDropDb"
+            class="px-3 py-2.5 flex items-center gap-3"
+          >
+            <span class="text-text-muted text-xs flex-shrink-0 w-20">Database dropped</span>
+            <span
+              class="text-2xs font-medium px-1.5 py-0.5 rounded"
+              :class="deletionResult.result.db_dropped
+                ? 'bg-success-muted text-success'
+                : 'bg-surface-base text-text-muted'"
+            >
+              {{ deletionResult.result.db_dropped ? 'yes' : 'no' }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hook results -->
+      <div class="space-y-2">
+        <h4 class="text-xs font-medium text-text-muted uppercase tracking-wider">Hooks</h4>
+
+        <!-- Warning banner for failed hooks -->
+        <div v-if="hasFailedHooks" class="p-2.5 bg-warning-muted/50 rounded-lg border border-warning/20">
+          <p class="text-warning text-xs flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            {{ failedHooks.length }} hook{{ failedHooks.length > 1 ? 's' : '' }} failed. The worktree was deleted but some cleanup may be incomplete.
+          </p>
+        </div>
+
+        <div v-if="hasHooks" class="bg-surface-overlay rounded-lg border border-border-subtle divide-y divide-border-subtle max-h-48 overflow-y-auto">
+          <div
+            v-for="hook in deletionResult.hooks"
+            :key="hook.name"
+            class="px-3 py-2 flex items-center justify-between"
+          >
+            <span class="text-text-secondary text-xs font-mono truncate mr-3">
+              {{ hook.name }}
+            </span>
+            <span
+              class="flex-shrink-0 text-2xs font-medium px-1.5 py-0.5 rounded"
+              :class="hook.status === 'success'
+                ? 'bg-success-muted text-success'
+                : 'bg-danger-muted text-danger'"
+            >
+              {{ hook.status === 'success' ? 'passed' : 'failed' }}
+            </span>
+          </div>
+        </div>
+
+        <p v-else class="text-text-muted text-xs italic px-1">
+          No hooks ran during deletion.
+        </p>
+      </div>
+    </div>
+
     <template #footer>
-      <div class="flex items-center justify-end gap-3">
+      <!-- Confirm phase footer -->
+      <div v-if="phase === 'confirm'" class="flex items-center justify-end gap-3">
         <!-- M9: Add ref for focus management -->
         <Button
           ref="cancelButtonRef"
@@ -214,6 +430,19 @@ function handleClose() {
           @click="handleDelete"
         >
           Delete Worktree
+        </Button>
+      </div>
+
+      <!-- Deleting phase footer (no actions) -->
+      <div v-else-if="phase === 'deleting'" />
+
+      <!-- Results phase footer -->
+      <div v-else-if="phase === 'results'" class="flex items-center justify-end gap-3">
+        <Button
+          variant="ghost"
+          @click="handleClose"
+        >
+          Close
         </Button>
       </div>
     </template>

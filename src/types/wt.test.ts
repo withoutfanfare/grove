@@ -152,8 +152,8 @@ describe('getHookScopeLabel', () => {
 
 describe('getConfigLayerLabel', () => {
   it('should return correct labels for config layers', () => {
-    expect(getConfigLayerLabel('global')).toBe('Global (~/.wtrc)')
-    expect(getConfigLayerLabel('project')).toBe('Project (.wtconfig)')
+    expect(getConfigLayerLabel('global')).toBe('Global (~/.groverc)')
+    expect(getConfigLayerLabel('project')).toBe('Project (.groveconfig)')
     expect(getConfigLayerLabel('repo')).toBe('Repository')
   })
 

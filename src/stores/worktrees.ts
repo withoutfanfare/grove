@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import type { Repository, Worktree, WtError, RecentWorktree } from '../types';
+import { useAppStore } from '../composables/useAppStore';
 
 export const useWorktreeStore = defineStore('worktrees', () => {
   // State
@@ -38,12 +39,24 @@ export const useWorktreeStore = defineStore('worktrees', () => {
     return worktrees.value.filter((wt) => !wt.dirty);
   });
 
+  // Persistent store for remembering selection across restarts
+  const appStore = useAppStore();
+
   // Actions
   function setRepositories(repos: Repository[]) {
     repositories.value = repos;
-    // If no repo is selected and we have repos, select the first one
+    // If no repo is selected and we have repos, select the first one immediately
+    // then try to restore the last selection from persistent store
     if (!selectedRepoName.value && repos.length > 0) {
       selectedRepoName.value = repos[0].name;
+      restoreLastSelectedRepo(repos);
+    }
+  }
+
+  async function restoreLastSelectedRepo(repos: Repository[]) {
+    const lastRepo = await appStore.getLastSelectedRepo();
+    if (lastRepo && repos.some((r) => r.name === lastRepo)) {
+      selectedRepoName.value = lastRepo;
     }
   }
 
@@ -59,6 +72,8 @@ export const useWorktreeStore = defineStore('worktrees', () => {
       loadingWorktrees.value = true;
       // Clear any focused branch when switching repos
       focusedBranch.value = null;
+      // Persist selection
+      appStore.setLastSelectedRepo(name);
     }
   }
 

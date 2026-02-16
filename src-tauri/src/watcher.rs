@@ -65,6 +65,8 @@ pub fn start_watching(
     worktree_paths: Vec<String>,
     app: AppHandle,
 ) -> Result<(), WtError> {
+    log::info!("Starting file watcher for '{}' ({} worktrees)", repo_name, worktree_paths.len());
+
     // Stop any existing watcher for this repo
     stop_watching(repo_name)?;
 
@@ -101,12 +103,12 @@ pub fn start_watching(
                         };
 
                         if let Err(e) = app_clone.emit("worktree_changed", &event) {
-                            eprintln!("[watcher] Failed to emit worktree_changed event: {}", e);
+                            log::error!("Failed to emit worktree_changed event: {}", e);
                         }
                     }
                 }
                 Err(e) => {
-                    eprintln!("[watcher] Watch error: {}", e);
+                    log::error!("File watcher error: {}", e);
                 }
             }
         },
@@ -135,7 +137,7 @@ pub fn start_watching(
 
                 if let Err(e) = debouncer.watcher().watch(&target, mode) {
                     // Log but continue - some targets may not exist
-                    eprintln!("[watcher] Could not watch {}: {}", target.display(), e);
+                    log::debug!("Could not watch {}: {}", target.display(), e);
                 }
             }
         }
@@ -158,7 +160,11 @@ pub fn start_watching(
 /// Stop watching a repository.
 pub fn stop_watching(repo_name: &str) -> Result<(), WtError> {
     match WATCHERS.lock() {
-        Ok(mut watchers) => { watchers.remove(repo_name); }
+        Ok(mut watchers) => {
+            if watchers.remove(repo_name).is_some() {
+                log::info!("Stopped file watcher for '{}'", repo_name);
+            }
+        }
         Err(e) => { e.into_inner().remove(repo_name); }
     }
     Ok(())

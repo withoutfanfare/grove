@@ -27,3 +27,5 @@ export { useRelativeTime, formatRelativeTime } from './useRelativeTime';
 export type { RelativeTimeResult } from './useRelativeTime';
 export { useCommandRegistry } from './useCommandRegistry';
 export type { Command, CommandHandlers } from './useCommandRegistry';
+export { useAppStore } from './useAppStore';
+export { useNotifications } from './useNotifications';
