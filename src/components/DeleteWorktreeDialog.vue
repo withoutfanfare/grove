@@ -10,8 +10,7 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import type { Worktree, RemoveWorktreeResponse } from '../types'
 import { useWorktrees, useToast } from '../composables'
-import { SButton } from '@stuntrocket/ui'
-import { Modal, Checkbox } from './ui'
+import { SButton, SModal, SCheckbox } from '@stuntrocket/ui'
 
 type ModalPhase = 'confirm' | 'deleting' | 'results'
 
@@ -159,35 +158,35 @@ function handleClose() {
 </script>
 
 <template>
-  <Modal
+  <SModal
     :open="isOpen && !!worktree"
-    :title="modalTitle"
-    :size="modalSize"
-    :closable="phase !== 'deleting'"
+    :max-width="modalSize === 'xl' ? 'max-w-2xl' : 'max-w-md'"
     @close="handleClose"
   >
-    <template #icon>
-      <!-- Confirm phase: trash icon -->
-      <div v-if="phase === 'confirm'" class="text-danger">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+    <template #header>
+      <div class="flex items-center gap-3">
+        <!-- Confirm phase: trash icon -->
+        <div v-if="phase === 'confirm'" class="text-danger">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </div>
+        <!-- Deleting phase: spinner icon -->
+        <svg v-else-if="phase === 'deleting'" class="w-5 h-5 animate-spin text-text-muted" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
+        <!-- Results phase: check icon -->
+        <svg v-else class="w-5 h-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <div>
+          <h3 class="text-[14px] font-semibold tracking-tight text-text-primary">{{ modalTitle }}</h3>
+          <code v-if="phase === 'confirm'" class="text-xs font-mono text-text-secondary">{{ worktree?.branch }}</code>
+        </div>
       </div>
-      <!-- Deleting phase: spinner icon -->
-      <svg v-else-if="phase === 'deleting'" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-      </svg>
-      <!-- Results phase: check icon -->
-      <svg v-else class="w-5 h-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    </template>
-
-    <template v-if="phase === 'confirm'" #subtitle>
-      <code class="font-mono text-text-primary">{{ worktree?.branch }}</code>
     </template>
 
     <!-- ============================================================ -->
@@ -226,14 +225,14 @@ function handleClose() {
 
       <!-- Options -->
       <div class="space-y-3 pt-2">
-        <Checkbox
+        <SCheckbox
           v-model="deleteBranch"
           label="Delete branch from repository"
           description="Removes the branch from the git repository"
           :disabled="isSubmitting"
         />
 
-        <Checkbox
+        <SCheckbox
           v-model="dropDatabase"
           label="Drop associated database"
           description="Deletes the database for this worktree"
@@ -249,7 +248,7 @@ function handleClose() {
           leave-to-class="opacity-0 -translate-y-1"
         >
           <div v-if="dropDatabase" class="ml-7">
-            <Checkbox
+            <SCheckbox
               v-model="skipBackup"
               label="Skip database backup"
               description="Delete without creating a backup (dangerous)"
@@ -447,5 +446,5 @@ function handleClose() {
         </SButton>
       </div>
     </template>
-  </Modal>
+  </SModal>
 </template>

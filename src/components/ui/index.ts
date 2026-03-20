@@ -6,18 +6,10 @@
  *
  * Migrated to @stuntrocket/ui:
  *   Button → SButton, IconButton → SIconButton, Panel → SPanel,
- *   ToastContainer → SToastContainer (via useToastStack)
+ *   ToastContainer → SToastContainer (via useToastStack),
+ *   Input → SInput, Select → SSelect, Toggle → SToggle,
+ *   Checkbox → SCheckbox, Modal → SModal, ConfirmDialog → SConfirmDialog
  */
-
-// Form controls (custom — library equivalents lack label/error/hint props)
-export { default as Input } from './Input.vue'
-export { default as Select } from './Select.vue'
-export { default as Toggle } from './Toggle.vue'
-export { default as Checkbox } from './Checkbox.vue'
-
-// Overlay (custom — library equivalents have different prop APIs)
-export { default as Modal } from './Modal.vue'
-export { default as ConfirmDialog } from './ConfirmDialog.vue'
 
 // Dropdown menu (custom — library SDropdownMenu uses items array, not slot-based)
 export { default as Dropdown } from './Dropdown.vue'

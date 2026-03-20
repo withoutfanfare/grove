@@ -7,8 +7,7 @@
  */
 import { ref, computed, watch, nextTick } from 'vue'
 import { useWt, useToast } from '../composables'
-import { SButton } from '@stuntrocket/ui'
-import { Modal, Input } from './ui'
+import { SButton, SModal, SInput } from '@stuntrocket/ui'
 
 const props = defineProps<{
   isOpen: boolean
@@ -116,60 +115,51 @@ function handleClose() {
 </script>
 
 <template>
-  <Modal
+  <SModal
     :open="isOpen"
-    title="Clone Repository"
-    size="md"
-    :closable="!isSubmitting"
+    max-width="max-w-md"
     @close="handleClose"
   >
-    <template #icon>
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-      </svg>
+    <template #header>
+      <div class="flex items-center gap-3">
+        <svg class="w-5 h-5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+        </svg>
+        <h3 class="text-[14px] font-semibold tracking-tight text-text-primary">Clone Repository</h3>
+      </div>
     </template>
 
     <form @submit.prevent="handleSubmit" class="space-y-5">
       <!-- Git URL -->
-      <div>
-        <Input
-          ref="urlInputRef"
-          v-model="gitUrl"
-          label="Git URL"
-          type="url"
-          placeholder="https://github.com/user/repo.git"
-          :disabled="isSubmitting"
-          :error="urlError ?? undefined"
-          hint="HTTPS or SSH format"
-          required
-          autofocus
-        >
-          <template #leading>
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-            </svg>
-          </template>
-        </Input>
-      </div>
+      <SInput
+        ref="urlInputRef"
+        v-model="gitUrl"
+        label="Git URL"
+        type="url"
+        placeholder="https://github.com/user/repo.git"
+        :disabled="isSubmitting"
+        :error="urlError ?? undefined"
+        hint="HTTPS or SSH format"
+        required
+      />
 
       <!-- Repository Name (optional) -->
-      <Input
+      <SInput
         v-model="repoName"
         label="Repository Name"
-        labelHint="optional"
         placeholder="Derived from URL if not specified"
         :disabled="isSubmitting"
+        hint="Optional — derived from URL if not specified"
       />
 
       <!-- Default Branch (optional) -->
-      <Input
+      <SInput
         v-model="defaultBranch"
         label="Default Branch"
-        labelHint="optional"
         placeholder="Uses remote default if not specified"
         :disabled="isSubmitting"
+        hint="Optional — uses remote default if not specified"
       />
 
       <!-- Progress indicator during clone -->
@@ -230,5 +220,5 @@ function handleClose() {
         </SButton>
       </div>
     </template>
-  </Modal>
+  </SModal>
 </template>
