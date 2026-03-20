@@ -951,6 +951,76 @@ pub struct ChangesResult {
 }
 
 // ============================================================================
+// Disk Usage Types
+// ============================================================================
+
+/// Disk usage for a single worktree
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorktreeDiskUsage {
+    /// Worktree branch name
+    pub branch: String,
+    /// Full path to the worktree
+    pub path: String,
+    /// Size in bytes
+    pub size_bytes: u64,
+    /// Human-readable size (e.g., "1.2 GB")
+    pub size_display: String,
+}
+
+/// Disk usage summary for a repository
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RepoDiskUsage {
+    /// Repository name
+    pub repo: String,
+    /// Total size in bytes
+    pub total_bytes: u64,
+    /// Human-readable total size
+    pub total_display: String,
+    /// Per-worktree sizes
+    pub worktrees: Vec<WorktreeDiskUsage>,
+}
+
+// ============================================================================
+// Diff Stats Types
+// ============================================================================
+
+/// Diff statistics for a worktree relative to its base branch
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiffStats {
+    /// Number of files changed
+    pub files_changed: u32,
+    /// Number of lines added
+    pub lines_added: u32,
+    /// Number of lines removed
+    pub lines_removed: u32,
+    /// Short display string (e.g., "5 files, +120/-45")
+    pub display: String,
+    /// Full file list for tooltip
+    pub file_list: Vec<String>,
+}
+
+// ============================================================================
+// Worktree Template Types
+// ============================================================================
+
+/// A worktree creation template
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorktreeTemplate {
+    /// Template name (e.g., "feature")
+    pub name: String,
+    /// Branch prefix (e.g., "feature/")
+    pub branch_prefix: String,
+    /// Default base branch (e.g., "origin/main")
+    pub default_base: String,
+    /// Optional post-create script
+    #[serde(default)]
+    pub post_create_script: Option<String>,
+    /// Whether this is a built-in template
+    #[serde(default)]
+    pub builtin: bool,
+}
+
+// ============================================================================
 // Configuration Types (M20)
 // ============================================================================
 

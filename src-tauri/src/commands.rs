@@ -1561,6 +1561,263 @@ pub async fn get_dirty_details(
 }
 
 // ============================================================================
+// Disk Usage
+// ============================================================================
+
+/// Get disk usage for all worktrees in a repository.
+///
+/// Calculates the size of each worktree's working directory.
+/// Runs asynchronously to avoid blocking the UI.
+/// Callable from frontend as: invoke('get_repo_disk_usage', { repoName })
+#[command(rename_all = "camelCase")]
+pub async fn get_repo_disk_usage(
+    repo_name: String,
+    app: tauri::AppHandle,
+) -> Result<crate::types::RepoDiskUsage, WtError> {
+    spawn_blocking(move || {
+        let worktrees = wt::get_worktrees(&app, &repo_name)?;
+        let mut wt_usages = Vec::new();
+        let mut total_bytes: u64 = 0;
+
+        for worktree in &worktrees {
+            let size = calculate_dir_size(std::path::Path::new(&worktree.path));
+            total_bytes += size;
+            wt_usages.push(crate::types::WorktreeDiskUsage {
+                branch: worktree.branch.clone(),
+                path: worktree.path.clone(),
+                size_bytes: size,
+                size_display: format_size(size),
+            });
+        }
+
+        Ok(crate::types::RepoDiskUsage {
+            repo: repo_name,
+            total_bytes,
+            total_display: format_size(total_bytes),
+            worktrees: wt_usages,
+        })
+    })
+    .await
+    .map_err(|e| WtError::spawn_error(e.to_string()))?
+}
+
+/// Calculate the total size of a directory recursively.
+fn calculate_dir_size(path: &std::path::Path) -> u64 {
+    let mut total: u64 = 0;
+    if let Ok(entries) = std::fs::read_dir(path) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Ok(metadata) = entry.metadata() {
+                if metadata.is_dir() {
+                    // Skip .git directory for worktrees (shared objects)
+                    if path.file_name().map(|n| n == ".git").unwrap_or(false) {
+                        continue;
+                    }
+                    total += calculate_dir_size(&path);
+                } else {
+                    total += metadata.len();
+                }
+            }
+        }
+    }
+    total
+}
+
+/// Format a byte count as a human-readable string.
+fn format_size(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = KB * 1024;
+    const GB: u64 = MB * 1024;
+
+    if bytes >= GB {
+        format!("{:.1} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.1} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.0} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{} B", bytes)
+    }
+}
+
+// ============================================================================
+// Diff Stats
+// ============================================================================
+
+/// Get diff statistics for a worktree relative to its base branch.
+///
+/// Runs `git diff --stat` against the merge base to calculate files changed
+/// and lines added/removed.
+/// Callable from frontend as: invoke('get_diff_stats', { worktreePath, baseBranch })
+#[command(rename_all = "camelCase")]
+pub async fn get_diff_stats(
+    worktree_path: String,
+    base_branch: Option<String>,
+) -> Result<crate::types::DiffStats, WtError> {
+    let path = validate_path(&worktree_path)?;
+
+    spawn_blocking(move || {
+        let base = base_branch.as_deref().unwrap_or("origin/main");
+
+        // Get the merge base
+        let merge_base_output = Command::new("git")
+            .args(["merge-base", "HEAD", base])
+            .current_dir(&path)
+            .output()
+            .map_err(|e| WtError::new("COMMAND_FAILED", format!("Failed to find merge base: {}", e)))?;
+
+        let merge_base = if merge_base_output.status.success() {
+            String::from_utf8_lossy(&merge_base_output.stdout).trim().to_string()
+        } else {
+            // If merge-base fails (e.g., no common ancestor), return empty stats
+            return Ok(crate::types::DiffStats {
+                files_changed: 0,
+                lines_added: 0,
+                lines_removed: 0,
+                display: "No changes".to_string(),
+                file_list: vec![],
+            });
+        };
+
+        if merge_base.is_empty() {
+            return Ok(crate::types::DiffStats {
+                files_changed: 0,
+                lines_added: 0,
+                lines_removed: 0,
+                display: "No changes".to_string(),
+                file_list: vec![],
+            });
+        }
+
+        // Get numstat for accurate line counts
+        let numstat_output = Command::new("git")
+            .args(["diff", "--numstat", &merge_base, "HEAD"])
+            .current_dir(&path)
+            .output()
+            .map_err(|e| WtError::new("COMMAND_FAILED", format!("Failed to get diff stats: {}", e)))?;
+
+        let numstat_str = String::from_utf8_lossy(&numstat_output.stdout);
+        let mut files_changed: u32 = 0;
+        let mut lines_added: u32 = 0;
+        let mut lines_removed: u32 = 0;
+        let mut file_list: Vec<String> = Vec::new();
+
+        for line in numstat_str.lines() {
+            let parts: Vec<&str> = line.split('\t').collect();
+            if parts.len() >= 3 {
+                files_changed += 1;
+                if let Ok(added) = parts[0].parse::<u32>() {
+                    lines_added += added;
+                }
+                if let Ok(removed) = parts[1].parse::<u32>() {
+                    lines_removed += removed;
+                }
+                file_list.push(parts[2].to_string());
+            }
+        }
+
+        let display = if files_changed == 0 {
+            "No changes".to_string()
+        } else {
+            format!(
+                "{} file{}, +{}/-{}",
+                files_changed,
+                if files_changed == 1 { "" } else { "s" },
+                lines_added,
+                lines_removed
+            )
+        };
+
+        Ok(crate::types::DiffStats {
+            files_changed,
+            lines_added,
+            lines_removed,
+            display,
+            file_list,
+        })
+    })
+    .await
+    .map_err(|e| WtError::spawn_error(e.to_string()))?
+}
+
+// ============================================================================
+// Background Fetch
+// ============================================================================
+
+/// Run git fetch for a repository.
+///
+/// Executes `git fetch --all` in the repository's bare directory.
+/// Callable from frontend as: invoke('fetch_repo', { repoName })
+#[command(rename_all = "camelCase")]
+pub async fn fetch_repo(
+    repo_name: String,
+    app: tauri::AppHandle,
+) -> Result<(), WtError> {
+    spawn_blocking(move || wt::fetch_repository(&app, &repo_name))
+        .await
+        .map_err(|e| WtError::spawn_error(e.to_string()))?
+}
+
+// ============================================================================
+// Remote Branches
+// ============================================================================
+
+/// Get remote branches for a repository.
+///
+/// Filters the branches list to return only remote branches.
+/// Callable from frontend as: invoke('get_remote_branches', { repoName })
+#[command(rename_all = "camelCase")]
+pub async fn get_remote_branches(
+    repo_name: String,
+    app: tauri::AppHandle,
+) -> Result<crate::types::BranchesResult, WtError> {
+    spawn_blocking(move || {
+        let result = wt::get_branches(&app, &repo_name)?;
+        // Filter to remote branches only
+        let remote_branches: Vec<_> = result
+            .branches
+            .into_iter()
+            .filter(|b| b.branch_type == crate::types::BranchType::Remote)
+            .collect();
+        Ok(crate::types::BranchesResult {
+            repo: result.repo,
+            branches: remote_branches,
+        })
+    })
+    .await
+    .map_err(|e| WtError::spawn_error(e.to_string()))?
+}
+
+// ============================================================================
+// Repository Registration
+// ============================================================================
+
+/// Register an existing git repository by path.
+///
+/// Validates the path is a git repository, then calls `wt register`.
+/// Callable from frontend as: invoke('register_repository', { path })
+#[command(rename_all = "camelCase")]
+pub async fn register_repository(
+    path: String,
+    app: tauri::AppHandle,
+) -> Result<(), WtError> {
+    let validated = validate_path(&path)?;
+
+    // Check that it's a git repository
+    let git_dir = validated.join(".git");
+    if !git_dir.exists() {
+        return Err(WtError::new(
+            "INVALID_REPO",
+            "The dropped folder is not a git repository (no .git directory found)",
+        ));
+    }
+
+    spawn_blocking(move || wt::register_repo(&app, &validated))
+        .await
+        .map_err(|e| WtError::spawn_error(e.to_string()))?
+}
+
+// ============================================================================
 // System Tray
 // ============================================================================
 ///
