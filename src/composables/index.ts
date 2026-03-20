@@ -19,7 +19,7 @@ export type {
   KeyboardShortcutHandlers,
 } from './useKeyboardShortcuts';
 export { useToast } from './useToast';
-export type { Toast, ToastVariant, ToastOptions } from './useToast';
+export type { ToastVariant, ToastOptions } from './useToast';
 export { useWorktreeWatcher } from './useWorktreeWatcher';
 export { useResizableSidebar } from './useResizableSidebar';
 export type { ResizableSidebarOptions } from './useResizableSidebar';
@@ -27,5 +27,13 @@ export { useRelativeTime, formatRelativeTime } from './useRelativeTime';
 export type { RelativeTimeResult } from './useRelativeTime';
 export { useCommandRegistry } from './useCommandRegistry';
 export type { Command, CommandHandlers } from './useCommandRegistry';
+export { useWorktreeFilters } from './useWorktreeFilters';
+export type { WorktreeFilter, WorktreeSort } from './useWorktreeFilters';
 export { useAppStore } from './useAppStore';
 export { useNotifications } from './useNotifications';
+export { useBackgroundFetch } from './useBackgroundFetch';
+export { useStaleDetection } from './useStaleDetection';
+export type { StaleWorktreeInfo } from './useStaleDetection';
+export { useTrayBadge } from './useTrayBadge';
+export { useRecentSwitches } from './useRecentSwitches';
+export type { RecentSwitchEntry } from './useRecentSwitches';

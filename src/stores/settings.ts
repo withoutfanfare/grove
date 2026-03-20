@@ -36,6 +36,14 @@ export interface Settings {
   customGitClientPath: string;
   defaultBaseBranch: string;
   enableNotifications: boolean;
+  /** Background fetch interval in minutes (0 = disabled) */
+  backgroundFetchInterval: number;
+  /** Stale worktree threshold in days */
+  staleThresholdDays: number;
+  /** Whether to show attention badge on system tray */
+  trayBadgeEnabled: boolean;
+  /** Which states count towards tray badge: dirty, behind, stale */
+  trayBadgeStates: string[];
 }
 
 const STORAGE_KEY = 'wt-app-settings';
@@ -48,6 +56,10 @@ export const DEFAULT_SETTINGS: Settings = {
   customGitClientPath: '',
   defaultBaseBranch: 'origin/main',
   enableNotifications: true,
+  backgroundFetchInterval: 5,
+  staleThresholdDays: 14,
+  trayBadgeEnabled: true,
+  trayBadgeStates: ['dirty', 'behind', 'stale'],
 };
 
 function loadSettings(): Settings {

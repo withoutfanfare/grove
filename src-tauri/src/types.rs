@@ -115,6 +115,20 @@ pub struct Worktree {
     pub stale: Option<bool>,
 }
 
+/// Detailed dirty state breakdown from `git status --porcelain`
+///
+/// Provides file counts by status category for richer UI display.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DirtyDetails {
+    /// Number of files staged for commit
+    pub staged: u32,
+    /// Number of files with unstaged modifications
+    pub modified: u32,
+    /// Number of untracked files
+    pub untracked: u32,
+}
+
 /// Result from `wt add <repo> <branch> --json`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateWorktreeResult {
@@ -934,6 +948,76 @@ pub struct FileChange {
 pub struct ChangesResult {
     /// List of changed files
     pub files: Vec<FileChange>,
+}
+
+// ============================================================================
+// Disk Usage Types
+// ============================================================================
+
+/// Disk usage for a single worktree
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorktreeDiskUsage {
+    /// Worktree branch name
+    pub branch: String,
+    /// Full path to the worktree
+    pub path: String,
+    /// Size in bytes
+    pub size_bytes: u64,
+    /// Human-readable size (e.g., "1.2 GB")
+    pub size_display: String,
+}
+
+/// Disk usage summary for a repository
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RepoDiskUsage {
+    /// Repository name
+    pub repo: String,
+    /// Total size in bytes
+    pub total_bytes: u64,
+    /// Human-readable total size
+    pub total_display: String,
+    /// Per-worktree sizes
+    pub worktrees: Vec<WorktreeDiskUsage>,
+}
+
+// ============================================================================
+// Diff Stats Types
+// ============================================================================
+
+/// Diff statistics for a worktree relative to its base branch
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiffStats {
+    /// Number of files changed
+    pub files_changed: u32,
+    /// Number of lines added
+    pub lines_added: u32,
+    /// Number of lines removed
+    pub lines_removed: u32,
+    /// Short display string (e.g., "5 files, +120/-45")
+    pub display: String,
+    /// Full file list for tooltip
+    pub file_list: Vec<String>,
+}
+
+// ============================================================================
+// Worktree Template Types
+// ============================================================================
+
+/// A worktree creation template
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorktreeTemplate {
+    /// Template name (e.g., "feature")
+    pub name: String,
+    /// Branch prefix (e.g., "feature/")
+    pub branch_prefix: String,
+    /// Default base branch (e.g., "origin/main")
+    pub default_base: String,
+    /// Optional post-create script
+    #[serde(default)]
+    pub post_create_script: Option<String>,
+    /// Whether this is a built-in template
+    #[serde(default)]
+    pub builtin: bool,
 }
 
 // ============================================================================

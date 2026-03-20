@@ -9,7 +9,7 @@
 import { ref, computed, watch } from 'vue'
 import { useWt, useToast } from '../composables'
 import type { ConfigEntry, ConfigKeyUpdate } from '../types'
-import { Panel, Button } from './ui'
+import { SPanel, SButton } from '@stuntrocket/ui'
 
 const props = defineProps<{
   isOpen: boolean
@@ -225,7 +225,7 @@ function handleClose() {
 </script>
 
 <template>
-  <Panel
+  <SPanel
     :open="isOpen"
     title="Global Configuration"
     subtitle="~/.groverc"
@@ -411,8 +411,8 @@ function handleClose() {
             />
           </div>
           <div class="flex items-center gap-2">
-            <Button variant="primary" size="sm" @click="addCustomKey" :disabled="!newKeyName.trim()">Add</Button>
-            <Button variant="ghost" size="sm" @click="showAddKey = false">Cancel</Button>
+            <SButton variant="primary" size="sm" @click="addCustomKey" :disabled="!newKeyName.trim()">Add</SButton>
+            <SButton variant="ghost" size="sm" @click="showAddKey = false">Cancel</SButton>
           </div>
         </div>
       </section>
@@ -423,14 +423,14 @@ function handleClose() {
         <span v-if="hasChanges" class="text-xs text-warning animate-pulse-subtle">Unsaved changes</span>
         <span v-else />
         <div class="flex items-center gap-2">
-          <Button variant="ghost" @click="handleClose">Cancel</Button>
-          <Button variant="primary" :disabled="saving || !hasChanges" @click="save">
+          <SButton variant="ghost" @click="handleClose">Cancel</SButton>
+          <SButton variant="primary" :disabled="saving || !hasChanges" @click="save">
             {{ saving ? 'Saving...' : 'Save' }}
-          </Button>
+          </SButton>
         </div>
       </div>
     </template>
-  </Panel>
+  </SPanel>
 </template>
 
 <style scoped>

@@ -34,6 +34,9 @@ export interface CommandHandlers {
   onSyncWorktree: () => void
   onDeleteWorktree: () => void
   onSelectRepo: (index: number) => void
+  /** Navigate to a worktree across any repo */
+  onNavigateToWorktree?: (repo: string, branch: string) => void
+  onReviewStaleWorktrees?: () => void
 }
 
 export function useCommandRegistry(handlers: CommandHandlers) {
@@ -194,6 +197,17 @@ export function useCommandRegistry(handlers: CommandHandlers) {
         title: 'Delete Worktree',
         category: 'Worktree',
         action: handlers.onDeleteWorktree,
+      })
+    }
+
+    // --- Tools: Stale worktree review ---
+    if (hasRepo.value && handlers.onReviewStaleWorktrees) {
+      cmds.push({
+        id: 'review-stale',
+        title: 'Review Stale Worktrees',
+        category: 'Repository',
+        action: handlers.onReviewStaleWorktrees,
+        visible: hasRepo.value,
       })
     }
 

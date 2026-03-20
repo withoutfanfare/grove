@@ -12,7 +12,8 @@ import { computed, ref, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useWorktreeStore } from '../stores'
 import { useRepos, useWorktrees, useRecent, useListNavigation, useKeyboardShortcuts, useShortcutTooltip, useSearch, useToast, useWt } from '../composables'
-import { IconButton, SkeletonList, Skeleton, Dropdown, DropdownItem } from './ui'
+import { SIconButton } from '@stuntrocket/ui'
+import { SkeletonList, Skeleton, Dropdown, DropdownItem } from './ui'
 import SearchInput from './SearchInput.vue'
 import CloneRepositoryModal from './CloneRepositoryModal.vue'
 import GlobalConfigPanel from './GlobalConfigPanel.vue'
@@ -340,22 +341,22 @@ onMounted(() => {
         <!-- Action buttons for repos tab -->
         <div v-if="activeTab === 'repos'" class="flex items-center gap-1">
           <!-- Clone button -->
-          <IconButton size="sm" tooltip="Clone Repository" @click="handleClone">
+          <SIconButton size="sm" tooltip="Clone Repository" @click="handleClone">
             <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-          </IconButton>
+          </SIconButton>
 
           <!-- Global config button -->
-          <IconButton size="sm" tooltip="Global Configuration" :active="showConfigPanel" @click="showConfigPanel = !showConfigPanel">
+          <SIconButton size="sm" tooltip="Global Configuration" :active="showConfigPanel" @click="showConfigPanel = !showConfigPanel">
             <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-          </IconButton>
+          </SIconButton>
         </div>
       </div>
 
@@ -426,10 +427,16 @@ onMounted(() => {
 
       <!-- Repository list -->
       <nav v-if="!loading && repositories.length > 0 && (filteredRepositories.length > 0 || !repoSearchQuery.trim())"
-        class="flex-1 overflow-y-auto py-2 px-2">
-        <ul class="space-y-0.5">
-          <li v-for="(repo, index) in filteredRepositories" :key="repo.name" class="relative">
-            <button @click="handleSelectRepo(repo.name)" :disabled="loadingRepoName === repo.name" :class="[
+        class="flex-1 overflow-y-auto py-2 px-2"
+        aria-label="Repository list">
+        <ul class="space-y-0.5" role="listbox" :aria-activedescendant="selectedRepoName ? `repo-${selectedRepoName}` : undefined">
+          <li v-for="(repo, index) in filteredRepositories" :key="repo.name" class="relative"
+            role="option"
+            :id="`repo-${repo.name}`"
+            :aria-selected="repo.name === selectedRepoName">
+            <button @click="handleSelectRepo(repo.name)" :disabled="loadingRepoName === repo.name"
+              :aria-label="`${repo.name}, ${repo.worktrees} worktree${repo.worktrees === 1 ? '' : 's'}`"
+              :class="[
               'group w-full text-left px-3 py-2.5 rounded-lg transition-all duration-150',
               'flex items-center gap-3',
               repo.name === selectedRepoName
@@ -641,28 +648,28 @@ onMounted(() => {
 
               <!-- Action buttons -->
               <div class="flex items-center gap-1 mt-2.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                <IconButton size="sm" variant="secondary" tooltip="Open in Editor"
+                <SIconButton size="sm" variant="secondary" tooltip="Open in Editor"
                   @click="handleOpenRecent(recent.path)">
                   <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                   </svg>
-                </IconButton>
+                </SIconButton>
 
-                <IconButton size="sm" tooltip="Open Terminal" @click="handleOpenRecentTerminal(recent.path)">
+                <SIconButton size="sm" tooltip="Open Terminal" @click="handleOpenRecentTerminal(recent.path)">
                   <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                </IconButton>
+                </SIconButton>
 
-                <IconButton v-if="recent.url" size="sm" tooltip="Open in Browser"
+                <SIconButton v-if="recent.url" size="sm" tooltip="Open in Browser"
                   @click="handleOpenRecentBrowser(recent.url)">
                   <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
                   </svg>
-                </IconButton>
+                </SIconButton>
               </div>
             </div>
           </li>

@@ -10,7 +10,7 @@ import { storeToRefs } from 'pinia'
 import { useDebounceFn } from '@vueuse/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useWorktreeStore } from '../stores'
-import { useRepos, useWorktrees, useOperationProgress, useAutoRefresh, useSearch, useKeyboardShortcuts, useShortcutTooltip, useToast, useWorktreeWatcher, useResizableSidebar, useCommandRegistry } from '../composables'
+import { useRepos, useWorktrees, useWt, useOperationProgress, useAutoRefresh, useSearch, useKeyboardShortcuts, useShortcutTooltip, useToast, useWorktreeWatcher, useResizableSidebar, useCommandRegistry, useWorktreeFilters, useBackgroundFetch, useStaleDetection, useTrayBadge, useRecentSwitches } from '../composables'
 import type { Worktree } from '../types'
 
 // Components
@@ -27,7 +27,8 @@ import OperationProgressPanel from './OperationProgressPanel.vue'
 import ErrorBoundary from './ErrorBoundary.vue'
 import SearchInput from './SearchInput.vue'
 import CommandPalette from './CommandPalette.vue'
-import { Button, IconButton, SkeletonCard, ResizeHandle } from './ui'
+import { SButton, SIconButton } from '@stuntrocket/ui'
+import { SkeletonCard, ResizeHandle } from './ui'
 import { copyPath, copyBranch, copyUrl, copyCdCommand } from '../utils/clipboard'
 
 /**
@@ -76,13 +77,35 @@ const {
 } = useAutoRefresh()
 
 // Search functionality
-const { query: worktreeSearchQuery, filterWorktrees, clearQuery: clearWorktreeSearch } = useSearch()
+const { query: worktreeSearchQuery, filterWorktrees: searchFilterWorktrees, clearQuery: clearWorktreeSearch } = useSearch()
+
+// Filter and sort functionality
+const {
+  activeFilter,
+  activeSort,
+  filterOptions,
+  sortOptions,
+  hasActiveFilter,
+  setFilter,
+  setSort,
+  resetFilter,
+  applyFiltersAndSort,
+} = useWorktreeFilters()
 
 // L12: Ref for search input focus
 const searchInputRef = ref<{ focus: () => void } | null>(null)
 
-// Filtered worktrees based on search
-const filteredWorktrees = computed(() => filterWorktrees(worktrees.value))
+// Filtered worktrees: apply text search, then structured filters and sort
+const filteredWorktrees = computed(() => {
+  const searched = searchFilterWorktrees(worktrees.value)
+  return applyFiltersAndSort(searched)
+})
+
+// Count of worktrees matching the active filter (before text search)
+const filterCount = computed(() => {
+  if (!hasActiveFilter.value) return worktrees.value.length
+  return applyFiltersAndSort(worktrees.value).length
+})
 
 // Content key for crossfade transitions when switching states
 const contentKey = computed(() => {
@@ -128,6 +151,21 @@ const {
   storageKey: 'wt-sidebar-width',
 })
 
+// Background fetch for remote tracking status
+const { start: startBackgroundFetch, stop: stopBackgroundFetch } = useBackgroundFetch()
+
+// Stale worktree detection
+const { staleCount } = useStaleDetection()
+
+// Tray badge
+const { badgeCount: trayBadgeCount } = useTrayBadge()
+
+// Recent switches
+const { recordSwitch } = useRecentSwitches()
+
+// Drag-and-drop state
+const isDragOver = ref(false)
+
 // Track the latest fetch request to handle race conditions
 const fetchCounter = ref(0)
 
@@ -154,11 +192,14 @@ onMounted(async () => {
     // Start file watching for real-time updates
     await startWatching(selectedRepoName.value)
   }
+  // Start background fetch for remote tracking
+  startBackgroundFetch()
 })
 
 // Cleanup on unmount
 onUnmounted(() => {
   stopAutoRefresh()
+  stopBackgroundFetch()
   stopWatching()
   unregisterWatcher()
   cleanupWorktrees()
@@ -166,11 +207,55 @@ onUnmounted(() => {
   // triggers, and cleanupWorktrees() clears state, so pending calls are harmless.
 })
 
+// Record worktree switches in recent history
+watch(focusedBranch, (branch) => {
+  if (branch && selectedRepoName.value) {
+    const wt = worktrees.value.find(w => w.branch === branch)
+    if (wt) {
+      recordSwitch(selectedRepoName.value, branch, wt.path)
+    }
+  }
+})
+
+// Drag-and-drop handlers for repository registration
+async function handleDragOver(e: DragEvent) {
+  e.preventDefault()
+  isDragOver.value = true
+}
+function handleDragLeave() {
+  isDragOver.value = false
+}
+async function handleDrop(e: DragEvent) {
+  e.preventDefault()
+  isDragOver.value = false
+
+  const files = e.dataTransfer?.files
+  if (!files || files.length === 0) return
+
+  // Get the dropped path from the file
+  const droppedPath = (files[0] as any).path as string | undefined
+  if (!droppedPath) {
+    toast.error('Could not read the dropped folder path')
+    return
+  }
+
+  try {
+    const wtApi = useWt()
+    await wtApi.registerRepository(droppedPath)
+    toast.success('Repository registered successfully')
+    await fetchRepositories()
+  } catch (error: any) {
+    const msg = error?.message || 'Failed to register repository'
+    toast.error(msg)
+  }
+}
+
 // Watch for repo selection changes with race condition protection
 watch(selectedRepoName, async (newName, oldName) => {
   if (newName && newName !== oldName) {
-    // Clear search when switching repositories
+    // Clear search and filters when switching repositories
     clearWorktreeSearch()
+    resetFilter()
     // Stop watching the old repo
     await stopWatching()
     const currentFetch = ++fetchCounter.value
@@ -648,9 +733,29 @@ async function handleTitlebarDrag(e: MouseEvent) {
 </script>
 
 <template>
-  <div class="h-screen flex flex-col bg-surface-base text-text-primary overflow-hidden">
+  <div class="h-screen flex flex-col bg-surface-base text-text-primary overflow-hidden"
+    @dragover.prevent="handleDragOver"
+    @dragleave="handleDragLeave"
+    @drop.prevent="handleDrop">
     <!-- Draggable title bar region for window movement (overlay titlebar mode) -->
     <div class="titlebar-drag-region" @mousedown.left="handleTitlebarDrag" />
+
+    <!-- Drag-and-drop overlay for repository registration -->
+    <Transition name="fade">
+      <div v-if="isDragOver"
+        class="fixed inset-0 z-[9998] flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-none">
+        <div class="text-center">
+          <div class="w-24 h-24 mx-auto mb-6 rounded-2xl bg-accent/20 flex items-center justify-center border-2 border-dashed border-accent/60">
+            <svg class="w-12 h-12 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M12 4v16m8-8H4" />
+            </svg>
+          </div>
+          <p class="text-lg font-semibold text-text-primary">Drop folder to register repository</p>
+          <p class="text-sm text-text-muted mt-1">The folder must contain a .git directory</p>
+        </div>
+      </div>
+    </Transition>
 
     <!-- grove CLI not available state -->
     <div v-if="!wtAvailable" class="flex-1 flex items-center justify-center p-8">
@@ -726,65 +831,65 @@ async function handleTitlebarDrag(e: MouseEvent) {
 
               <!-- Right: action buttons -->
               <div v-if="selectedRepo" class="flex items-center gap-2 flex-shrink-0">
-                <Button variant="secondary" size="sm" :loading="isPullingAll" @click="handlePullAll">
+                <SButton variant="secondary" size="sm" :loading="isPullingAll" @click="handlePullAll">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
                   <span class="hidden sm:inline">Pull All</span>
-                </Button>
-                <Button variant="secondary" size="sm" @click="openHealthPanel">
+                </SButton>
+                <SButton variant="secondary" size="sm" @click="openHealthPanel">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
                   <span class="hidden sm:inline">Health</span>
-                </Button>
-                <Button variant="secondary" size="sm" :loading="isPruning" title="Clean up stale references and find merged branches that can be safely removed" @click="handlePrune">
+                </SButton>
+                <SButton variant="secondary" size="sm" :loading="isPruning" title="Clean up stale references and find merged branches that can be safely removed" @click="handlePrune">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
                   <span class="hidden sm:inline">Clean Up</span>
-                </Button>
+                </SButton>
 
                 <div class="divider-vertical mx-1 h-6" />
 
-                <Button variant="primary" size="sm" @click="openCreateModal">
+                <SButton variant="primary" size="sm" @click="openCreateModal">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                   </svg>
                   Create
-                </Button>
+                </SButton>
 
-                <IconButton :tooltip="tooltipWithShortcut('Refresh', 'R')" @click="handleRefresh">
+                <SIconButton :tooltip="tooltipWithShortcut('Refresh', 'R')" @click="handleRefresh">
                   <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                </IconButton>
-                <IconButton :tooltip="tooltipWithShortcut('Repository Management', 'M')"
+                </SIconButton>
+                <SIconButton :tooltip="tooltipWithShortcut('Repository Management', 'M')"
                   :active="showRepoManagementPanel"
                   @click="() => openRepoManagementPanel()">
                   <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
                   </svg>
-                </IconButton>
-                <IconButton tooltip="Help" :active="showHelpModal" @click="openHelpModal">
+                </SIconButton>
+                <SIconButton tooltip="Help" :active="showHelpModal" @click="openHelpModal">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                </IconButton>
-                <IconButton :tooltip="tooltipWithShortcut('Settings', ',')" :active="showSettingsPanel" @click="openSettingsPanel">
+                </SIconButton>
+                <SIconButton :tooltip="tooltipWithShortcut('Settings', ',')" :active="showSettingsPanel" @click="openSettingsPanel">
                   <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                </IconButton>
+                </SIconButton>
               </div>
             </div>
 
@@ -806,13 +911,58 @@ async function handleTitlebarDrag(e: MouseEvent) {
                   <p class="text-xs text-text-tertiary truncate">{{ error.message }}</p>
                 </div>
               </div>
-              <IconButton variant="danger" size="sm" tooltip="Dismiss error" @click="dismissError">
+              <SIconButton variant="danger" size="sm" tooltip="Dismiss error" @click="dismissError">
                 <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
-              </IconButton>
+              </SIconButton>
             </div>
           </Transition>
+
+          <!-- Filter/sort toolbar (visible when worktrees exist) -->
+          <div v-if="selectedRepo && worktrees.length > 0"
+            class="flex-shrink-0 px-6 py-2 border-b border-white/5 flex items-center gap-3"
+            style="background-color: rgba(3, 7, 18, 0.8);">
+            <!-- Filter toggles -->
+            <div class="flex items-center gap-1">
+              <button v-for="opt in filterOptions" :key="opt.value"
+                :class="[
+                  'px-2.5 py-1 text-2xs font-medium rounded-md transition-colors duration-100',
+                  activeFilter === opt.value
+                    ? 'bg-accent/15 text-accent border border-accent/30'
+                    : 'text-text-muted hover:text-text-secondary hover:bg-surface-overlay border border-transparent'
+                ]"
+                @click="setFilter(opt.value)">
+                {{ opt.label }}
+              </button>
+            </div>
+
+            <!-- Active filter pill with clear -->
+            <span v-if="hasActiveFilter"
+              class="inline-flex items-center gap-1 px-2 py-0.5 text-2xs font-medium rounded-full bg-accent/10 text-accent border border-accent/20">
+              {{ filterCount }} of {{ worktrees.length }}
+              <button class="ml-0.5 hover:text-text-primary transition-colors" @click="resetFilter" title="Clear filter">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </span>
+
+            <div class="flex-1" />
+
+            <!-- Sort selector -->
+            <div class="flex items-center gap-1.5">
+              <span class="text-2xs text-text-muted">Sort:</span>
+              <select
+                :value="activeSort"
+                class="text-2xs bg-surface-overlay text-text-secondary border border-border-subtle rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-accent/50"
+                @change="setSort(($event.target as HTMLSelectElement).value as any)">
+                <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">
+                  {{ opt.label }}
+                </option>
+              </select>
+            </div>
+          </div>
 
           <!-- Content area -->
           <div class="flex-1">
@@ -854,12 +1004,12 @@ async function handleTitlebarDrag(e: MouseEvent) {
                     Worktrees let you work on multiple branches at the same time, each in its own directory. Create one to get started.
                   </p>
 
-                  <Button variant="primary" size="lg" @click="openCreateModal">
+                  <SButton variant="primary" size="lg" @click="openCreateModal">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                     </svg>
                     Create Your First Worktree
-                  </Button>
+                  </SButton>
                 </div>
               </div>
 
@@ -876,12 +1026,12 @@ async function handleTitlebarDrag(e: MouseEvent) {
                   </div>
                   <p class="text-sm font-medium text-text-secondary">No results for '{{ worktreeSearchQuery }}'</p>
                   <p class="text-xs text-text-muted mt-1 mb-4">No matches in {{ worktrees.length }} worktree{{ worktrees.length !== 1 ? 's' : '' }}</p>
-                  <Button variant="ghost" size="sm" @click="clearWorktreeSearch">
+                  <SButton variant="ghost" size="sm" @click="clearWorktreeSearch">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                     Clear search
-                  </Button>
+                  </SButton>
                 </div>
 
                 <!-- Worktree cards: virtual scroll for large lists, animated TransitionGroup for smaller lists -->

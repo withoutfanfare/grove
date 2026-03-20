@@ -8,7 +8,8 @@
 import { ref, watch, computed } from 'vue'
 import { useWorktrees } from '../composables'
 import type { HealthResult, HealthGrade } from '../types'
-import { Panel, Button, Skeleton } from './ui'
+import { SPanel, SButton } from '@stuntrocket/ui'
+import { Skeleton } from './ui'
 import GradeBadge from './GradeBadge.vue'
 
 const props = defineProps<{
@@ -85,7 +86,7 @@ function getSeverityStyle(severity: string) {
 </script>
 
 <template>
-  <Panel
+  <SPanel
     :open="isOpen"
     title="Health Report"
     :subtitle="repoName"
@@ -277,9 +278,9 @@ function getSeverityStyle(severity: string) {
     </div>
 
     <template v-if="health && !loading" #footer>
-      <Button variant="primary" class="w-full" @click="handleClose">
+      <SButton variant="primary" class="w-full" @click="handleClose">
         Done
-      </Button>
+      </SButton>
     </template>
-  </Panel>
+  </SPanel>
 </template>
