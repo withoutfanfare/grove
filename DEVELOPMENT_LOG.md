@@ -7,5 +7,5 @@
 - Items attempted but failed: none
 - Branch: feature/scooda-design-tokens
 - Tests passing: yes (79/79 Rust tests, 224/245 frontend tests — 21 pre-existing failures in settings.test.ts due to localStorage mock issue)
-- Build status: frontend build success (vite build), cargo check clean, cargo clippy clean
-- Notes: Compatibility layer maps 30+ legacy token names (--color-surface-base, --color-surface-raised, --duration-modal, --ease-spring, etc.) to Scooda equivalents so all existing components work without modification. The full UI Migration (P1/XL) is flagged as too large for autonomous cycles. Production Tauri build not attempted due to missing wt sidecar binary (pre-existing infrastructure issue — wt CLI needs building in parent repo first).
+- Build status: vite build success, cargo check clean, cargo clippy clean. Production tauri build blocked by two pre-existing issues: (1) vue-tsc errors in test files (33 errors on main, same count on feature branch — zero new errors introduced), (2) missing wt sidecar binary (wt CLI needs building in parent repo first).
+- Notes: Compatibility layer maps 30+ legacy token names (--color-surface-base, --color-surface-raised, --duration-modal, --ease-spring, etc.) to Scooda equivalents so all existing components work without modification. The full UI Migration (P1/XL) is flagged as too large for autonomous cycles.
