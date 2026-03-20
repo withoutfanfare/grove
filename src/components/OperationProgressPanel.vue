@@ -16,7 +16,7 @@
  */
 import { computed, ref } from 'vue'
 import type { ProgressItem, ProgressStatus, ResultFilter, StatusCounts } from '../types'
-import { Panel, Button } from './ui'
+import { SPanel, SButton } from '@stuntrocket/ui'
 import { useToast } from '../composables'
 
 /**
@@ -234,7 +234,7 @@ function hasError(item: ProgressItem): boolean {
 </script>
 
 <template>
-  <Panel
+  <SPanel
     :open="isOpen"
     :title="title"
     size="lg"
@@ -500,19 +500,19 @@ function hasError(item: ProgressItem): boolean {
 
     <!-- Cancel button when in progress -->
     <template v-if="!isComplete && progress" #footer>
-      <Button variant="ghost" class="w-full" @click="handleCancel">
+      <SButton variant="ghost" class="w-full" @click="handleCancel">
         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
         </svg>
         Cancel Operation
-      </Button>
+      </SButton>
     </template>
 
     <!-- Footer buttons when complete -->
     <template v-if="isComplete" #footer>
       <div class="flex gap-3 w-full">
         <!-- Retry Failed button when there are failures or conflicts -->
-        <Button
+        <SButton
           v-if="hasFailures || hasConflicts"
           variant="danger"
           class="flex-1"
@@ -522,11 +522,11 @@ function hasError(item: ProgressItem): boolean {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
           Retry Failed
-        </Button>
+        </SButton>
 
         <!-- Done button -->
-        <Button
-          :variant="hasFailures || hasConflicts ? 'ghost' : 'success'"
+        <SButton
+          :variant="hasFailures || hasConflicts ? 'ghost' : 'primary'"
           :class="hasFailures || hasConflicts ? 'flex-1' : 'w-full'"
           @click="handleClose"
         >
@@ -534,10 +534,10 @@ function hasError(item: ProgressItem): boolean {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
           </svg>
           Done
-        </Button>
+        </SButton>
       </div>
     </template>
-  </Panel>
+  </SPanel>
 </template>
 
 <style scoped>

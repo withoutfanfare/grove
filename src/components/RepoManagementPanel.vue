@@ -8,7 +8,7 @@
 import { ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRepoConfigStore, useHooksStore, useWorktreeStore } from '../stores'
-import { Panel, Button } from './ui'
+import { SPanel, SButton } from '@stuntrocket/ui'
 import ConfigPanel from './repo/ConfigPanel.vue'
 import HooksPanel from './repo/HooksPanel.vue'
 
@@ -79,7 +79,7 @@ function handleRefresh() {
 </script>
 
 <template>
-  <Panel
+  <SPanel
     :open="isOpen"
     title="Repository Management"
     size="xl"
@@ -184,13 +184,13 @@ function handleRefresh() {
 
     <template #footer>
       <div class="flex items-center justify-end w-full">
-        <Button
+        <SButton
           variant="ghost"
           @click="handleClose"
         >
           Close
-        </Button>
+        </SButton>
       </div>
     </template>
-  </Panel>
+  </SPanel>
 </template>

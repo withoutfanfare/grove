@@ -4,7 +4,8 @@
  *
  * A simple confirmation dialog for destructive actions.
  */
-import { Modal, Button } from '.'
+import { SButton } from '@stuntrocket/ui'
+import Modal from './Modal.vue'
 
 defineProps<{
   open: boolean
@@ -67,16 +68,16 @@ const emit = defineEmits<{
 
     <template #footer>
       <div class="flex items-center justify-end gap-3 w-full">
-        <Button variant="ghost" :disabled="loading" @click="emit('cancel')">
+        <SButton variant="ghost" :disabled="loading" @click="emit('cancel')">
           {{ cancelLabel || 'Cancel' }}
-        </Button>
-        <Button
+        </SButton>
+        <SButton
           :variant="variant === 'danger' ? 'danger' : 'primary'"
           :loading="loading"
           @click="emit('confirm')"
         >
           {{ confirmLabel || 'Confirm' }}
-        </Button>
+        </SButton>
       </div>
     </template>
   </Modal>

@@ -12,7 +12,7 @@ import { copyPath, copyUrl } from '../utils/clipboard'
 import CommitList from './CommitList.vue'
 import FileChangesList from './FileChangesList.vue'
 import GradeBadge from './GradeBadge.vue'
-import { IconButton } from './ui'
+import { SIconButton } from '@stuntrocket/ui'
 
 const props = defineProps<{
   worktree: Worktree
@@ -170,7 +170,7 @@ const syncExplanation = computed(() => {
         <div class="px-4 py-4 space-y-5 relative">
           <!-- Refresh button -->
           <div class="absolute top-3 right-3">
-            <IconButton
+            <SIconButton
               tooltip="Refresh details"
               size="sm"
               @click="refreshData"
@@ -183,7 +183,7 @@ const syncExplanation = computed(() => {
                   d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                 />
               </svg>
-            </IconButton>
+            </SIconButton>
           </div>
 
           <!-- Path and URL section -->
@@ -201,7 +201,7 @@ const syncExplanation = computed(() => {
               <code class="flex-1 text-sm font-mono text-text-secondary truncate" :title="worktree.path">
                 {{ worktree.path }}
               </code>
-              <IconButton
+              <SIconButton
                 tooltip="Copy path"
                 size="sm"
                 class="opacity-0 group-hover:opacity-100 transition-opacity"
@@ -211,7 +211,7 @@ const syncExplanation = computed(() => {
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
-              </IconButton>
+              </SIconButton>
             </div>
 
             <!-- URL (if available) -->
@@ -229,7 +229,7 @@ const syncExplanation = computed(() => {
               >
                 {{ worktree.url }}
               </a>
-              <IconButton
+              <SIconButton
                 tooltip="Copy URL"
                 size="sm"
                 class="opacity-0 group-hover:opacity-100 transition-opacity"
@@ -239,7 +239,7 @@ const syncExplanation = computed(() => {
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
-              </IconButton>
+              </SIconButton>
             </div>
           </section>
 

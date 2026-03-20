@@ -16,7 +16,7 @@
     "test:ui": "vitest --ui"
   },
   "dependencies": {
-    "@stuntrocket/ui": "^0.3.0",
+    "@stuntrocket/ui": "^0.8.1",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/vue-virtual": "^3.13.18",
     "@tauri-apps/api": "^2",

@@ -10,7 +10,8 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import type { Worktree, RemoveWorktreeResponse } from '../types'
 import { useWorktrees, useToast } from '../composables'
-import { Modal, Button, Checkbox } from './ui'
+import { SButton } from '@stuntrocket/ui'
+import { Modal, Checkbox } from './ui'
 
 type ModalPhase = 'confirm' | 'deleting' | 'results'
 
@@ -44,7 +45,7 @@ const elapsedSeconds = ref(0)
 let elapsedInterval: ReturnType<typeof setInterval> | null = null
 
 // M9: Ref for cancel button focus management
-const cancelButtonRef = ref<InstanceType<typeof Button> | null>(null)
+const cancelButtonRef = ref<InstanceType<typeof SButton> | null>(null)
 
 // Computed helpers for results phase
 const hasHooks = computed(() => (deletionResult.value?.hooks.length ?? 0) > 0)
@@ -416,21 +417,21 @@ function handleClose() {
       <!-- Confirm phase footer -->
       <div v-if="phase === 'confirm'" class="flex items-center justify-end gap-3">
         <!-- M9: Add ref for focus management -->
-        <Button
+        <SButton
           ref="cancelButtonRef"
           variant="ghost"
           @click="handleClose"
           :disabled="isSubmitting"
         >
           Cancel
-        </Button>
-        <Button
+        </SButton>
+        <SButton
           variant="danger"
           :loading="isSubmitting"
           @click="handleDelete"
         >
           Delete Worktree
-        </Button>
+        </SButton>
       </div>
 
       <!-- Deleting phase footer (no actions) -->
@@ -438,12 +439,12 @@ function handleClose() {
 
       <!-- Results phase footer -->
       <div v-else-if="phase === 'results'" class="flex items-center justify-end gap-3">
-        <Button
+        <SButton
           variant="ghost"
           @click="handleClose"
         >
           Close
-        </Button>
+        </SButton>
       </div>
     </template>
   </Modal>

@@ -1,37 +1,32 @@
 /**
- * UI Component Library
+ * UI Component Library — Custom Components
  *
- * Premium, reusable components for the wt desktop app.
+ * Components that remain app-specific because their API diverges
+ * from the @stuntrocket/ui equivalents.
+ *
+ * Migrated to @stuntrocket/ui:
+ *   Button → SButton, IconButton → SIconButton, Panel → SPanel,
+ *   ToastContainer → SToastContainer (via useToastStack)
  */
 
-export { default as Button } from './Button.vue'
-export { default as IconButton } from './IconButton.vue'
-export { default as Badge } from './Badge.vue'
-export { default as Modal } from './Modal.vue'
-export { default as Panel } from './Panel.vue'
+// Form controls (custom — library equivalents lack label/error/hint props)
 export { default as Input } from './Input.vue'
-export { default as Textarea } from './Textarea.vue'
 export { default as Select } from './Select.vue'
 export { default as Toggle } from './Toggle.vue'
 export { default as Checkbox } from './Checkbox.vue'
 
-// Skeleton loaders for premium loading states
+// Overlay (custom — library equivalents have different prop APIs)
+export { default as Modal } from './Modal.vue'
+export { default as ConfirmDialog } from './ConfirmDialog.vue'
+
+// Dropdown menu (custom — library SDropdownMenu uses items array, not slot-based)
+export { default as Dropdown } from './Dropdown.vue'
+export { default as DropdownItem } from './DropdownItem.vue'
+
+// Skeleton loaders (custom — library uses CSS values, custom uses Tailwind classes)
 export { default as Skeleton } from './Skeleton.vue'
 export { default as SkeletonCard } from './SkeletonCard.vue'
 export { default as SkeletonList } from './SkeletonList.vue'
-export { default as SkeletonText } from './SkeletonText.vue'
 
-// Toast notifications
-export { default as Toast } from './Toast.vue'
-export { default as ToastContainer } from './ToastContainer.vue'
-
-// Layout utilities
+// Layout utilities (app-specific)
 export { default as ResizeHandle } from './ResizeHandle.vue'
-
-// Dropdown menu
-export { default as Dropdown } from './Dropdown.vue'
-export { default as DropdownItem } from './DropdownItem.vue'
-export { default as ConfirmDialog } from './ConfirmDialog.vue'
-
-// Code editor with syntax highlighting
-export { default as CodeEditor } from './CodeEditor.vue'

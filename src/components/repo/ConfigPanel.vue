@@ -13,7 +13,7 @@ import { storeToRefs } from 'pinia'
 import { useRepoConfigStore } from '../../stores'
 import type { ConfigLayer, ConfigFileMeta } from '../../types'
 import { getConfigLayerLabel } from '../../types'
-import { Button } from '../ui'
+import { SButton } from '@stuntrocket/ui'
 import { copyToClipboard } from '../../utils/clipboard'
 
 const props = defineProps<{
@@ -479,10 +479,10 @@ function handleEditorKeydown(e: KeyboardEvent) {
               </svg>
             </button>
             <div class="w-px h-5 bg-border-subtle mx-1" />
-            <Button variant="ghost" size="sm" :disabled="saving" @click="cancelEdit">Cancel</Button>
-            <Button v-if="!isViewOnly" variant="primary" size="sm" :disabled="saving" @click="saveEdit">
+            <SButton variant="ghost" size="sm" :disabled="saving" @click="cancelEdit">Cancel</SButton>
+            <SButton v-if="!isViewOnly" variant="primary" size="sm" :disabled="saving" @click="saveEdit">
               {{ saving ? 'Saving...' : 'Save' }}
-            </Button>
+            </SButton>
           </div>
         </div>
 
@@ -579,14 +579,14 @@ function handleEditorKeydown(e: KeyboardEvent) {
                 </button>
                 <div class="w-px h-4 bg-border-subtle mx-1" />
               </template>
-              <Button v-if="file.exists && file.writable" variant="ghost" size="sm" @click="openForEdit(file.layer)">Edit</Button>
-              <Button v-else-if="!file.exists" variant="primary" size="sm" @click="createConfigFile(file.layer)">
+              <SButton v-if="file.exists && file.writable" variant="ghost" size="sm" @click="openForEdit(file.layer)">Edit</SButton>
+              <SButton v-else-if="!file.exists" variant="primary" size="sm" @click="createConfigFile(file.layer)">
                 <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
                 Create
-              </Button>
-              <Button v-else-if="file.exists" variant="ghost" size="sm" @click="openForEdit(file.layer, true)">View</Button>
+              </SButton>
+              <SButton v-else-if="file.exists" variant="ghost" size="sm" @click="openForEdit(file.layer, true)">View</SButton>
             </div>
           </div>
         </div>

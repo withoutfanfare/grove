@@ -9,7 +9,8 @@ import { ref, watch, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useSettingsStore, EDITOR_OPTIONS, TERMINAL_OPTIONS, GIT_CLIENT_OPTIONS } from '../stores'
 import type { EditorChoice, TerminalChoice, GitClientChoice } from '../stores'
-import { Panel, Button, Input, Select, Toggle } from './ui'
+import { SPanel, SButton } from '@stuntrocket/ui'
+import { Input, Select, Toggle } from './ui'
 
 const props = defineProps<{
   isOpen: boolean
@@ -30,6 +31,9 @@ const gitClient = ref<GitClientChoice>(settings.value.gitClient)
 const customGitClientPath = ref(settings.value.customGitClientPath)
 const defaultBaseBranch = ref(settings.value.defaultBaseBranch)
 const enableNotifications = ref(settings.value.enableNotifications)
+const backgroundFetchInterval = ref(settings.value.backgroundFetchInterval)
+const staleThresholdDays = ref(settings.value.staleThresholdDays)
+const trayBadgeEnabled = ref(settings.value.trayBadgeEnabled)
 
 // M6: Validation for custom editor path
 const customEditorPathError = computed(() => {
@@ -79,6 +83,9 @@ watch(() => props.isOpen, (open) => {
     customGitClientPath.value = settings.value.customGitClientPath
     defaultBaseBranch.value = settings.value.defaultBaseBranch
     enableNotifications.value = settings.value.enableNotifications
+    backgroundFetchInterval.value = settings.value.backgroundFetchInterval
+    staleThresholdDays.value = settings.value.staleThresholdDays
+    trayBadgeEnabled.value = settings.value.trayBadgeEnabled
   }
 })
 
@@ -92,6 +99,10 @@ function handleSave() {
   store.setCustomGitClientPath(customGitClientPath.value)
   store.setDefaultBaseBranch(defaultBaseBranch.value)
   store.setEnableNotifications(enableNotifications.value)
+  // New settings
+  settings.value.backgroundFetchInterval = backgroundFetchInterval.value
+  settings.value.staleThresholdDays = staleThresholdDays.value
+  settings.value.trayBadgeEnabled = trayBadgeEnabled.value
   emit('close')
 }
 
@@ -108,6 +119,9 @@ function handleReset() {
   customGitClientPath.value = settings.value.customGitClientPath
   defaultBaseBranch.value = settings.value.defaultBaseBranch
   enableNotifications.value = settings.value.enableNotifications
+  backgroundFetchInterval.value = settings.value.backgroundFetchInterval
+  staleThresholdDays.value = settings.value.staleThresholdDays
+  trayBadgeEnabled.value = settings.value.trayBadgeEnabled
 }
 
 // Get descriptions
@@ -121,7 +135,7 @@ const gitClientDescription = computed(() => {
 </script>
 
 <template>
-  <Panel
+  <SPanel
     :open="isOpen"
     title="Settings"
     size="lg"
@@ -244,33 +258,97 @@ const gitClientDescription = computed(() => {
           description="Show toast notifications for operations"
         />
       </section>
+
+      <div class="divider-horizontal" />
+
+      <!-- Background Fetch Section -->
+      <section class="space-y-4">
+        <h3 class="text-xs font-semibold text-text-muted uppercase tracking-wider">
+          Background Fetch
+        </h3>
+
+        <div>
+          <label class="block text-sm font-medium text-text-secondary mb-1.5">
+            Fetch Interval (minutes)
+          </label>
+          <select
+            v-model.number="backgroundFetchInterval"
+            class="w-full text-sm bg-surface-overlay text-text-primary border border-border-subtle rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-accent/50"
+          >
+            <option :value="0">Disabled</option>
+            <option :value="1">Every minute</option>
+            <option :value="2">Every 2 minutes</option>
+            <option :value="5">Every 5 minutes</option>
+            <option :value="10">Every 10 minutes</option>
+            <option :value="15">Every 15 minutes</option>
+            <option :value="30">Every 30 minutes</option>
+          </select>
+          <p class="mt-1 text-xs text-text-muted">
+            Periodically fetch from remote to keep ahead/behind counts current
+          </p>
+        </div>
+      </section>
+
+      <div class="divider-horizontal" />
+
+      <!-- Stale Detection Section -->
+      <section class="space-y-4">
+        <h3 class="text-xs font-semibold text-text-muted uppercase tracking-wider">
+          Stale Detection
+        </h3>
+
+        <div>
+          <label class="block text-sm font-medium text-text-secondary mb-1.5">
+            Stale Threshold (days)
+          </label>
+          <select
+            v-model.number="staleThresholdDays"
+            class="w-full text-sm bg-surface-overlay text-text-primary border border-border-subtle rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-accent/50"
+          >
+            <option :value="7">7 days</option>
+            <option :value="14">14 days</option>
+            <option :value="21">21 days</option>
+            <option :value="30">30 days</option>
+            <option :value="60">60 days</option>
+          </select>
+          <p class="mt-1 text-xs text-text-muted">
+            Mark worktrees as stale when not accessed within this period
+          </p>
+        </div>
+
+        <Toggle
+          v-model="trayBadgeEnabled"
+          label="System Tray Badge"
+          description="Show attention count on the system tray icon"
+        />
+      </section>
     </div>
 
     <template #footer>
       <div class="flex items-center justify-between w-full">
-        <Button
+        <SButton
           variant="ghost"
           size="sm"
           @click="handleReset"
         >
           Reset to Defaults
-        </Button>
+        </SButton>
         <div class="flex items-center gap-3">
-          <Button
+          <SButton
             variant="ghost"
             @click="handleCancel"
           >
             Cancel
-          </Button>
-          <Button
+          </SButton>
+          <SButton
             variant="primary"
             :disabled="!isFormValid"
             @click="handleSave"
           >
             Save Settings
-          </Button>
+          </SButton>
         </div>
       </div>
     </template>
-  </Panel>
+  </SPanel>
 </template>

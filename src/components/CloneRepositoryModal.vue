@@ -7,7 +7,8 @@
  */
 import { ref, computed, watch, nextTick } from 'vue'
 import { useWt, useToast } from '../composables'
-import { Modal, Button, Input } from './ui'
+import { SButton } from '@stuntrocket/ui'
+import { Modal, Input } from './ui'
 
 const props = defineProps<{
   isOpen: boolean
@@ -212,21 +213,21 @@ function handleClose() {
 
     <template #footer>
       <div class="flex items-center justify-end gap-3">
-        <Button
+        <SButton
           variant="ghost"
           @click="handleClose"
           :disabled="isSubmitting"
         >
           Cancel
-        </Button>
-        <Button
+        </SButton>
+        <SButton
           variant="primary"
           :loading="isSubmitting"
           :disabled="!isValid"
           @click="handleSubmit"
         >
           Clone Repository
-        </Button>
+        </SButton>
       </div>
     </template>
   </Modal>

@@ -13,10 +13,12 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useWorktreeStore, useSettingsStore } from '../stores'
-import type { ConfigLayer, CreateWorktreeResponse } from '../types'
+import { useTemplateStore } from '../stores/templates'
+import type { ConfigLayer, CreateWorktreeResponse, WorktreeTemplate } from '../types'
 import { useWorktrees, useWt, useToast } from '../composables'
 import { copyPath } from '../utils/clipboard'
-import { Modal, Button, Input } from './ui'
+import { SButton } from '@stuntrocket/ui'
+import { Modal, Input } from './ui'
 import type { Branch } from '../types'
 
 type ModalPhase = 'form' | 'creating' | 'results'
@@ -37,10 +39,67 @@ const { createWorktree, listBranches, openInEditor, openInBrowser } = useWorktre
 const { readConfigFile } = useWt()
 const { toast } = useToast()
 
+const templateStore = useTemplateStore()
+
 const branch = ref('')
 const baseBranch = ref(settingsStore.settings.defaultBaseBranch)
 const isSubmitting = ref(false)
 const error = ref<string | null>(null)
+
+// Template selection state
+const selectedTemplate = ref<WorktreeTemplate | null>(null)
+
+// Remote branches state
+const remoteBranches = ref<Branch[]>([])
+const loadingRemoteBranches = ref(false)
+const showRemoteBranchPicker = ref(false)
+const remoteBranchFilter = ref('')
+
+// Filtered remote branches
+const filteredRemoteBranches = computed(() => {
+  const filter = remoteBranchFilter.value.toLowerCase()
+  return remoteBranches.value
+    .filter(b => b.name.toLowerCase().includes(filter))
+    .slice(0, 30)
+})
+
+// Apply template to form
+function applyTemplate(template: WorktreeTemplate) {
+  selectedTemplate.value = template
+  baseBranch.value = template.default_base
+  branchFilter.value = template.default_base
+  // Pre-fill the branch prefix if branch is empty
+  if (!branch.value) {
+    branch.value = template.branch_prefix
+  }
+}
+
+function clearTemplate() {
+  selectedTemplate.value = null
+}
+
+// Fetch remote branches
+async function fetchRemoteBranches() {
+  if (!selectedRepoName.value) return
+  loadingRemoteBranches.value = true
+  try {
+    const wtApi = useWt()
+    const result = await wtApi.getRemoteBranches(selectedRepoName.value)
+    remoteBranches.value = result.branches
+  } catch (e) {
+    console.warn('Failed to fetch remote branches:', e)
+  } finally {
+    loadingRemoteBranches.value = false
+  }
+}
+
+// Select a remote branch for checkout
+function selectRemoteBranch(branchName: string) {
+  // Strip origin/ prefix for the branch name
+  const localName = branchName.replace(/^origin\//, '')
+  branch.value = localName
+  showRemoteBranchPicker.value = false
+}
 
 // Multi-phase state
 const phase = ref<ModalPhase>('form')
@@ -145,6 +204,11 @@ watch(() => props.isOpen, async (open) => {
     showBranchDropdown.value = false
     dropdownHovered.value = false
 
+    // Clear template selection
+    selectedTemplate.value = null
+    remoteBranchFilter.value = ''
+    showRemoteBranchPicker.value = false
+
     // Fetch branches for the selected repo
     if (selectedRepoName.value) {
       loadingBranches.value = true
@@ -153,6 +217,9 @@ watch(() => props.isOpen, async (open) => {
         branches.value = result.branches
       }
       loadingBranches.value = false
+
+      // Also fetch remote branches for the browser
+      fetchRemoteBranches()
     }
 
     // M9: Focus the branch input when modal opens
@@ -297,15 +364,90 @@ function handleClose() {
         </div>
       </div>
 
+      <!-- Template selector -->
+      <div>
+        <label class="block text-sm font-medium text-text-secondary mb-1.5">
+          Template
+          <span class="text-text-muted text-xs">(optional)</span>
+        </label>
+        <div class="flex flex-wrap gap-1.5">
+          <button
+            v-for="template in templateStore.allTemplates"
+            :key="template.name"
+            type="button"
+            :class="[
+              'px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors border',
+              selectedTemplate?.name === template.name
+                ? 'bg-accent/15 text-accent border-accent/30'
+                : 'text-text-muted hover:text-text-secondary hover:bg-surface-overlay border-transparent'
+            ]"
+            @click="selectedTemplate?.name === template.name ? clearTemplate() : applyTemplate(template)">
+            {{ template.name }}
+          </button>
+        </div>
+      </div>
+
       <!-- Branch name -->
-      <Input
-        ref="branchInputRef"
-        v-model="branch"
-        label="Branch Name"
-        placeholder="feature/my-feature"
-        :disabled="isSubmitting"
-        autofocus
-      />
+      <div class="flex items-end gap-2">
+        <div class="flex-1">
+          <Input
+            ref="branchInputRef"
+            v-model="branch"
+            label="Branch Name"
+            placeholder="feature/my-feature"
+            :disabled="isSubmitting"
+            autofocus
+          />
+        </div>
+        <!-- Browse remote branches button -->
+        <button
+          type="button"
+          class="px-3 py-2 text-xs font-medium rounded-lg bg-surface-overlay text-text-secondary hover:text-text-primary hover:bg-surface-raised border border-border-subtle transition-colors flex-shrink-0"
+          :disabled="loadingRemoteBranches"
+          @click="showRemoteBranchPicker = !showRemoteBranchPicker"
+          title="Browse remote branches">
+          <svg v-if="loadingRemoteBranches" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Remote branch picker -->
+      <div v-if="showRemoteBranchPicker" class="border border-border-subtle rounded-lg bg-surface-overlay p-3">
+        <div class="flex items-center gap-2 mb-2">
+          <input
+            v-model="remoteBranchFilter"
+            type="text"
+            class="flex-1 text-sm bg-surface-base text-text-primary border border-border-subtle rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-accent/50"
+            placeholder="Filter remote branches..."
+          />
+          <button
+            type="button"
+            class="text-xs text-accent hover:text-accent-hover transition-colors"
+            :disabled="loadingRemoteBranches"
+            @click="fetchRemoteBranches">
+            Refresh
+          </button>
+        </div>
+        <div class="max-h-40 overflow-y-auto space-y-0.5">
+          <button
+            v-for="rb in filteredRemoteBranches"
+            :key="rb.name"
+            type="button"
+            class="w-full text-left px-2.5 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-surface-raised rounded transition-colors truncate"
+            @click="selectRemoteBranch(rb.name)">
+            {{ rb.name }}
+          </button>
+          <p v-if="filteredRemoteBranches.length === 0" class="text-xs text-text-muted text-center py-2">
+            {{ loadingRemoteBranches ? 'Loading...' : 'No matching remote branches' }}
+          </p>
+        </div>
+      </div>
 
       <!-- Base branch with dropdown -->
       <div class="relative">
@@ -531,21 +673,21 @@ function handleClose() {
     <template #footer>
       <!-- Form phase footer -->
       <div v-if="phase === 'form'" class="flex items-center justify-end gap-3">
-        <Button
+        <SButton
           variant="ghost"
           @click="handleClose"
           :disabled="isSubmitting"
         >
           Cancel
-        </Button>
-        <Button
+        </SButton>
+        <SButton
           variant="primary"
           :loading="isSubmitting"
           :disabled="!isValid"
           @click="handleSubmit"
         >
           Create Worktree
-        </Button>
+        </SButton>
       </div>
 
       <!-- Creating phase footer (no actions) -->
@@ -553,19 +695,19 @@ function handleClose() {
 
       <!-- Results phase footer -->
       <div v-else-if="phase === 'results'" class="flex items-center justify-end gap-3">
-        <Button
+        <SButton
           variant="ghost"
           @click="handleClose"
         >
           Close
-        </Button>
-        <Button
+        </SButton>
+        <SButton
           v-if="creationResult?.result.path"
           variant="primary"
           @click="handleOpenInEditor"
         >
           Open in Editor
-        </Button>
+        </SButton>
       </div>
     </template>
   </Modal>

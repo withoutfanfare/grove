@@ -13,7 +13,8 @@ import { storeToRefs } from 'pinia'
 import { useHooksStore, useSettingsStore } from '../../stores'
 import type { HookEvent, HookScope, HookScriptMeta } from '../../types'
 import { getHookEventLabel, getHookScopeLabel } from '../../types'
-import { Button, Input, ConfirmDialog, Dropdown, DropdownItem } from '../ui'
+import { SButton } from '@stuntrocket/ui'
+import { Input, ConfirmDialog, Dropdown, DropdownItem } from '../ui'
 import { copyToClipboard } from '../../utils/clipboard'
 
 const props = defineProps<{
@@ -315,17 +316,17 @@ function handleEditorKeydown(e: KeyboardEvent) {
         </div>
       </div>
       <div v-if="!isEditing && !isCreating" class="flex items-center gap-2">
-        <Button variant="ghost" size="sm" title="Open hooks folder in Finder" @click="openHooksFolder">
+        <SButton variant="ghost" size="sm" title="Open hooks folder in Finder" @click="openHooksFolder">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
           </svg>
-        </Button>
-        <Button variant="primary" size="sm" @click="startCreate">
+        </SButton>
+        <SButton variant="primary" size="sm" @click="startCreate">
           <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
         </svg>
         New Hook
-        </Button>
+        </SButton>
       </div>
     </div>
 
@@ -384,10 +385,10 @@ function handleEditorKeydown(e: KeyboardEvent) {
         />
 
         <div class="flex justify-end gap-2 mt-5 pt-4 border-t border-border-subtle/50">
-          <Button variant="ghost" size="sm" @click="cancelCreate">Cancel</Button>
-          <Button variant="primary" size="sm" :disabled="saving" @click="createHook">
+          <SButton variant="ghost" size="sm" @click="cancelCreate">Cancel</SButton>
+          <SButton variant="primary" size="sm" :disabled="saving" @click="createHook">
             {{ saving ? 'Creating...' : 'Create Hook' }}
-          </Button>
+          </SButton>
         </div>
       </div>
     </div>
@@ -431,10 +432,10 @@ function handleEditorKeydown(e: KeyboardEvent) {
             </svg>
           </button>
           <div class="w-px h-5 bg-border-subtle mx-1" />
-          <Button variant="ghost" size="sm" :disabled="saving" @click="cancelEdit">Cancel</Button>
-          <Button variant="primary" size="sm" :disabled="saving" @click="saveEdit">
+          <SButton variant="ghost" size="sm" :disabled="saving" @click="cancelEdit">Cancel</SButton>
+          <SButton variant="primary" size="sm" :disabled="saving" @click="saveEdit">
             {{ saving ? 'Saving...' : 'Save' }}
-          </Button>
+          </SButton>
         </div>
       </div>
 
@@ -609,9 +610,9 @@ function handleEditorKeydown(e: KeyboardEvent) {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
               </svg>
               <p class="text-text-muted text-sm mb-2">No hooks for this event</p>
-              <Button variant="ghost" size="sm" @click="startCreate(); newHookEvent = event">
+              <SButton variant="ghost" size="sm" @click="startCreate(); newHookEvent = event">
                 Create {{ getHookEventLabel(event) }} hook
-              </Button>
+              </SButton>
             </div>
           </div>
         </Transition>

@@ -16,6 +16,7 @@ import WorktreeDetailsPanel from './WorktreeDetailsPanel.vue'
 import { useWorktrees, useToast, formatRelativeTime, useWt } from '../composables'
 import { useSettingsStore } from '../stores/settings'
 import { Dropdown, DropdownItem } from './ui'
+// Dropdown/DropdownItem kept custom — library SDropdownMenu has incompatible API (items prop vs slot-based)
 import { copyPath, copyBranch, copyUrl, copyCdCommand } from '../utils/clipboard'
 
 const props = defineProps<{
@@ -31,11 +32,34 @@ const emit = defineEmits<{
 
 const { openInEditor, openInGitClient, openInTerminal, openInBrowser, openInFinder, openAll, pullWorktree, syncWorktree, getWorktreeOperation, isWorktreeBusy } = useWorktrees()
 const { toast } = useToast()
-const { getDirtyDetails } = useWt()
+const { getDirtyDetails, getDiffStats } = useWt()
 const settingsStore = useSettingsStore()
 
 // Check if git client is configured
 const hasGitClient = computed(() => settingsStore.settings.gitClient !== 'none')
+
+// Diff stats (lazy-loaded)
+const diffStats = ref<import('../types').DiffStats | undefined>(undefined)
+
+// Stale detection
+const isStaleWorktree = computed(() => {
+  if (!props.worktree.lastAccessed) return false
+  const thresholdMs = (settingsStore.settings.staleThresholdDays ?? 14) * 24 * 60 * 60 * 1000
+  return Date.now() - new Date(props.worktree.lastAccessed).getTime() > thresholdMs
+})
+
+// Load diff stats on mount (async, non-blocking)
+onMounted(async () => {
+  try {
+    const stats = await getDiffStats(
+      props.worktree.path,
+      settingsStore.settings.defaultBaseBranch || undefined
+    )
+    diffStats.value = stats
+  } catch {
+    // Silently ignore — diff stats are supplementary
+  }
+})
 
 // M8: Local refs for double-click prevention on git actions
 const isLocalPulling = ref(false)
@@ -285,11 +309,14 @@ async function handleOpenAll() {
 </script>
 
 <template>
-  <div class="card card-interactive group relative" :class="{
-    'opacity-75': isBusy,
-    'ring-2 ring-accent ring-offset-2 ring-offset-surface-primary': focused,
-    'card-expanded': isDetailsExpanded
-  }">
+  <div class="card card-interactive group relative"
+    role="article"
+    :aria-label="`Worktree ${branchName}${worktree.dirty ? ', has uncommitted changes' : ''}${isStaleWorktree ? ', stale' : ''}`"
+    :class="{
+      'opacity-75': isBusy,
+      'ring-2 ring-accent ring-offset-2 ring-offset-surface-primary': focused,
+      'card-expanded': isDetailsExpanded
+    }">
     <!-- Main content row (click to toggle details) -->
     <div class="p-4 flex items-center gap-4 cursor-pointer" role="button" tabindex="0"
       @click="toggleDetails" @keydown.enter.prevent="toggleDetails" @keydown.space.prevent="toggleDetails">
@@ -317,6 +344,20 @@ async function handleOpenAll() {
 
           <!-- Phase 2: Status badges (MERGED, STALE, MISMATCH) -->
           <WorktreeStatusBadges :merged="worktree.merged" :stale="worktree.stale" :mismatch="hasMismatch" />
+
+          <!-- Stale worktree badge (configurable threshold) -->
+          <span v-if="isStaleWorktree && !worktree.stale"
+            class="inline-flex items-center px-1.5 py-0.5 text-2xs font-medium rounded bg-warning/10 text-warning border border-warning/20"
+            title="Worktree not accessed within stale threshold">
+            Stale
+          </span>
+
+          <!-- Diff stats badge -->
+          <span v-if="diffStats && diffStats.files_changed > 0"
+            class="inline-flex items-center px-1.5 py-0.5 text-2xs font-mono rounded bg-surface-overlay text-text-muted border border-border-subtle"
+            :title="diffStats.file_list.join('\n')">
+            {{ diffStats.display }}
+          </span>
 
           <span class="text-text-muted text-2xs font-mono truncate" :title="worktree.path">
             {{ shortPath }}

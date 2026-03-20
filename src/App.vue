@@ -3,7 +3,7 @@ import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import Dashboard from './components/Dashboard.vue';
 import LoadingScreen from './components/LoadingScreen.vue';
-import { ToastContainer } from './components/ui';
+import { SToastContainer } from '@stuntrocket/ui';
 import { useWorktreeStore } from './stores/worktrees';
 import { useRepos } from './composables';
 import type { TrayWorktreeSelectedEvent } from './types';
@@ -92,6 +92,6 @@ onUnmounted(() => {
   <!-- Main app (no transition wrapper needed - Dashboard handles its own animations) -->
   <div v-if="!isInitialising">
     <Dashboard />
-    <ToastContainer />
+    <SToastContainer />
   </div>
 </template>
