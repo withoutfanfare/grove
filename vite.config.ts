@@ -36,7 +36,7 @@ export default defineConfig(async () => ({
       output: {
         manualChunks: {
           vue: ["vue", "pinia"],
-          tauri: ["@tauri-apps/api", "@tauri-apps/plugin-shell", "@tauri-apps/plugin-clipboard-manager", "@tauri-apps/plugin-opener"],
+          tauri: ["@tauri-apps/api", "@tauri-apps/plugin-shell", "@tauri-apps/plugin-clipboard-manager", "@tauri-apps/plugin-store", "@tauri-apps/plugin-notification", "@tauri-apps/plugin-log", "@tauri-apps/plugin-global-shortcut", "@tauri-apps/plugin-process", "@tauri-apps/plugin-dialog"],
         },
       },
     },

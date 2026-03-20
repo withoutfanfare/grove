@@ -142,6 +142,24 @@ pub struct CreateWorktreeResult {
     pub database: String,
 }
 
+/// A hook that was executed during worktree creation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HookExecution {
+    /// Hook name (e.g. "post-add", "post-add.d/01-setup.sh")
+    pub name: String,
+    /// Execution status: "success" or "failed"
+    pub status: String,
+}
+
+/// Response from creating a worktree, including hook execution results
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateWorktreeResponse {
+    /// The CLI's JSON output (path, url, branch, database)
+    pub result: CreateWorktreeResult,
+    /// Hooks that ran during creation (parsed from stderr)
+    pub hooks: Vec<HookExecution>,
+}
+
 /// Result from `wt rm <repo> <branch> --json`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RemoveWorktreeResult {
@@ -157,6 +175,15 @@ pub struct RemoveWorktreeResult {
     pub branch_deleted: bool,
     /// Whether the database was dropped
     pub db_dropped: bool,
+}
+
+/// Response from removing a worktree, including hook execution results
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RemoveWorktreeResponse {
+    /// The CLI's JSON output (success, repo, branch, path, etc.)
+    pub result: RemoveWorktreeResult,
+    /// Hooks that ran during removal (parsed from stderr)
+    pub hooks: Vec<HookExecution>,
 }
 
 /// Result from `wt pull <repo> <branch> --json`
@@ -408,9 +435,9 @@ pub struct OperationProgressEvent {
 // - wt.rs: CLI execution errors
 //
 // Standard error codes:
-// - CLI_NOT_FOUND: wt CLI binary not found in PATH
-// - COMMAND_FAILED: wt CLI command returned non-zero exit code
-// - PARSE_ERROR: Failed to parse JSON output from wt
+// - CLI_NOT_FOUND: grove CLI binary not found in PATH
+// - COMMAND_FAILED: grove CLI command returned non-zero exit code
+// - PARSE_ERROR: Failed to parse JSON output from grove
 // - IO_ERROR: General I/O error (file, network, etc.)
 // - UTF8_ERROR: Invalid UTF-8 in command output
 // - INVALID_INPUT: User input validation failed
@@ -437,15 +464,15 @@ impl WtError {
         }
     }
 
-    /// wt CLI not found in PATH
+    /// grove CLI not found in PATH
     pub fn cli_not_found() -> Self {
         Self::new(
             "CLI_NOT_FOUND",
-            "wt CLI not found. Please ensure wt is installed and in your PATH.",
+            "grove CLI not found. Please ensure grove is installed and in your PATH.",
         )
     }
 
-    /// wt command execution failed
+    /// grove command execution failed
     pub fn command_failed(stderr: impl Into<String>) -> Self {
         Self::new("COMMAND_FAILED", stderr)
     }
@@ -959,6 +986,9 @@ pub struct Config {
     /// Database configuration
     #[serde(default)]
     pub database: Option<ConfigDatabase>,
+    /// URL subdomain prefix (e.g., "api" turns feature.test into api.feature.test)
+    #[serde(default)]
+    pub url_subdomain: Option<String>,
 }
 
 /// Database configuration from wt config.

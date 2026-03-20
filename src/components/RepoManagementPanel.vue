@@ -58,7 +58,7 @@ watch(selectedRepoName, async () => {
 async function loadData() {
   try {
     await Promise.all([
-      configStore.loadEffectiveConfig(),
+      configStore.loadEffectiveConfig(selectedRepoName.value ?? undefined),
       configStore.loadConfigFiles(selectedRepoName.value ?? undefined),
       hooksStore.loadHooks(selectedRepoName.value ?? undefined),
     ])
@@ -92,7 +92,7 @@ function handleRefresh() {
       </svg>
     </template>
 
-    <div class="flex flex-col h-[60vh]">
+    <div class="flex flex-col h-full">
       <!-- Tab Bar -->
       <div class="flex items-center gap-1 border-b border-border-subtle px-1 -mx-6 -mt-2 mb-4">
         <button

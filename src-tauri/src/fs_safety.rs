@@ -148,29 +148,29 @@ pub fn get_home_dir() -> Result<PathBuf, WtError> {
     dirs::home_dir().ok_or_else(|| WtError::new("NOT_FOUND", "Could not determine home directory"))
 }
 
-/// Get the default wt config directory (~/.wt).
+/// Get the default grove config directory (~/.grove).
 pub fn get_wt_config_dir() -> Result<PathBuf, WtError> {
     let home = get_home_dir()?;
-    Ok(home.join(".wt"))
+    Ok(home.join(".grove"))
 }
 
 /// Get allowed roots for config/hook file operations.
 ///
 /// Returns paths where config and hook files may be read/written:
-/// - ~/.wt (default config/hooks directory)
+/// - ~/.grove (default config/hooks directory)
 /// - $HERD_ROOT if set (Laravel Herd project root)
-/// - User's home directory (for ~/.wtrc)
+/// - User's home directory (for ~/.groverc)
 pub fn get_allowed_roots(herd_root: Option<&str>) -> Result<Vec<PathBuf>, WtError> {
     let mut roots = Vec::new();
 
-    // Home directory (for ~/.wtrc)
+    // Home directory (for ~/.groverc)
     let home = get_home_dir()?;
     roots.push(home.clone());
 
-    // Default wt config directory
-    let wt_dir = home.join(".wt");
-    if wt_dir.exists() {
-        if let Ok(canonical) = wt_dir.canonicalize() {
+    // Default grove config directory
+    let grove_dir = home.join(".grove");
+    if grove_dir.exists() {
+        if let Ok(canonical) = grove_dir.canonicalize() {
             roots.push(canonical);
         }
     }
@@ -182,8 +182,8 @@ pub fn get_allowed_roots(herd_root: Option<&str>) -> Result<Vec<PathBuf>, WtErro
         }
     }
 
-    // Also check WT_HOOKS_DIR environment variable
-    if let Ok(hooks_dir) = std::env::var("WT_HOOKS_DIR") {
+    // Also check GROVE_HOOKS_DIR environment variable
+    if let Ok(hooks_dir) = std::env::var("GROVE_HOOKS_DIR") {
         if let Ok(canonical) = PathBuf::from(hooks_dir).canonicalize() {
             roots.push(canonical);
         }

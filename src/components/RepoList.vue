@@ -22,7 +22,7 @@ const props = withDefaults(defineProps<{
   /** Sidebar width in pixels (for resizable sidebar) */
   width?: number;
 }>(), {
-  width: 256, // Default: w-64 equivalent
+  width: 300,
 });
 
 const emit = defineEmits<{
@@ -75,12 +75,12 @@ const {
   navigateDown,
   selectIndex,
   getCurrentItem,
-} = useListNavigation(() => repositories.value)
+} = useListNavigation(() => filteredRepositories.value)
 
 // Update focused index when selected repo changes externally
 watch(selectedRepoName, (name) => {
   if (name) {
-    const index = repositories.value.findIndex(r => r.name === name)
+    const index = filteredRepositories.value.findIndex(r => r.name === name)
     if (index !== -1) {
       selectIndex(index)
     }
@@ -89,8 +89,8 @@ watch(selectedRepoName, (name) => {
 
 // Handle quick select by number (1-9)
 function handleQuickSelect(index: number) {
-  if (activeTab.value === 'repos' && index < repositories.value.length) {
-    const repo = repositories.value[index]
+  if (activeTab.value === 'repos' && index < filteredRepositories.value.length) {
+    const repo = filteredRepositories.value[index]
     if (repo) {
       handleSelectRepo(repo.name)
     }
@@ -130,8 +130,9 @@ async function handleSelectRepo(name: string) {
   selectRepository(name)
 
   // Create a timeout promise that rejects after LOADING_TIMEOUT_MS
+  let timeoutId: ReturnType<typeof setTimeout> | null = null
   const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error('Request timed out')), LOADING_TIMEOUT_MS)
+    timeoutId = setTimeout(() => reject(new Error('Request timed out')), LOADING_TIMEOUT_MS)
   })
 
   try {
@@ -143,6 +144,9 @@ async function handleSelectRepo(name: string) {
     toast.error(errorMessage)
     console.warn('[RepoList] handleSelectRepo failed:', errorMessage)
   } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+    }
     // Ensure loading state is always cleared
     loadingRepoName.value = null
   }
@@ -301,8 +305,8 @@ onMounted(() => {
 <template>
   <aside class="bg-surface-raised border-r border-border-subtle flex flex-col h-full"
     :style="{ width: `${props.width}px` }">
-    <!-- Tab header -->
-    <div class="flex-shrink-0 border-b border-border-subtle p-3">
+    <!-- Tab header (pt-8 clears the native traffic light buttons in overlay mode) -->
+    <div class="flex-shrink-0 border-b border-border-subtle p-3 pt-8">
       <div class="flex p-1 bg-surface-overlay/40 rounded-lg relative isolate">
         <!-- Sliding background pill -->
         <div class="absolute inset-y-1 transition-all duration-200 ease-out gradient-tab rounded-md" :class="[
@@ -392,9 +396,9 @@ onMounted(() => {
           </p>
           <div class="mt-4 p-3 bg-surface-overlay rounded-lg text-left">
             <p class="text-2xs text-text-muted mb-2">Quick start:</p>
-            <code class="text-2xs font-mono text-accent block">wt add &lt;repo&gt; &lt;branch&gt;</code>
+            <code class="text-2xs font-mono text-accent block">grove add &lt;repo&gt; &lt;branch&gt;</code>
           </div>
-          <a href="https://github.com/your-repo/wt#getting-started" target="_blank"
+          <a href="https://github.com/your-org/grove#getting-started" target="_blank"
             class="inline-flex items-center gap-1 text-2xs text-accent hover:text-accent-hover mt-3 transition-colors">
             <span>View documentation</span>
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -666,10 +670,10 @@ onMounted(() => {
       </nav>
     </template>
 
-    <!-- Footer with wt version -->
+    <!-- Footer with grove version -->
     <div class="flex-shrink-0 px-4 py-3 border-t border-border-subtle">
       <div class="flex items-center justify-between text-2xs text-text-muted">
-        <span>wt CLI</span>
+        <span>grove CLI</span>
         <span v-if="store.wtVersion" class="font-mono">v{{ store.wtVersion }}</span>
         <span v-else class="animate-pulse-subtle">...</span>
       </div>

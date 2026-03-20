@@ -8,6 +8,7 @@
 import { onMounted, onUnmounted, watch, ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useDebounceFn } from '@vueuse/core'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useWorktreeStore } from '../stores'
 import { useRepos, useWorktrees, useOperationProgress, useAutoRefresh, useSearch, useKeyboardShortcuts, useShortcutTooltip, useToast, useWorktreeWatcher, useResizableSidebar, useCommandRegistry, useWorktreeFilters } from '../composables'
 import type { Worktree } from '../types'
@@ -27,6 +28,7 @@ import ErrorBoundary from './ErrorBoundary.vue'
 import SearchInput from './SearchInput.vue'
 import CommandPalette from './CommandPalette.vue'
 import { Button, IconButton, SkeletonCard, ResizeHandle } from './ui'
+import { copyPath, copyBranch, copyUrl, copyCdCommand } from '../utils/clipboard'
 
 /**
  * L4: Number of worktrees above which the list switches from animated
@@ -49,7 +51,20 @@ const {
 } = storeToRefs(store)
 
 const { fetchRepositories } = useRepos()
-const { fetchWorktrees, pruneRepo, pullAllWorktrees, pullSelectedWorktrees, cancelOperation, openInEditor, openInTerminal, pullWorktree, syncWorktree, cleanup: cleanupWorktrees } = useWorktrees()
+const {
+  fetchWorktrees,
+  pruneRepo,
+  pullAllWorktrees,
+  pullSelectedWorktrees,
+  cancelOperation,
+  openInEditor,
+  openInTerminal,
+  openInBrowser,
+  openAll,
+  pullWorktree,
+  syncWorktree,
+  cleanup: cleanupWorktrees,
+} = useWorktrees()
 const {
   isRefreshing: isAutoRefreshing,
   lastUpdatedText,
@@ -129,7 +144,7 @@ const {
   startResize: startSidebarResize,
   resetWidth: resetSidebarWidth,
 } = useResizableSidebar({
-  defaultWidth: 256,
+  defaultWidth: 300,
   minWidth: 200,
   maxWidth: 400,
   storageKey: 'wt-sidebar-width',
@@ -201,48 +216,36 @@ function dismissError() {
   store.clearError()
 }
 
-// Helper to scroll focused worktree into view
+// Helper to scroll focused worktree into view (retries until element appears in DOM)
 function scrollToFocusedWorktree() {
   const branch = focusedBranch.value
   if (!branch) return
 
-  setTimeout(() => {
+  let attempts = 0
+  const maxAttempts = 15
+
+  const tryScroll = () => {
+    // Stop if focus was cleared while we were retrying
+    if (focusedBranch.value !== branch) return
+
     const element = document.getElementById(`worktree-${branch}`)
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      // Clear expandOnFocus after scroll completes (card has had time to expand)
-      setTimeout(() => {
-        store.clearExpandOnFocus()
-      }, 500)
-      // Clear focus after a delay to remove highlight
-      setTimeout(() => {
-        store.clearFocusedWorktree()
-      }, 3000)
+      setTimeout(() => store.clearExpandOnFocus(), 500)
+      setTimeout(() => store.clearFocusedWorktree(), 3000)
+    } else if (++attempts < maxAttempts) {
+      // Element not in DOM yet — retry (worktrees may still be loading)
+      setTimeout(tryScroll, 200)
     }
-  }, 100)
+  }
+
+  setTimeout(tryScroll, 100)
 }
 
 // Watch for focused branch changes and scroll into view
 watch(focusedBranch, (branch) => {
   if (branch) {
     scrollToFocusedWorktree()
-  }
-})
-
-// Also watch loadingWorktrees - when it becomes false and we have a focused branch, scroll to it
-// This handles the case where focus is set before worktrees finish loading
-watch(loadingWorktrees, (isLoading, wasLoading) => {
-  if (wasLoading && !isLoading && focusedBranch.value) {
-    // Worktrees just finished loading, try to scroll to focused branch
-    scrollToFocusedWorktree()
-  }
-})
-
-// Watch worktrees array - when it populates and we have a focused branch, scroll to it
-watch(worktrees, (newWorktrees) => {
-  if (newWorktrees.length > 0 && focusedBranch.value) {
-    // Small delay to ensure DOM has rendered
-    setTimeout(scrollToFocusedWorktree, 50)
   }
 })
 
@@ -447,18 +450,16 @@ async function handleRetryFailed() {
 
 // Phase 5: Handle open in editor from progress panel (for conflict resolution)
 async function handleOpenInEditor(path: string) {
-  try {
-    await openInEditor(path)
-  } catch {
+  const success = await openInEditor(path)
+  if (!success) {
     toast.error('Failed to open in editor')
   }
 }
 
 // Phase 5: Handle open in terminal from progress panel (for conflict resolution)
 async function handleOpenInTerminal(path: string) {
-  try {
-    await openInTerminal(path)
-  } catch {
+  const success = await openInTerminal(path)
+  if (!success) {
     toast.error('Failed to open in terminal')
   }
 }
@@ -504,6 +505,88 @@ function getFocusedWorktree() {
   return worktrees.value.find((wt) => wt.branch === focusedBranch.value) ?? null
 }
 
+async function copyFocusedWorktreeValue(
+  getValue: (worktree: Worktree) => string | null,
+  copier: (value: string) => Promise<{ success: boolean }>,
+  successMessage: string,
+  missingMessage?: string
+) {
+  const wt = getFocusedWorktree()
+  if (!wt) return
+
+  const value = getValue(wt)
+  if (!value) {
+    if (missingMessage) {
+      toast.warning(missingMessage)
+    }
+    return
+  }
+
+  const result = await copier(value)
+  if (result.success) {
+    toast.success(successMessage)
+  } else {
+    toast.error('Failed to copy to clipboard')
+  }
+}
+
+async function handlePaletteOpenInEditor() {
+  const wt = getFocusedWorktree()
+  if (!wt) return
+  const success = await openInEditor(wt.path)
+  if (!success) {
+    toast.error('Failed to open in editor')
+  }
+}
+
+async function handlePaletteOpenInTerminal() {
+  const wt = getFocusedWorktree()
+  if (!wt) return
+  const success = await openInTerminal(wt.path)
+  if (!success) {
+    toast.error('Failed to open in terminal')
+  }
+}
+
+async function handlePaletteOpenInBrowser() {
+  const wt = getFocusedWorktree()
+  if (!wt) return
+  if (!wt.url) {
+    toast.warning('No URL available for this worktree')
+    return
+  }
+
+  const success = await openInBrowser(wt.url)
+  if (!success) {
+    toast.error('Failed to open in browser')
+  }
+}
+
+async function handlePaletteOpenAll() {
+  const wt = getFocusedWorktree()
+  if (!wt) return
+
+  const result = await openAll(wt.path, wt.url)
+  const openedCount = Number(result.terminal) + Number(result.editor) + Number(result.browser)
+  const expectedCount = result.browserSkipped ? 2 : 3
+
+  if (openedCount === 0) {
+    toast.error('Failed to open any tools')
+    return
+  }
+
+  if (openedCount < expectedCount) {
+    toast.warning(`Opened ${openedCount}/${expectedCount} tools`)
+    return
+  }
+
+  if (result.browserSkipped) {
+    toast.info('Opened terminal and editor (no URL available for browser)')
+  } else {
+    toast.success('Opened terminal, editor, and browser')
+  }
+}
+
 // Command registry for palette
 const { commands: paletteCommands } = useCommandRegistry({
   onRefresh: () => handleRefresh(),
@@ -515,14 +598,39 @@ const { commands: paletteCommands } = useCommandRegistry({
   onPullAll: () => handlePullAll(),
   onPrune: () => handlePrune(),
   onOpenHealthPanel: () => openHealthPanel(),
-  onOpenEditor: () => { const wt = getFocusedWorktree(); if (wt) openInEditor(wt.path) },
-  onOpenTerminal: () => { const wt = getFocusedWorktree(); if (wt) openInTerminal(wt.path) },
-  onOpenBrowser: () => { const wt = getFocusedWorktree(); if (wt?.url) wt.url },
-  onOpenAll: () => {},
-  onCopyPath: () => { const wt = getFocusedWorktree(); if (wt) navigator.clipboard.writeText(wt.path) },
-  onCopyBranch: () => { const wt = getFocusedWorktree(); if (wt) navigator.clipboard.writeText(wt.branch) },
-  onCopyUrl: () => { const wt = getFocusedWorktree(); if (wt?.url) navigator.clipboard.writeText(wt.url) },
-  onCopyCdCommand: () => { const wt = getFocusedWorktree(); if (wt) navigator.clipboard.writeText(`cd ${wt.path}`) },
+  onOpenEditor: () => { void handlePaletteOpenInEditor() },
+  onOpenTerminal: () => { void handlePaletteOpenInTerminal() },
+  onOpenBrowser: () => { void handlePaletteOpenInBrowser() },
+  onOpenAll: () => { void handlePaletteOpenAll() },
+  onCopyPath: () => {
+    void copyFocusedWorktreeValue(
+      (wt) => wt.path,
+      copyPath,
+      'Copied path to clipboard'
+    )
+  },
+  onCopyBranch: () => {
+    void copyFocusedWorktreeValue(
+      (wt) => wt.branch,
+      copyBranch,
+      'Copied branch name to clipboard'
+    )
+  },
+  onCopyUrl: () => {
+    void copyFocusedWorktreeValue(
+      (wt) => wt.url ?? null,
+      copyUrl,
+      'Copied URL to clipboard',
+      'No URL available for this worktree'
+    )
+  },
+  onCopyCdCommand: () => {
+    void copyFocusedWorktreeValue(
+      (wt) => wt.path,
+      copyCdCommand,
+      'Copied cd command to clipboard'
+    )
+  },
   onPullWorktree: () => {
     const wt = getFocusedWorktree()
     if (wt && selectedRepoName.value) pullWorktree(selectedRepoName.value, wt.branch)
@@ -554,11 +662,20 @@ useKeyboardShortcuts({
   onFocusSearch: () => focusSearch(),  // L12
   onCommandPalette: () => toggleCommandPalette(),
 })
+
+async function handleTitlebarDrag(e: MouseEvent) {
+  if (e.button === 0) {
+    await getCurrentWindow().startDragging()
+  }
+}
 </script>
 
 <template>
   <div class="h-screen flex flex-col bg-surface-base text-text-primary overflow-hidden">
-    <!-- wt CLI not available state -->
+    <!-- Draggable title bar region for window movement (overlay titlebar mode) -->
+    <div class="titlebar-drag-region" @mousedown.left="handleTitlebarDrag" />
+
+    <!-- grove CLI not available state -->
     <div v-if="!wtAvailable" class="flex-1 flex items-center justify-center p-8">
       <div class="max-w-md text-center animate-fade-in">
         <div class="w-20 h-20 mx-auto mb-8 rounded-2xl bg-danger-muted flex items-center justify-center shadow-lg">
@@ -568,13 +685,13 @@ useKeyboardShortcuts({
           </svg>
         </div>
         <h2 class="text-2xl font-semibold text-text-primary mb-3 tracking-tight">
-          wt CLI Not Found
+          grove CLI Not Found
         </h2>
         <p class="text-text-secondary mb-8 leading-relaxed">
-          The wt command-line tool is not installed or not in your PATH.
-          Please install wt to use this application.
+          The grove command-line tool is not installed or not in your PATH.
+          Please install grove to use this application.
         </p>
-        <a href="https://github.com/your-repo/wt" target="_blank"
+        <a href="https://github.com/your-org/grove" target="_blank"
           class="inline-flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-accent-hover text-white font-medium rounded-xl transition-all duration-150 hover:shadow-glow">
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
             <path fill-rule="evenodd" clip-rule="evenodd"
@@ -585,7 +702,7 @@ useKeyboardShortcuts({
       </div>
     </div>
 
-    <!-- Main layout when wt is available -->
+    <!-- Main layout when grove is available -->
     <template v-else>
       <div class="flex-1 flex min-h-0" :class="{ 'select-none': isSidebarResizing }">
         <!-- Sidebar -->
@@ -599,7 +716,7 @@ useKeyboardShortcuts({
           <!-- Header (Sticky & Glassmorphic) -->
           <header class="sticky top-0 border-b border-white/5"
             style="background-color: rgba(3, 7, 18, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); z-index: 100;">
-            <div class="px-6 py-3 flex items-center gap-4">
+            <div class="px-6 py-3 pt-8 flex items-center gap-4">
               <!-- Left: repo info -->
               <div class="flex items-center gap-3 flex-shrink-0">
                 <h1 class="text-xl font-bold text-text-primary tracking-tight truncate">
@@ -890,6 +1007,26 @@ useKeyboardShortcuts({
 </template>
 
 <style scoped>
+/* Draggable title bar region for overlay mode (no native chrome) */
+.titlebar-drag-region {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  -webkit-app-region: drag;
+  app-region: drag;
+  z-index: 9999;
+  pointer-events: auto;
+}
+
+/* Prevent drag on interactive elements within the title bar zone */
+button, a, input, select, textarea,
+[role="button"], [role="menuitem"] {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
 /* Dashboard animations using design tokens */
 
 /* Fade animation for refresh indicator */

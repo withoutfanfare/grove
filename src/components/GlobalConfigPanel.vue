@@ -2,7 +2,7 @@
 /**
  * GlobalConfigPanel Component
  *
- * Form-based editor for the global wt configuration file (~/.wtrc).
+ * Form-based editor for the global grove configuration file (~/.groverc).
  * Reads config entries and presents them as structured form fields,
  * saving changes back via per-key updates to avoid user error.
  */
@@ -51,9 +51,9 @@ const knownKeys = [
     group: 'Hooks',
     icon: 'code',
     fields: [
-      { key: 'WT_HOOKS_ENABLED', label: 'Hooks Enabled', type: 'boolean' as const, placeholder: '' },
-      { key: 'WT_HOOKS_DIR', label: 'Hooks Directory', type: 'text' as const, placeholder: '~/.wt/hooks' },
-      { key: 'WT_TEMPLATES_DIR', label: 'Templates Directory', type: 'text' as const, placeholder: '~/.wt/templates' },
+      { key: 'GROVE_HOOKS_ENABLED', label: 'Hooks Enabled', type: 'boolean' as const, placeholder: '' },
+      { key: 'GROVE_HOOKS_DIR', label: 'Hooks Directory', type: 'text' as const, placeholder: '~/.grove/hooks' },
+      { key: 'GROVE_TEMPLATES_DIR', label: 'Templates Directory', type: 'text' as const, placeholder: '~/.grove/templates' },
     ],
   },
   {
@@ -64,6 +64,13 @@ const knownKeys = [
       { key: 'DB_HOST', label: 'Database Host', type: 'text' as const, placeholder: '127.0.0.1' },
       { key: 'DB_USER', label: 'Database User', type: 'text' as const, placeholder: 'root' },
       { key: 'DB_PASSWORD', label: 'Database Password', type: 'password' as const, placeholder: '' },
+    ],
+  },
+  {
+    group: 'URL',
+    icon: 'link',
+    fields: [
+      { key: 'GROVE_URL_SUBDOMAIN', label: 'URL Subdomain', type: 'text' as const, placeholder: 'e.g. api' },
     ],
   },
 ]
@@ -221,7 +228,7 @@ function handleClose() {
   <Panel
     :open="isOpen"
     title="Global Configuration"
-    subtitle="~/.wtrc"
+    subtitle="~/.groverc"
     size="md"
     @close="handleClose"
   >
@@ -251,7 +258,7 @@ function handleClose() {
         <div class="flex items-center gap-2 mb-3">
           <!-- Group icons -->
           <div class="w-6 h-6 rounded-md flex items-center justify-center"
-            :class="group.icon === 'cog' ? 'bg-accent/10' : group.icon === 'code' ? 'bg-info/10' : 'bg-warning/10'">
+            :class="group.icon === 'cog' ? 'bg-accent/10' : group.icon === 'code' ? 'bg-info/10' : group.icon === 'link' ? 'bg-info/10' : 'bg-warning/10'">
             <svg v-if="group.icon === 'cog'" class="w-3.5 h-3.5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -259,6 +266,9 @@ function handleClose() {
             </svg>
             <svg v-else-if="group.icon === 'code'" class="w-3.5 h-3.5 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+            </svg>
+            <svg v-else-if="group.icon === 'link'" class="w-3.5 h-3.5 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
             </svg>
             <svg v-else class="w-3.5 h-3.5 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

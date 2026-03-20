@@ -2,16 +2,16 @@
 
 ## Prerequisites
 
-Before using the wt Worktree Manager app, you need:
+Before using the Grove Worktree Manager app, you need:
 
-1. **At least one repository** - Set up a repository with `wt`:
+1. **At least one repository** - Set up a repository with `grove`:
    ```bash
    # Register an existing git repository
    cd /path/to/your/repo
-   wt setup
+   grove setup
    ```
 
-The `wt` CLI is bundled with the app - no separate installation required.
+The `grove` CLI is bundled with the app - no separate installation required.
 
 ## Installation
 
@@ -35,22 +35,22 @@ The `wt` CLI is bundled with the app - no separate installation required.
 
 **Debian/Ubuntu:**
 ```bash
-sudo dpkg -i wt-worktree-manager_*.deb
+sudo dpkg -i grove_*.deb
 ```
 
 **AppImage:**
 ```bash
-chmod +x wt-worktree-manager_*.AppImage
-./wt-worktree-manager_*.AppImage
+chmod +x grove_*.AppImage
+./grove_*.AppImage
 ```
 
 ## First Run
 
 When you first launch the app:
 
-1. **Repository Detection** - The app automatically detects repositories registered with `wt`
+1. **Repository Detection** - The app automatically detects repositories registered with `grove`
 
-2. **Select a Repository** - Click a repository in the sidebar to view its worktrees
+2. **Select a Repository** - Click a repository in the sidebar to view its worktrees. Grove will remember your last selected repository for next time.
 
 3. **Explore Worktrees** - Each worktree card shows:
    - Branch name and short SHA
@@ -58,11 +58,28 @@ When you first launch the app:
    - Dirty/clean status
    - Commits ahead/behind
 
+### Single Instance
+
+Grove prevents multiple instances from running. If you accidentally try to launch the app again while it's already running, the existing window will focus instead of opening a duplicate.
+
+### Window Position
+
+Grove remembers your window position, size, and whether it was maximised. The next time you launch, the window will appear exactly where you left it - perfect for multi-monitor setups.
+
+### Global Shortcuts
+
+After first launch, you can access Grove from anywhere using global keyboard shortcuts:
+
+- **Cmd+Shift+G** (macOS) - Toggle the Grove window
+- **Cmd+Shift+W** (macOS) - Show Grove and open quick worktree switcher
+
+These shortcuts work even when Grove is hidden to the tray.
+
 ## Troubleshooting
 
-### "Failed to initialise wt sidecar"
+### "Failed to initialise grove sidecar"
 
-The bundled wt CLI failed to start. This is rare but can happen if:
+The bundled grove CLI failed to start. This is rare but can happen if:
 
 1. **App bundle is corrupted** - Re-download and reinstall the app
 2. **Permissions issue** - On macOS, ensure the app is allowed in System Settings > Privacy & Security
@@ -88,5 +105,7 @@ If "Open in Code" or other actions fail:
 ## Getting Help
 
 - **CLI Help**: `wt help` or `wt <command> --help`
+- **In-App Help**: Press `?` or `Cmd+/` to open the help modal
 - **Documentation**: See the [Features Guide](features.md)
+- **Logs**: Check `~/Library/Logs/Grove/` (macOS) for diagnostic information
 - **Issues**: Report bugs on GitHub

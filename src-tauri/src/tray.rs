@@ -77,6 +77,8 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         Err(e) => { *e.into_inner() = Some(tray.id().0.clone()); }
     }
 
+    log::info!("System tray set up successfully");
+
     Ok(())
 }
 

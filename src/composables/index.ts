@@ -29,3 +29,5 @@ export { useCommandRegistry } from './useCommandRegistry';
 export type { Command, CommandHandlers } from './useCommandRegistry';
 export { useWorktreeFilters } from './useWorktreeFilters';
 export type { WorktreeFilter, WorktreeSort } from './useWorktreeFilters';
+export { useAppStore } from './useAppStore';
+export { useNotifications } from './useNotifications';

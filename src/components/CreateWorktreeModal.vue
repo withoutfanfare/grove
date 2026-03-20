@@ -4,14 +4,22 @@
  *
  * Premium modal for creating new worktrees with branch selection,
  * base branch picker with dropdown, and template selection.
+ *
+ * Multi-phase modal:
+ * 1. Form - branch name + base branch selection
+ * 2. Creating - progress view while CLI runs hooks
+ * 3. Results - summary of creation with hook execution details
  */
 import { ref, computed, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useWorktreeStore, useSettingsStore } from '../stores'
-import type { ConfigLayer } from '../types'
+import type { ConfigLayer, CreateWorktreeResponse } from '../types'
 import { useWorktrees, useWt, useToast } from '../composables'
+import { copyPath } from '../utils/clipboard'
 import { Modal, Button, Input } from './ui'
 import type { Branch } from '../types'
+
+type ModalPhase = 'form' | 'creating' | 'results'
 
 const props = defineProps<{
   isOpen: boolean
@@ -25,7 +33,7 @@ const emit = defineEmits<{
 const store = useWorktreeStore()
 const settingsStore = useSettingsStore()
 const { selectedRepoName } = storeToRefs(store)
-const { createWorktree, listBranches } = useWorktrees()
+const { createWorktree, listBranches, openInEditor, openInBrowser } = useWorktrees()
 const { readConfigFile } = useWt()
 const { toast } = useToast()
 
@@ -33,6 +41,17 @@ const branch = ref('')
 const baseBranch = ref(settingsStore.settings.defaultBaseBranch)
 const isSubmitting = ref(false)
 const error = ref<string | null>(null)
+
+// Multi-phase state
+const phase = ref<ModalPhase>('form')
+const creationResult = ref<CreateWorktreeResponse | null>(null)
+
+// Track whether the repo has database creation enabled
+const dbEnabled = ref(false)
+
+// Creating phase elapsed timer
+const elapsedSeconds = ref(0)
+let elapsedInterval: ReturnType<typeof setInterval> | null = null
 
 // Branches state
 const branches = ref<Branch[]>([])
@@ -52,19 +71,68 @@ const filteredBranches = computed(() => {
     .slice(0, 20)
 })
 
+// Computed helpers for results phase
+const hasHooks = computed(() => (creationResult.value?.hooks.length ?? 0) > 0)
+const failedHooks = computed(() => creationResult.value?.hooks.filter(h => h.status === 'failed') ?? [])
+const hasFailedHooks = computed(() => failedHooks.value.length > 0)
+
+// Modal title based on phase
+const modalTitle = computed(() => {
+  switch (phase.value) {
+    case 'form': return 'Create Worktree'
+    case 'creating': return 'Creating Worktree'
+    case 'results': return 'Worktree Created'
+  }
+})
+
+// Modal size: wider for results phase to show full paths
+const modalSize = computed(() => {
+  return phase.value === 'results' ? 'xl' as const : 'md' as const
+})
+
+// Elapsed time display
+const elapsedDisplay = computed(() => {
+  if (elapsedSeconds.value < 5) return ''
+  const mins = Math.floor(elapsedSeconds.value / 60)
+  const secs = elapsedSeconds.value % 60
+  if (mins > 0) return `${mins}m ${secs}s`
+  return `${secs}s`
+})
+
+function startElapsedTimer() {
+  elapsedSeconds.value = 0
+  elapsedInterval = setInterval(() => {
+    elapsedSeconds.value++
+  }, 1000)
+}
+
+function stopElapsedTimer() {
+  if (elapsedInterval) {
+    clearInterval(elapsedInterval)
+    elapsedInterval = null
+  }
+}
+
 // Reset form when modal opens
 watch(() => props.isOpen, async (open) => {
   if (open) {
     branch.value = ''
+    phase.value = 'form'
+    creationResult.value = null
+    dbEnabled.value = false
 
-    // Use repo-specific default_base_branch if available, otherwise fall back to global setting
+    // Use repo-specific config if available
     let defaultBase = settingsStore.settings.defaultBaseBranch
     if (selectedRepoName.value) {
       try {
         const repoConfig = await readConfigFile('repo' as ConfigLayer, selectedRepoName.value)
-        const entry = repoConfig.entries.find(e => e.key === 'DEFAULT_BASE_BRANCH' && !e.commented)
-        if (entry?.value) {
-          defaultBase = entry.value
+        const baseEntry = repoConfig.entries.find(e => e.key === 'DEFAULT_BASE' && !e.commented)
+        if (baseEntry?.value) {
+          defaultBase = baseEntry.value
+        }
+        const dbEntry = repoConfig.entries.find(e => e.key === 'DB_CREATE' && !e.commented)
+        if (dbEntry?.value?.toLowerCase() === 'true') {
+          dbEnabled.value = true
         }
       } catch (_) {
         // Repo may not have a config file — fall back to global setting
@@ -94,6 +162,7 @@ watch(() => props.isOpen, async (open) => {
   } else {
     // M7: Clear branch filter when modal closes
     branchFilter.value = ''
+    stopElapsedTimer()
   }
 })
 
@@ -102,8 +171,6 @@ function selectBranch(branchName: string) {
   branchFilter.value = branchName
   showBranchDropdown.value = false
   dropdownHovered.value = false
-  // M7: branchFilter is set to selected branch name for display,
-  // will be reset when modal reopens (see watch on isOpen)
 }
 
 function handleBranchInputFocus() {
@@ -111,8 +178,6 @@ function handleBranchInputFocus() {
 }
 
 function handleBranchInputBlur() {
-  // Only close dropdown if not hovering over it
-  // This prevents race condition where blur fires before click
   if (!dropdownHovered.value) {
     showBranchDropdown.value = false
   }
@@ -135,51 +200,93 @@ async function handleSubmit() {
 
   isSubmitting.value = true
   error.value = null
+  phase.value = 'creating'
+  startElapsedTimer()
 
   try {
-    const success = await createWorktree({
+    const response = await createWorktree({
       repo: selectedRepoName.value,
       branch: branch.value.trim(),
       base: baseBranch.value || undefined,
     })
 
-    if (success) {
-      toast.success(`Worktree created: ${branch.value.trim()}`)
+    if (response) {
+      creationResult.value = response
+      phase.value = 'results'
       emit('created')
-      emit('close')
+    } else {
+      error.value = store.error?.message ?? 'Failed to create worktree'
+      phase.value = 'form'
     }
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : 'Failed to create worktree'
     error.value = errorMessage
     toast.error(errorMessage)
+    phase.value = 'form'
   } finally {
     isSubmitting.value = false
+    stopElapsedTimer()
   }
 }
 
-function handleClose() {
-  if (!isSubmitting.value) {
-    emit('close')
+async function handleCopyPath() {
+  if (!creationResult.value?.result.path) return
+  const result = await copyPath(creationResult.value.result.path)
+  if (result.success) {
+    toast.success('Path copied to clipboard')
+  } else {
+    toast.error('Failed to copy path')
   }
+}
+
+async function handleOpenUrl() {
+  if (!creationResult.value?.result.url) return
+  await openInBrowser(creationResult.value.result.url)
+}
+
+async function handleOpenInEditor() {
+  if (creationResult.value?.result.path) {
+    await openInEditor(creationResult.value.result.path)
+  }
+  emit('close')
+}
+
+function handleClose() {
+  if (phase.value === 'creating') return
+  emit('close')
 }
 </script>
 
 <template>
   <Modal
     :open="isOpen"
-    title="Create Worktree"
-    size="md"
-    :closable="!isSubmitting"
+    :title="modalTitle"
+    :size="modalSize"
+    :closable="phase !== 'creating'"
     @close="handleClose"
   >
     <template #icon>
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <!-- Form phase: plus icon -->
+      <svg v-if="phase === 'form'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
       </svg>
+      <!-- Creating phase: spinner icon -->
+      <svg v-else-if="phase === 'creating'" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+      </svg>
+      <!-- Results phase: check icon -->
+      <svg v-else class="w-5 h-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
     </template>
 
-    <form @submit.prevent="handleSubmit" class="space-y-5">
+    <!-- ============================================================ -->
+    <!-- Phase 1: Form -->
+    <!-- ============================================================ -->
+    <form v-if="phase === 'form'" @submit.prevent="handleSubmit" class="space-y-5">
       <!-- Repository (read-only) -->
       <div>
         <label class="block text-sm font-medium text-text-secondary mb-1.5">
@@ -191,7 +298,6 @@ function handleClose() {
       </div>
 
       <!-- Branch name -->
-      <!-- M9: Added ref for focus management -->
       <Input
         ref="branchInputRef"
         v-model="branch"
@@ -278,8 +384,153 @@ function handleClose() {
       </Transition>
     </form>
 
+    <!-- ============================================================ -->
+    <!-- Phase 2: Creating (progress) -->
+    <!-- ============================================================ -->
+    <div v-else-if="phase === 'creating'" class="py-8 text-center space-y-4">
+      <div class="flex justify-center">
+        <div class="relative">
+          <svg class="w-12 h-12 text-accent animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        </div>
+      </div>
+      <div>
+        <p class="text-text-primary font-medium">Creating worktree...</p>
+        <p class="text-text-muted text-sm mt-1">Setting up branch, running hooks, and configuring environment</p>
+        <p v-if="elapsedDisplay" class="text-text-muted text-xs mt-2 tabular-nums">{{ elapsedDisplay }} elapsed</p>
+      </div>
+      <!-- Animated progress steps -->
+      <div class="mt-4 mx-auto max-w-[220px] text-left space-y-2">
+        <div class="flex items-center gap-2 text-xs text-text-muted">
+          <svg class="w-3.5 h-3.5 text-success flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+          </svg>
+          <span>Creating git worktree</span>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-text-muted animate-pulse">
+          <svg class="w-3.5 h-3.5 text-accent flex-shrink-0 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <span>Running post-add hooks...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Phase 3: Results -->
+    <!-- ============================================================ -->
+    <div v-else-if="phase === 'results' && creationResult" class="space-y-5">
+      <!-- Success header -->
+      <div class="flex items-center gap-3 p-3 bg-success-muted/50 rounded-lg border border-success/20">
+        <svg class="w-5 h-5 text-success flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <div>
+          <p class="text-text-primary font-medium text-sm">Worktree created successfully</p>
+          <p class="text-text-muted text-xs font-mono mt-0.5">{{ creationResult.result.branch }}</p>
+        </div>
+      </div>
+
+      <!-- Worktree details -->
+      <div class="space-y-2">
+        <h4 class="text-xs font-medium text-text-muted uppercase tracking-wider">Details</h4>
+        <div class="bg-surface-overlay rounded-lg border border-border-subtle divide-y divide-border-subtle">
+          <!-- Path: click to copy -->
+          <button
+            type="button"
+            class="w-full px-3 py-2.5 flex items-center gap-3 hover:bg-surface-base/50 transition-colors group text-left"
+            title="Click to copy path"
+            @click="handleCopyPath"
+          >
+            <span class="text-text-muted text-xs flex-shrink-0 w-14">Path</span>
+            <span class="text-text-secondary text-xs font-mono truncate">
+              {{ creationResult.result.path }}
+            </span>
+            <svg class="w-3.5 h-3.5 text-text-muted opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </button>
+
+          <!-- URL: click to open in browser -->
+          <button
+            v-if="creationResult.result.url"
+            type="button"
+            class="w-full px-3 py-2.5 flex items-center gap-3 hover:bg-surface-base/50 transition-colors group text-left"
+            title="Click to open in browser"
+            @click="handleOpenUrl"
+          >
+            <span class="text-text-muted text-xs flex-shrink-0 w-14">URL</span>
+            <span class="text-accent text-xs font-mono truncate group-hover:underline">
+              {{ creationResult.result.url }}
+            </span>
+            <svg class="w-3.5 h-3.5 text-text-muted opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </button>
+
+          <!-- Database: only show if DB creation is enabled for this repo -->
+          <div
+            v-if="dbEnabled && creationResult.result.database"
+            class="px-3 py-2.5 flex items-center gap-3"
+          >
+            <span class="text-text-muted text-xs flex-shrink-0 w-14">Database</span>
+            <span class="text-text-secondary text-xs font-mono truncate">
+              {{ creationResult.result.database }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hook results -->
+      <div class="space-y-2">
+        <h4 class="text-xs font-medium text-text-muted uppercase tracking-wider">Hooks</h4>
+
+        <!-- Warning banner for failed hooks -->
+        <div v-if="hasFailedHooks" class="p-2.5 bg-warning-muted/50 rounded-lg border border-warning/20">
+          <p class="text-warning text-xs flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            {{ failedHooks.length }} hook{{ failedHooks.length > 1 ? 's' : '' }} failed. The worktree was created but some setup may be incomplete.
+          </p>
+        </div>
+
+        <div v-if="hasHooks" class="bg-surface-overlay rounded-lg border border-border-subtle divide-y divide-border-subtle max-h-48 overflow-y-auto">
+          <div
+            v-for="hook in creationResult.hooks"
+            :key="hook.name"
+            class="px-3 py-2 flex items-center justify-between"
+          >
+            <span class="text-text-secondary text-xs font-mono truncate mr-3">
+              {{ hook.name }}
+            </span>
+            <span
+              class="flex-shrink-0 text-2xs font-medium px-1.5 py-0.5 rounded"
+              :class="hook.status === 'success'
+                ? 'bg-success-muted text-success'
+                : 'bg-danger-muted text-danger'"
+            >
+              {{ hook.status === 'success' ? 'passed' : 'failed' }}
+            </span>
+          </div>
+        </div>
+
+        <p v-else class="text-text-muted text-xs italic px-1">
+          No hooks configured for this repository.
+        </p>
+      </div>
+    </div>
+
     <template #footer>
-      <div class="flex items-center justify-end gap-3">
+      <!-- Form phase footer -->
+      <div v-if="phase === 'form'" class="flex items-center justify-end gap-3">
         <Button
           variant="ghost"
           @click="handleClose"
@@ -294,6 +545,26 @@ function handleClose() {
           @click="handleSubmit"
         >
           Create Worktree
+        </Button>
+      </div>
+
+      <!-- Creating phase footer (no actions) -->
+      <div v-else-if="phase === 'creating'" />
+
+      <!-- Results phase footer -->
+      <div v-else-if="phase === 'results'" class="flex items-center justify-end gap-3">
+        <Button
+          variant="ghost"
+          @click="handleClose"
+        >
+          Close
+        </Button>
+        <Button
+          v-if="creationResult?.result.path"
+          variant="primary"
+          @click="handleOpenInEditor"
+        >
+          Open in Editor
         </Button>
       </div>
     </template>

@@ -263,6 +263,19 @@ async function handleCopyCdCommand() {
 
 async function handleOpenAll() {
   const result = await openAll(props.worktree.path, props.worktree.url)
+  const openedCount = Number(result.terminal) + Number(result.editor) + Number(result.browser)
+  const expectedCount = result.browserSkipped ? 2 : 3
+
+  if (openedCount === 0) {
+    toast.error('Failed to open any tools')
+    return
+  }
+
+  if (openedCount < expectedCount) {
+    toast.warning(`Opened ${openedCount}/${expectedCount} tools`)
+    return
+  }
+
   if (result.browserSkipped) {
     toast.info('Opened terminal and editor (no URL available for browser)')
   } else {

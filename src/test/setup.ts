@@ -32,10 +32,48 @@ vi.mock('@tauri-apps/plugin-clipboard-manager', () => ({
   readText: vi.fn(),
 }))
 
-// Mock @tauri-apps/plugin-opener
-vi.mock('@tauri-apps/plugin-opener', () => ({
-  openPath: vi.fn(),
-  openUrl: vi.fn(),
+// Mock @tauri-apps/plugin-store
+vi.mock('@tauri-apps/plugin-store', () => ({
+  load: vi.fn().mockResolvedValue({
+    get: vi.fn().mockResolvedValue(null),
+    set: vi.fn().mockResolvedValue(undefined),
+  }),
+}))
+
+// Mock @tauri-apps/plugin-notification
+vi.mock('@tauri-apps/plugin-notification', () => ({
+  isPermissionGranted: vi.fn().mockResolvedValue(true),
+  requestPermission: vi.fn().mockResolvedValue('granted'),
+  sendNotification: vi.fn(),
+}))
+
+// Mock @tauri-apps/api/window
+vi.mock('@tauri-apps/api/window', () => ({
+  getCurrentWindow: vi.fn().mockReturnValue({
+    isFocused: vi.fn().mockResolvedValue(true),
+  }),
+}))
+
+// Mock @tauri-apps/plugin-process
+vi.mock('@tauri-apps/plugin-process', () => ({
+  exit: vi.fn(),
+  relaunch: vi.fn(),
+}))
+
+// Mock @tauri-apps/plugin-dialog
+vi.mock('@tauri-apps/plugin-dialog', () => ({
+  ask: vi.fn().mockResolvedValue(true),
+  confirm: vi.fn().mockResolvedValue(true),
+  open: vi.fn(),
+  save: vi.fn(),
+  message: vi.fn(),
+}))
+
+// Mock @tauri-apps/plugin-global-shortcut
+vi.mock('@tauri-apps/plugin-global-shortcut', () => ({
+  register: vi.fn(),
+  unregister: vi.fn(),
+  isRegistered: vi.fn().mockResolvedValue(false),
 }))
 
 // Export mock functions for test access

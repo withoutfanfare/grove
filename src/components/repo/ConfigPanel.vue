@@ -2,7 +2,7 @@
 /**
  * ConfigPanel Component
  *
- * Displays and allows editing of wt configuration files.
+ * Displays and allows editing of grove configuration files.
  * Shows effective config (resolved values) and individual config layers.
  * Premium UI with glassmorphism and refined styling.
  */
@@ -109,7 +109,7 @@ function cancelEdit() {
 }
 
 async function createConfigFile(layer: ConfigLayer) {
-  const defaultContent = `# wt configuration file
+  const defaultContent = `# grove configuration file
 # Created by Grove
 
 # Default base branch for new worktrees
@@ -335,13 +335,35 @@ function handleEditorKeydown(e: KeyboardEvent) {
               <div class="config-field-row">
                 <dt class="config-label">Config Directory</dt>
                 <dd class="config-mono-badge">
-                  {{ effectiveConfig.config_dir || '~/.wt' }}
+                  {{ effectiveConfig.config_dir || '~/.grove' }}
                 </dd>
               </div>
               <div class="config-field-row">
                 <dt class="config-label">Hooks Directory</dt>
                 <dd class="config-mono-badge">
-                  {{ effectiveConfig.hooks_dir || '~/.wt/hooks' }}
+                  {{ effectiveConfig.hooks_dir || '~/.grove/hooks' }}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+
+        <!-- URL Card -->
+        <div class="config-card group">
+          <div class="config-card-header">
+            <div class="config-card-icon bg-gradient-to-br from-accent/20 to-accent/5">
+              <svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+              </svg>
+            </div>
+            <h4 class="text-sm font-semibold text-text-primary">URL</h4>
+          </div>
+          <div class="config-card-content">
+            <dl class="space-y-4">
+              <div class="config-field-row">
+                <dt class="config-label">Subdomain</dt>
+                <dd class="config-mono-badge">
+                  {{ effectiveConfig.url_subdomain || 'None' }}
                 </dd>
               </div>
             </dl>

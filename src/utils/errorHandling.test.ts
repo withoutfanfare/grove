@@ -76,7 +76,7 @@ describe('isRetryableError', () => {
 
 describe('getErrorAction', () => {
   it('should return action for known error codes', () => {
-    expect(getErrorAction('CLI_NOT_FOUND')).toContain('wt CLI')
+    expect(getErrorAction('CLI_NOT_FOUND')).toContain('grove CLI')
     expect(getErrorAction('REPO_NOT_FOUND')).toContain('repository name')
     expect(getErrorAction('WORKTREE_EXISTS')).toContain('already exists')
   })

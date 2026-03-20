@@ -5,20 +5,27 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "opener:default",
     "clipboard-manager:allow-write-text",
     "shell:default",
     {
       "identifier": "shell:allow-execute",
       "allow": [
         {
-          "name": "binaries/wt",
+          "name": "binaries/grove",
           "sidecar": true,
           "args": true
         }
       ]
     },
+    "core:window:allow-start-dragging",
     "core:menu:default",
-    "core:tray:default"
+    "core:tray:default",
+    "window-state:default",
+    "log:default",
+    "store:default",
+    "notification:default",
+    "global-shortcut:default",
+    "process:default",
+    "dialog:default"
   ]
 }

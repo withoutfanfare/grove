@@ -2,7 +2,7 @@
 /**
  * HooksPanel Component
  *
- * Displays and allows editing of wt lifecycle hooks.
+ * Displays and allows editing of grove lifecycle hooks.
  * Shows hooks grouped by event type with security status indicators.
  * Premium UI with refined styling and animations.
  */
@@ -200,7 +200,7 @@ async function openHooksFolder() {
   }
   // Fallback to default hooks directory
   const homeDir = await getHomeDir()
-  const defaultHooksDir = `${homeDir}/.wt/hooks`
+  const defaultHooksDir = `${homeDir}/.grove/hooks`
   try {
     await wt.openInFinder(defaultHooksDir)
   } catch (e) {

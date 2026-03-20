@@ -1,5 +1,5 @@
 [package]
-name = "wt-app"
+name = "grove-app"
 version = "0.1.0"
 description = "A Tauri App"
 authors = ["Danny Harding"]
@@ -11,17 +11,33 @@ edition = "2021"
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-name = "wt_app_lib"
+name = "grove_app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "image-png"] }
-tauri-plugin-opener = "2"
+tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-png"] }
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-shell = "2"
+
+# Phase 1: Foundation
+tauri-plugin-single-instance = "2"
+tauri-plugin-window-state = "2"
+tauri-plugin-log = "2"
+tauri-plugin-store = "2"
+
+# Phase 2: Desktop Integration
+tauri-plugin-notification = "2"
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-process = "2"
+tauri-plugin-dialog = "2"
+
+# Phase 4: Visual Polish
+tauri-plugin-positioner = { version = "2", features = ["tray-icon"] }
+
+log = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["rt", "sync", "time"] }

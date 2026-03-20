@@ -1,9 +1,9 @@
-// wt CLI execution layer
+// grove CLI execution layer
 //
-// This module provides functions to execute wt CLI commands and parse their JSON output.
+// This module provides functions to execute grove CLI commands and parse their JSON output.
 // It handles command spawning, output capture, and error handling.
 //
-// The wt CLI is bundled as a sidecar binary with the Tauri app. All execution goes through
+// The grove CLI is bundled as a sidecar binary with the Tauri app. All execution goes through
 // Tauri's shell plugin sidecar API, which provides the binary from the app bundle.
 
 use std::collections::HashMap;
@@ -32,7 +32,7 @@ use crate::types::{
 
 /// Represents a structured CLI error response.
 ///
-/// The wt CLI outputs JSON errors in this format when commands fail:
+/// The grove CLI outputs JSON errors in this format when commands fail:
 /// `{"success": false, "error": {"code": "ERROR_CODE", "message": "..."}}`
 #[derive(Debug, Deserialize)]
 struct CliErrorResponse {
@@ -380,9 +380,9 @@ fn validate_repo_name(name: &str) -> WtResult<()> {
     Ok(())
 }
 
-/// Execute a wt CLI command and return stdout.
+/// Execute a grove CLI command and return stdout.
 ///
-/// Uses Tauri's sidecar API to execute the bundled wt binary.
+/// Uses Tauri's sidecar API to execute the bundled grove binary.
 ///
 /// # Memory Buffering Behaviour (H5)
 ///
@@ -397,11 +397,10 @@ fn validate_repo_name(name: &str) -> WtResult<()> {
 ///
 /// # Timeout Behaviour (M5)
 ///
-/// TODO: This function does not currently implement a timeout. Long-running CLI
-/// commands (e.g., network operations during `git fetch`) could potentially hang
-/// indefinitely. A future enhancement should add a configurable timeout.
-/// For now, users can cancel via the frontend cancel button which sets the
-/// cancellation flag checked between parallel operations.
+/// Commands are wrapped in a 5-minute timeout via `tokio::time::timeout`.
+/// This prevents indefinite hangs for long-running CLI operations.
+/// Users can still cancel multi-item operations from the frontend, which
+/// signals the operation token checked between parallel items.
 ///
 /// For operations requiring real-time progress, use the `*_with_progress` variants
 /// which emit events as work completes rather than buffering results.
@@ -409,11 +408,14 @@ fn validate_repo_name(name: &str) -> WtResult<()> {
 const SIDECAR_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
 
 fn execute_wt(app: &tauri::AppHandle, args: &[&str]) -> WtResult<String> {
-    // Get the sidecar command for the bundled wt binary
-    let sidecar = app.shell().sidecar("wt").map_err(|e| {
+    log::debug!("Executing sidecar: grove {}", args.join(" "));
+
+    // Get the sidecar command for the bundled grove binary
+    let sidecar = app.shell().sidecar("grove").map_err(|e| {
+        log::error!("Failed to initialise grove sidecar: {}", e);
         WtError::new(
             "SIDECAR_ERROR",
-            format!("Failed to initialise wt sidecar: {}", e),
+            format!("Failed to initialise grove sidecar: {}", e),
         )
     })?;
 
@@ -435,7 +437,7 @@ fn execute_wt(app: &tauri::AppHandle, args: &[&str]) -> WtResult<String> {
                 WtError::cli_not_found()
             } else {
                 // H6: Sanitise error messages before returning to frontend
-                let sanitised = sanitise_error_message(&format!("Failed to execute wt: {}", e));
+                let sanitised = sanitise_error_message(&format!("Failed to execute grove: {}", e));
                 WtError::new("IO_ERROR", sanitised)
             }
         })?;
@@ -446,7 +448,7 @@ fn execute_wt(app: &tauri::AppHandle, args: &[&str]) -> WtResult<String> {
         return Err(WtError::new(
             "OUTPUT_TOO_LARGE",
             format!(
-                "CLI output exceeded maximum size limit of {} MB. This may indicate an issue with the wt command.",
+                "CLI output exceeded maximum size limit of {} MB. This may indicate an issue with the grove command.",
                 MAX_OUTPUT_SIZE / (1024 * 1024)
             ),
         ));
@@ -456,12 +458,15 @@ fn execute_wt(app: &tauri::AppHandle, args: &[&str]) -> WtResult<String> {
     let success = output.status.code().map(|c| c == 0).unwrap_or(false);
 
     if !success {
+        log::warn!("Sidecar command failed (exit code {:?})", output.status.code());
+
         // First, try to parse structured JSON error from stdout
         // The CLI outputs: {"success": false, "error": {"code": "...", "message": "..."}}
         let stdout_str = String::from_utf8_lossy(&output.stdout);
         if let Ok(cli_error) = extract_json_object::<CliErrorResponse>(&stdout_str) {
             // H6: Sanitise error messages before returning to frontend
             let sanitised = sanitise_error_message(&cli_error.error.message);
+            log::warn!("CLI error [{}]: {}", cli_error.error.code, sanitised);
             return Err(WtError::new(&cli_error.error.code, sanitised));
         }
 
@@ -488,30 +493,226 @@ fn execute_wt(app: &tauri::AppHandle, args: &[&str]) -> WtResult<String> {
 
     let stdout_str = String::from_utf8_lossy(&output.stdout);
     if stdout_str.contains('\u{FFFD}') {
-        eprintln!("[wt] Warning: CLI output contained invalid UTF-8 bytes (replaced with U+FFFD). \
+        log::warn!("CLI output contained invalid UTF-8 bytes (replaced with U+FFFD). \
             This may indicate corrupted git data or a non-UTF-8 locale.");
     }
     Ok(stdout_str.into_owned())
 }
 
-/// Execute a wt CLI command that returns JSON, handling non-zero exit codes gracefully.
+/// Execute a grove CLI command and return both stdout and stderr on success.
 ///
-/// Some wt commands (like `pull` and `sync`) output valid JSON even when the operation
+/// Unlike `execute_wt` which discards stderr on success, this variant returns
+/// the (stdout, stderr) tuple so callers can parse additional information from
+/// stderr (e.g. hook execution messages).
+fn execute_wt_with_stderr(app: &tauri::AppHandle, args: &[&str]) -> WtResult<(String, String)> {
+    let sidecar = app.shell().sidecar("grove").map_err(|e| {
+        WtError::new(
+            "SIDECAR_ERROR",
+            format!("Failed to initialise grove sidecar: {}", e),
+        )
+    })?;
+
+    let rt_handle = tauri::async_runtime::handle();
+    let output = std::thread::scope(|s| {
+        s.spawn(|| {
+            rt_handle.block_on(async {
+                tokio::time::timeout(SIDECAR_TIMEOUT, sidecar.args(args).output()).await
+            })
+        })
+        .join()
+        .expect("sidecar thread panicked")
+    })
+    .map_err(|_| WtError::new("TIMEOUT", "Command timed out after 5 minutes"))?
+    .map_err(|e| {
+        let error_str = e.to_string();
+        if error_str.contains("not found") || error_str.contains("No such file") {
+            WtError::cli_not_found()
+        } else {
+            let sanitised = sanitise_error_message(&format!("Failed to execute grove: {}", e));
+            WtError::new("IO_ERROR", sanitised)
+        }
+    })?;
+
+    let total_output_size = output.stdout.len() + output.stderr.len();
+    if total_output_size > MAX_OUTPUT_SIZE {
+        return Err(WtError::new(
+            "OUTPUT_TOO_LARGE",
+            format!(
+                "CLI output exceeded maximum size limit of {} MB.",
+                MAX_OUTPUT_SIZE / (1024 * 1024)
+            ),
+        ));
+    }
+
+    let success = output.status.code().map(|c| c == 0).unwrap_or(false);
+
+    if !success {
+        let stdout_str = String::from_utf8_lossy(&output.stdout);
+        if let Ok(cli_error) = extract_json_object::<CliErrorResponse>(&stdout_str) {
+            let sanitised = sanitise_error_message(&cli_error.error.message);
+            return Err(WtError::new(&cli_error.error.code, sanitised));
+        }
+
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let error_lines: Vec<&str> = stderr
+            .lines()
+            .filter(|line| {
+                !line.starts_with('\u{2192}')
+                    && !line.starts_with("  \u{2192}")
+                    && !line.contains("...")
+            })
+            .collect();
+
+        let error_msg = if error_lines.is_empty() {
+            stderr.to_string()
+        } else {
+            error_lines.join("\n")
+        };
+
+        let sanitised = sanitise_error_message(error_msg.trim());
+        return Err(WtError::command_failed(sanitised));
+    }
+
+    let stdout_str = String::from_utf8_lossy(&output.stdout).into_owned();
+    let stderr_str = String::from_utf8_lossy(&output.stderr).into_owned();
+    Ok((stdout_str, stderr_str))
+}
+
+/// Strip ANSI escape codes from a string.
+///
+/// The grove CLI outputs coloured text via `info`, `ok`, `warn` functions.
+/// This strips those codes so we can cleanly parse hook execution messages.
+fn strip_ansi(input: &str) -> String {
+    // Matches ANSI escape sequences: ESC[ ... m (SGR) and ESC[ ... other codes
+    lazy_static::lazy_static! {
+        static ref ANSI_RE: regex::Regex = regex::Regex::new(r"\x1b\[[0-9;]*[a-zA-Z]").unwrap();
+    }
+    ANSI_RE.replace_all(input, "").to_string()
+}
+
+/// Parse hook execution results from CLI output.
+///
+/// The grove CLI outputs recognisable patterns for hook execution via
+/// `info()`, `ok()`, `warn()` shell functions (which write to stdout):
+/// - `→ Running <hook-name> hook...` - single hook started
+/// - `→ Running <hook-name>.d/<script>...` - .d hook script started
+/// - `✔ Hook <name> completed` / `✔ <script> completed` - success (U+2714)
+/// - `⚠ Hook <name> exited with non-zero status` - failure
+///
+/// Accepts combined output (stdout + stderr) since hook messages may appear on either stream.
+fn parse_hook_executions(output: &str) -> Vec<crate::types::HookExecution> {
+    let clean = strip_ansi(output);
+    let mut hooks: Vec<crate::types::HookExecution> = Vec::new();
+    // Track hooks that have been started so we can match completions
+    let mut pending: Vec<String> = Vec::new();
+
+    for line in clean.lines() {
+        let trimmed = line.trim();
+
+        // Match "→ Running <name> hook..." or "→ Running <name>..."
+        if let Some(rest) = trimmed.strip_prefix('\u{2192}') {
+            let rest = rest.trim();
+            if let Some(rest) = rest.strip_prefix("Running ") {
+                let name = rest
+                    .trim_end_matches("...")
+                    .trim_end_matches(" hook")
+                    .trim()
+                    .to_string();
+                if !name.is_empty() {
+                    pending.push(name);
+                }
+            }
+        }
+        // Match "✔ Hook <name> completed" or "✔ <name> completed" (U+2714 HEAVY CHECK MARK)
+        // Also match "✓" (U+2713 CHECK MARK) for compatibility.
+        // IMPORTANT: Only match lines ending with " completed" to avoid capturing
+        // informational output from within hook scripts (e.g. "✔ 3177 modules transformed.")
+        else if (trimmed.starts_with('\u{2714}') || trimmed.starts_with('\u{2713}'))
+            && trimmed.ends_with(" completed")
+        {
+            let rest = trimmed
+                .trim_start_matches('\u{2714}')
+                .trim_start_matches('\u{2713}')
+                .trim();
+            let name = rest
+                .strip_prefix("Hook ")
+                .unwrap_or(rest)
+                .trim_end_matches(" completed")
+                .trim()
+                .to_string();
+            // Remove from pending and add as success
+            if let Some(pos) = pending.iter().position(|p| p == &name || name.contains(p.as_str()) || p.contains(name.as_str())) {
+                let matched_name = pending.remove(pos);
+                hooks.push(crate::types::HookExecution {
+                    name: matched_name,
+                    status: "success".to_string(),
+                });
+            } else if !name.is_empty() {
+                hooks.push(crate::types::HookExecution {
+                    name,
+                    status: "success".to_string(),
+                });
+            }
+        }
+        // Match "⚠ Hook <name> exited with non-zero status" or "⚠ <name> exited with non-zero status"
+        // IMPORTANT: Only match lines containing "exited with non-zero status" to avoid
+        // capturing warnings from within hook scripts (e.g. "⚠ SSL mismatch: ...")
+        else if trimmed.starts_with('\u{26A0}')
+            && trimmed.contains("exited with non-zero status")
+        {
+            let rest = trimmed.trim_start_matches('\u{26A0}').trim();
+            let name = rest
+                .strip_prefix("Hook ")
+                .unwrap_or(rest)
+                .split(" exited with")
+                .next()
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            if let Some(pos) = pending.iter().position(|p| p == &name || name.contains(p.as_str()) || p.contains(name.as_str())) {
+                let matched_name = pending.remove(pos);
+                hooks.push(crate::types::HookExecution {
+                    name: matched_name,
+                    status: "failed".to_string(),
+                });
+            } else if !name.is_empty() {
+                hooks.push(crate::types::HookExecution {
+                    name,
+                    status: "failed".to_string(),
+                });
+            }
+        }
+    }
+
+    // Any remaining pending hooks that never got a completion line
+    for name in pending {
+        hooks.push(crate::types::HookExecution {
+            name,
+            status: "success".to_string(),
+        });
+    }
+
+    hooks
+}
+
+/// Execute a grove CLI command that returns JSON, handling non-zero exit codes gracefully.
+///
+/// Some grove commands (like `pull` and `sync`) output valid JSON even when the operation
 /// fails (e.g., dirty worktree, conflicts). This function tries to parse JSON from
 /// stdout first, regardless of exit code, before falling back to error handling.
 ///
-/// Uses Tauri's sidecar API to execute the bundled wt binary.
+/// Uses Tauri's sidecar API to execute the bundled grove binary.
 ///
 /// Use this for commands where the CLI provides structured error info in the JSON response.
 fn execute_wt_json_result<T: serde::de::DeserializeOwned>(
     app: &tauri::AppHandle,
     args: &[&str],
 ) -> WtResult<T> {
-    // Get the sidecar command for the bundled wt binary
-    let sidecar = app.shell().sidecar("wt").map_err(|e| {
+    // Get the sidecar command for the bundled grove binary
+    let sidecar = app.shell().sidecar("grove").map_err(|e| {
         WtError::new(
             "SIDECAR_ERROR",
-            format!("Failed to initialise wt sidecar: {}", e),
+            format!("Failed to initialise grove sidecar: {}", e),
         )
     })?;
 
@@ -532,7 +733,7 @@ fn execute_wt_json_result<T: serde::de::DeserializeOwned>(
             if error_str.contains("not found") || error_str.contains("No such file") {
                 WtError::cli_not_found()
             } else {
-                let sanitised = sanitise_error_message(&format!("Failed to execute wt: {}", e));
+                let sanitised = sanitise_error_message(&format!("Failed to execute grove: {}", e));
                 WtError::new("IO_ERROR", sanitised)
             }
         })?;
@@ -542,7 +743,7 @@ fn execute_wt_json_result<T: serde::de::DeserializeOwned>(
         return Err(WtError::new(
             "OUTPUT_TOO_LARGE",
             format!(
-                "CLI output exceeded maximum size limit of {} MB. This may indicate an issue with the wt command.",
+                "CLI output exceeded maximum size limit of {} MB. This may indicate an issue with the grove command.",
                 MAX_OUTPUT_SIZE / (1024 * 1024)
             ),
         ));
@@ -550,7 +751,7 @@ fn execute_wt_json_result<T: serde::de::DeserializeOwned>(
 
     let stdout_str = String::from_utf8_lossy(&output.stdout);
     if stdout_str.contains('\u{FFFD}') {
-        eprintln!("[wt] Warning: CLI output contained invalid UTF-8 bytes (replaced with U+FFFD). \
+        eprintln!("[grove] Warning: CLI output contained invalid UTF-8 bytes (replaced with U+FFFD). \
             This may indicate corrupted git data or a non-UTF-8 locale.");
     }
 
@@ -620,18 +821,18 @@ pub fn get_worktrees(app: &tauri::AppHandle, repo_name: &str) -> WtResult<Vec<Wo
 
 /// Get status of worktrees in a repository
 ///
-/// Note: This runs `wt ls <repo> --json` as status is provided in the ls output.
-/// The wt status command doesn't currently support --json output.
+/// Note: This runs `grove ls <repo> --json` as status is provided in the ls output.
+/// The grove status command doesn't currently support --json output.
 pub fn get_worktree_status(app: &tauri::AppHandle, repo_name: &str) -> WtResult<Vec<Worktree>> {
     // Status information is included in ls --json output
     get_worktrees(app, repo_name)
 }
 
-/// Check if the wt CLI is available
+/// Check if the grove CLI is available
 ///
-/// Uses Tauri's sidecar API to check if the bundled wt binary is accessible.
+/// Uses Tauri's sidecar API to check if the bundled grove binary is accessible.
 pub fn is_wt_available(app: &tauri::AppHandle) -> bool {
-    let sidecar = match app.shell().sidecar("wt") {
+    let sidecar = match app.shell().sidecar("grove") {
         Ok(s) => s,
         Err(_) => return false,
     };
@@ -701,7 +902,7 @@ pub fn create_worktree(
     base: Option<&str>,
     template: Option<&str>,
     force: bool,
-) -> WtResult<CreateWorktreeResult> {
+) -> WtResult<crate::types::CreateWorktreeResponse> {
     validate_repo_name(repo_name)?;
     validate_branch_name(branch)?;
 
@@ -732,15 +933,23 @@ pub fn create_worktree(
         args.push(t);
     }
 
-    let output = execute_wt(app, &args)?;
+    let (stdout, stderr) = execute_wt_with_stderr(app, &args)?;
 
     // H1: Use robust JSON extraction to handle debug output mixed with JSON
-    extract_json_object(&output)
+    let result: CreateWorktreeResult = extract_json_object(&stdout)?;
+
+    // Hook messages are written to stdout (via info/ok/warn shell functions),
+    // but also check stderr for completeness
+    let combined_output = format!("{}\n{}", stdout, stderr);
+    let hooks = parse_hook_executions(&combined_output);
+
+    Ok(crate::types::CreateWorktreeResponse { result, hooks })
 }
 
 /// Remove a worktree
 ///
 /// Executes `wt rm <repo> <branch> --json` with various options.
+/// Returns a RemoveWorktreeResponse including hook execution results.
 pub fn remove_worktree(
     app: &tauri::AppHandle,
     repo_name: &str,
@@ -749,7 +958,7 @@ pub fn remove_worktree(
     drop_db: bool,
     skip_backup: bool,
     force: bool,
-) -> WtResult<RemoveWorktreeResult> {
+) -> WtResult<crate::types::RemoveWorktreeResponse> {
     validate_repo_name(repo_name)?;
     validate_branch_name(branch)?;
 
@@ -772,10 +981,17 @@ pub fn remove_worktree(
     args.push(branch);
     args.push("--json");
 
-    let output = execute_wt(app, &args)?;
+    let (stdout, stderr) = execute_wt_with_stderr(app, &args)?;
 
     // H1: Use robust JSON extraction to handle debug output mixed with JSON
-    extract_json_object(&output)
+    let result: RemoveWorktreeResult = extract_json_object(&stdout)?;
+
+    // Hook messages are written to stdout (via info/ok/warn shell functions),
+    // but also check stderr for completeness
+    let combined_output = format!("{}\n{}", stdout, stderr);
+    let hooks = parse_hook_executions(&combined_output);
+
+    Ok(crate::types::RemoveWorktreeResponse { result, hooks })
 }
 
 /// Pull changes for a worktree
@@ -1895,6 +2111,8 @@ pub fn get_config(app: &tauri::AppHandle) -> WtResult<crate::types::Config> {
         herd_root: Option<String>,
         hooks_enabled: bool,
         database: Option<ConfigDatabase>,
+        #[serde(default)]
+        url_subdomain: Option<String>,
     }
 
     #[derive(Deserialize)]
@@ -1918,6 +2136,7 @@ pub fn get_config(app: &tauri::AppHandle) -> WtResult<crate::types::Config> {
             host: db.host,
             user: db.user,
         }),
+        url_subdomain: response.data.url_subdomain,
     })
 }
 
@@ -2047,10 +2266,10 @@ pub fn unlock_repository(app: &tauri::AppHandle, repo_name: &str) -> WtResult<Un
     extract_json_object(&output)
 }
 
-/// Get the path to the wt config file
+/// Get the path to the grove config file
 ///
-/// Returns the path to ~/.wtrc (the CLI's config file location)
-/// Also checks HERD_ROOT/.wtconfig as a fallback
+/// Returns the path to ~/.groverc (the CLI's config file location)
+/// Also checks HERD_ROOT/.groveconfig as a fallback
 pub fn get_config_path() -> WtResult<String> {
     // Get home directory
     let home = std::env::var("HOME").map_err(|_| {
@@ -2060,15 +2279,15 @@ pub fn get_config_path() -> WtResult<String> {
         )
     })?;
 
-    // Primary config location: ~/.wtrc
-    let config_path = format!("{}/.wtrc", home);
+    // Primary config location: ~/.groverc
+    let config_path = format!("{}/.groverc", home);
     if std::path::Path::new(&config_path).exists() {
         return Ok(config_path);
     }
 
-    // Fallback: check HERD_ROOT/.wtconfig
+    // Fallback: check HERD_ROOT/.groveconfig
     if let Ok(herd_root) = std::env::var("HERD_ROOT") {
-        let herd_config = format!("{}/.wtconfig", herd_root);
+        let herd_config = format!("{}/.groveconfig", herd_root);
         if std::path::Path::new(&herd_config).exists() {
             return Ok(herd_config);
         }
