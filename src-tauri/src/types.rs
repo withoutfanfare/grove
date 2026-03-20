@@ -115,6 +115,20 @@ pub struct Worktree {
     pub stale: Option<bool>,
 }
 
+/// Detailed dirty state breakdown from `git status --porcelain`
+///
+/// Provides file counts by status category for richer UI display.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DirtyDetails {
+    /// Number of files staged for commit
+    pub staged: u32,
+    /// Number of files with unstaged modifications
+    pub modified: u32,
+    /// Number of untracked files
+    pub untracked: u32,
+}
+
 /// Result from `wt add <repo> <branch> --json`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateWorktreeResult {

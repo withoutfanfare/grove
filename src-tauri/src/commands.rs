@@ -1486,6 +1486,73 @@ pub async fn set_hook_executable(
 }
 
 // ============================================================================
+// Dirty State Details
+// ============================================================================
+
+/// Get detailed dirty state for a worktree via `git status --porcelain`
+///
+/// Runs `git status --porcelain` on the worktree path and counts files by
+/// status category (staged, modified, untracked). Used for richer status
+/// display on worktree cards.
+///
+/// Callable from frontend as: invoke('get_dirty_details', { worktreePath })
+#[command]
+pub async fn get_dirty_details(
+    worktree_path: String,
+) -> Result<crate::types::DirtyDetails, WtError> {
+    let path = validate_path(&worktree_path)?;
+
+    spawn_blocking(move || {
+        let output = Command::new("git")
+            .args(["status", "--porcelain"])
+            .current_dir(&path)
+            .output()
+            .map_err(|e| WtError::new("COMMAND_FAILED", format!("Failed to run git status: {}", e)))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(WtError::command_failed(stderr.to_string()));
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut staged: u32 = 0;
+        let mut modified: u32 = 0;
+        let mut untracked: u32 = 0;
+
+        for line in stdout.lines() {
+            if line.len() < 2 {
+                continue;
+            }
+            let index_status = line.as_bytes()[0];
+            let worktree_status = line.as_bytes()[1];
+
+            match (index_status, worktree_status) {
+                (b'?', b'?') => untracked += 1,
+                (b'!', b'!') => {} // ignored
+                _ => {
+                    // Staged: index has A, M, D, R, C (not space or ?)
+                    if index_status != b' ' && index_status != b'?' {
+                        staged += 1;
+                    }
+                    // Modified in worktree: worktree has M, D (not space or ?)
+                    if worktree_status != b' ' && worktree_status != b'?' {
+                        modified += 1;
+                    }
+                }
+            }
+        }
+
+        Ok(crate::types::DirtyDetails {
+            staged,
+            modified,
+            untracked,
+        })
+    })
+    .await
+    .map_err(|e| WtError::spawn_error(e.to_string()))?
+}
+
+// ============================================================================
 // System Tray
 // ============================================================================
 ///

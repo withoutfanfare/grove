@@ -3,6 +3,7 @@ import type {
   Repository,
   Worktree,
   WtError,
+  DirtyDetails,
   CreateWorktreeResult,
   CreateWorktreeOptions,
   RemoveWorktreeResult,
@@ -407,6 +408,13 @@ export function useWt() {
   }
 
   /**
+   * Get detailed dirty state (staged, modified, untracked counts) for a worktree
+   */
+  async function getDirtyDetails(worktreePath: string): Promise<DirtyDetails> {
+    return await invoke<DirtyDetails>('get_dirty_details', { worktreePath });
+  }
+
+  /**
    * Convert an unknown error to a WtError
    */
   function toWtError(error: unknown): WtError {
@@ -467,6 +475,7 @@ export function useWt() {
     generateReport,
     saveReportToDesktop,
     deriveRepoName,
+    getDirtyDetails,
     toWtError,
   };
 }

@@ -83,6 +83,18 @@ export interface Worktree {
 }
 
 /**
+ * Detailed dirty state breakdown from `git status --porcelain`
+ */
+export interface DirtyDetails {
+  /** Number of files staged for commit */
+  staged: number;
+  /** Number of files with unstaged modifications */
+  modified: number;
+  /** Number of untracked files */
+  untracked: number;
+}
+
+/**
  * Error type returned from the backend.
  *
  * The code field contains a WtErrorCode (or a string for unknown codes).
