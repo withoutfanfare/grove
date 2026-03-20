@@ -9,7 +9,7 @@ import { onMounted, onUnmounted, watch, ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useDebounceFn } from '@vueuse/core'
 import { useWorktreeStore } from '../stores'
-import { useRepos, useWorktrees, useOperationProgress, useAutoRefresh, useSearch, useKeyboardShortcuts, useShortcutTooltip, useToast, useWorktreeWatcher, useResizableSidebar, useCommandRegistry } from '../composables'
+import { useRepos, useWorktrees, useOperationProgress, useAutoRefresh, useSearch, useKeyboardShortcuts, useShortcutTooltip, useToast, useWorktreeWatcher, useResizableSidebar, useCommandRegistry, useWorktreeFilters } from '../composables'
 import type { Worktree } from '../types'
 
 // Components
@@ -61,13 +61,35 @@ const {
 } = useAutoRefresh()
 
 // Search functionality
-const { query: worktreeSearchQuery, filterWorktrees, clearQuery: clearWorktreeSearch } = useSearch()
+const { query: worktreeSearchQuery, filterWorktrees: searchFilterWorktrees, clearQuery: clearWorktreeSearch } = useSearch()
+
+// Filter and sort functionality
+const {
+  activeFilter,
+  activeSort,
+  filterOptions,
+  sortOptions,
+  hasActiveFilter,
+  setFilter,
+  setSort,
+  resetFilter,
+  applyFiltersAndSort,
+} = useWorktreeFilters()
 
 // L12: Ref for search input focus
 const searchInputRef = ref<{ focus: () => void } | null>(null)
 
-// Filtered worktrees based on search
-const filteredWorktrees = computed(() => filterWorktrees(worktrees.value))
+// Filtered worktrees: apply text search, then structured filters and sort
+const filteredWorktrees = computed(() => {
+  const searched = searchFilterWorktrees(worktrees.value)
+  return applyFiltersAndSort(searched)
+})
+
+// Count of worktrees matching the active filter (before text search)
+const filterCount = computed(() => {
+  if (!hasActiveFilter.value) return worktrees.value.length
+  return applyFiltersAndSort(worktrees.value).length
+})
 
 // Content key for crossfade transitions when switching states
 const contentKey = computed(() => {
@@ -154,8 +176,9 @@ onUnmounted(() => {
 // Watch for repo selection changes with race condition protection
 watch(selectedRepoName, async (newName, oldName) => {
   if (newName && newName !== oldName) {
-    // Clear search when switching repositories
+    // Clear search and filters when switching repositories
     clearWorktreeSearch()
+    resetFilter()
     // Stop watching the old repo
     await stopWatching()
     const currentFetch = ++fetchCounter.value
@@ -696,6 +719,51 @@ useKeyboardShortcuts({
               </IconButton>
             </div>
           </Transition>
+
+          <!-- Filter/sort toolbar (visible when worktrees exist) -->
+          <div v-if="selectedRepo && worktrees.length > 0"
+            class="flex-shrink-0 px-6 py-2 border-b border-white/5 flex items-center gap-3"
+            style="background-color: rgba(3, 7, 18, 0.8);">
+            <!-- Filter toggles -->
+            <div class="flex items-center gap-1">
+              <button v-for="opt in filterOptions" :key="opt.value"
+                :class="[
+                  'px-2.5 py-1 text-2xs font-medium rounded-md transition-colors duration-100',
+                  activeFilter === opt.value
+                    ? 'bg-accent/15 text-accent border border-accent/30'
+                    : 'text-text-muted hover:text-text-secondary hover:bg-surface-overlay border border-transparent'
+                ]"
+                @click="setFilter(opt.value)">
+                {{ opt.label }}
+              </button>
+            </div>
+
+            <!-- Active filter pill with clear -->
+            <span v-if="hasActiveFilter"
+              class="inline-flex items-center gap-1 px-2 py-0.5 text-2xs font-medium rounded-full bg-accent/10 text-accent border border-accent/20">
+              {{ filterCount }} of {{ worktrees.length }}
+              <button class="ml-0.5 hover:text-text-primary transition-colors" @click="resetFilter" title="Clear filter">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </span>
+
+            <div class="flex-1" />
+
+            <!-- Sort selector -->
+            <div class="flex items-center gap-1.5">
+              <span class="text-2xs text-text-muted">Sort:</span>
+              <select
+                :value="activeSort"
+                class="text-2xs bg-surface-overlay text-text-secondary border border-border-subtle rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-accent/50"
+                @change="setSort(($event.target as HTMLSelectElement).value as any)">
+                <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">
+                  {{ opt.label }}
+                </option>
+              </select>
+            </div>
+          </div>
 
           <!-- Content area -->
           <div class="flex-1">

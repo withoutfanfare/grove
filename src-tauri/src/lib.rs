@@ -20,7 +20,7 @@ use commands::{
     cancel_operation, check_wt_available, clone_repository, create_hook, create_worktree,
     delete_hook, derive_repo_name, dismiss_operation, generate_report,
     save_report_to_desktop, get_config,
-    get_config_files, get_recent_commits, get_recent_worktrees, get_repo_health,
+    get_config_files, get_dirty_details, get_recent_commits, get_recent_worktrees, get_repo_health,
     get_resumable_operations, get_uncommitted_files, get_worktree_status, get_wt_version,
     is_watching, list_branches, list_hooks, list_repositories, list_worktrees,
     mark_interrupted_operations, open_config, open_in_browser, open_in_editor, open_in_finder, open_in_git_client,
@@ -86,6 +86,8 @@ pub fn run() {
             start_watching,
             stop_watching,
             is_watching,
+            // Dirty state details
+            get_dirty_details,
             // System integration commands
             open_in_editor,
             open_in_git_client,
