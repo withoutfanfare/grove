@@ -114,7 +114,7 @@ The minimum viable product that provides value to the team.
 │  ● modern...  │  ┌─────────────────────────────────────────┐   │
 │    4 worktrees │  │ staging                                 │   │
 │                │  │ ✓ Clean  ↓2 behind  Grade: A           │   │
-│  ○ scooda     │  │ [Code] [Terminal] [Browser]             │   │
+│  ○ my-project │  │ [Code] [Terminal] [Browser]             │   │
 │    2 worktrees │  └─────────────────────────────────────────┘   │
 │                │                                                 │
 │  ○ api-gateway│  ┌─────────────────────────────────────────┐   │
@@ -233,7 +233,7 @@ Always-available quick access.
 ├────────────────────────────────┤
 │  Recent                        │
 │  ├─ modernprintworks/staging   │
-│  ├─ scooda/develop             │
+│  ├─ my-project/develop         │
 │  └─ api-gateway/main           │
 ├────────────────────────────────┤
 │  ⚠ 2 worktrees need attention │

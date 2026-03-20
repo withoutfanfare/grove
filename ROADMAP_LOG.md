@@ -36,9 +36,9 @@
 - **Items added (Design System Adoption section):**
   - [Foundation] Integrate @stuntrocket/ui shared component library and design tokens (P1, M)
   - [UI Migration] Replace bespoke components with @stuntrocket/ui shared components (P1, XL)
-  - [Polish] Achieve full Scooda styleguide visual conformance (P2, L)
+  - [Polish] Achieve full @stuntrocket/ui styleguide visual conformance (P2, L)
 - **Items archived:** none
-- **Observations:** Added Design System Adoption section. Grove is the most production-ready app and already has a polished design with animation custom properties — the migration path is clear: remap existing duration tokens to Scooda values, replace src/components/ui/ primitives with @stuntrocket/ui imports. Grove's existing 245+ frontend tests provide confidence for the visual migration. As the most mature app, Grove should be an early adopter (after Dalil validates the package).
+- **Observations:** Added Design System Adoption section. Grove is the most production-ready app and already has a polished design with animation custom properties — the migration path is clear: remap existing duration tokens to @stuntrocket/ui values, replace src/components/ui/ primitives with @stuntrocket/ui imports. Grove's existing 245+ frontend tests provide confidence for the visual migration. As the most mature app, Grove should be an early adopter (after Dalil validates the package).
 
 ## Cycle: 2026-03-20 18:00
 - **Items added:**
@@ -118,6 +118,6 @@
 - **Items skipped:**
   - [Distribution] Tauri auto-updater — Requires update endpoint infrastructure
   - [UI Migration] Replace bespoke components — XL item needing Danny's input
-  - [Polish] Scooda visual conformance — Depends on UI Migration
+  - [Polish] @stuntrocket/ui visual conformance — Depends on UI Migration
 - **Items archived:** none
 - **Observations:** Massive execution cycle completing all 12 functional pending items in one batch. The implementation follows the existing architecture patterns: Rust backend (wt.rs → commands.rs), TypeScript types (types/wt.ts), useWt.ts composable, and Vue component integration. New Rust commands: get_repo_disk_usage, get_diff_stats, fetch_repo, get_remote_branches, register_repository. New composables: useBackgroundFetch, useStaleDetection, useTrayBadge, useRecentSwitches. New store: templates.ts. Settings extended with backgroundFetchInterval, staleThresholdDays, trayBadgeEnabled. Grove now has 3 pending items (1 functional + 2 design system) and 16 completed items — the highest execution velocity in the portfolio.

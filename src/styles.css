@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ============================================================================
-   Scooda Design System Foundation
+   @stuntrocket/ui Design System Foundation
    Provides: colour palette, typography (Poppins), spacing, radii, shadows,
    durations, easings, layout tokens, base styles, focus rings, scrollbars,
    micro-animations, ambient blobs, and reduced motion support.
@@ -11,26 +11,26 @@
 
 /* ============================================================================
    Grove Compatibility Layer
-   Maps legacy token names used by existing components to Scooda equivalents.
+   Maps legacy token names used by existing components to @stuntrocket/ui equivalents.
    These aliases will be removed when the full UI Migration (P1/XL) replaces
-   all component references with Scooda canonical names.
+   all component references with @stuntrocket/ui canonical names.
    ============================================================================ */
 
 :root {
-  /* Surface aliases (Grove name → Scooda name) */
+  /* Surface aliases (Grove name → @stuntrocket/ui name) */
   --color-surface-base: var(--color-surface);
   --color-surface-raised: var(--color-surface-app);
   --color-surface-overlay: var(--color-surface-secondary);
   --color-surface-elevated: var(--color-sidebar);
 
-  /* Text alias — Scooda uses tertiary where Grove used muted */
+  /* Text alias — @stuntrocket/ui uses tertiary where Grove used muted */
   --color-text-muted: var(--color-text-tertiary);
 
-  /* Accent variants not in Scooda */
+  /* Accent variants not in @stuntrocket/ui */
   --color-accent-muted: var(--color-accent-subtle);
   --color-accent-strong: color-mix(in srgb, var(--color-accent) 25%, transparent);
 
-  /* Border focus — Scooda uses accent directly in focus ring */
+  /* Border focus — @stuntrocket/ui uses accent directly in focus ring */
   --color-border-focus: color-mix(in srgb, var(--color-accent) 50%, transparent);
 
   /* Status subtle aliases */
@@ -41,31 +41,31 @@
   --color-danger-muted: var(--color-danger-subtle);
   --color-danger-strong: color-mix(in srgb, var(--color-danger) 25%, transparent);
 
-  /* Info colour — not in Scooda */
+  /* Info colour — not in @stuntrocket/ui */
   --color-info: #3B82F6;
   --color-info-muted: rgba(59, 130, 246, 0.15);
 
-  /* Component-specific durations — Scooda provides instant/fast/normal/smooth/slow */
+  /* Component-specific durations — @stuntrocket/ui provides instant/fast/normal/smooth/slow */
   --duration-slower: 350ms;
   --duration-modal: var(--duration-smooth);
   --duration-toast: 300ms;
   --duration-panel: 300ms;
   --duration-progress: 300ms;
 
-  /* Animation durations — not covered by Scooda timing scale */
+  /* Animation durations — not covered by @stuntrocket/ui timing scale */
   --duration-spin: 1s;
   --duration-shimmer: 1.5s;
   --duration-pulse: 2s;
 
-  /* Easing aliases (Grove name → Scooda name) */
+  /* Easing aliases (Grove name → @stuntrocket/ui name) */
   --ease-smooth: var(--ease-default);
   --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* Radius aliases — Scooda uses xs/sm/md/lg, Grove used sm/md/lg/xl/2xl */
+  /* Radius aliases — @stuntrocket/ui uses xs/sm/md/lg, Grove used sm/md/lg/xl/2xl */
   --radius-2xl: 1rem;
 
-  /* Shadow variants not in Scooda */
+  /* Shadow variants not in @stuntrocket/ui */
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
   --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.6), 0 10px 10px rgba(0, 0, 0, 0.4);
   --shadow-glow: 0 0 20px color-mix(in srgb, var(--color-accent) 25%, transparent);
@@ -73,7 +73,7 @@
   --shadow-glow-danger: 0 0 20px color-mix(in srgb, var(--color-danger) 20%, transparent);
   --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.3);
 
-  /* Z-index scale — not in Scooda */
+  /* Z-index scale — not in @stuntrocket/ui */
   --z-base: 0;
   --z-dropdown: 9999;
   --z-sticky: 20;

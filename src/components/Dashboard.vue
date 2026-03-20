@@ -155,10 +155,10 @@ const {
 const { start: startBackgroundFetch, stop: stopBackgroundFetch } = useBackgroundFetch()
 
 // Stale worktree detection
-const { staleCount } = useStaleDetection()
+useStaleDetection()
 
 // Tray badge
-const { badgeCount: trayBadgeCount } = useTrayBadge()
+useTrayBadge()
 
 // Recent switches
 const { recordSwitch } = useRecentSwitches()

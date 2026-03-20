@@ -44,7 +44,7 @@ export type WtErrorCode =
  * Repository information from `wt repos --json`
  */
 export interface Repository {
-  /** Repository name (e.g., "scooda") */
+  /** Repository name (e.g., "my-project") */
   name: string;
   /** Number of worktrees in this repository */
   worktrees: number;

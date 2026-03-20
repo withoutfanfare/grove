@@ -148,7 +148,7 @@ pub async fn list_repositories(app: tauri::AppHandle) -> Result<Vec<Repository>,
 ///
 /// Returns detailed information about each worktree including branch, status, and health.
 /// Runs on a background thread to keep the UI responsive.
-/// Callable from frontend as: invoke('list_worktrees', { repoName: 'scooda' })
+/// Callable from frontend as: invoke('list_worktrees', { repoName: 'my-project' })
 #[command(rename_all = "camelCase")]
 pub async fn list_worktrees(
     repo_name: String,
@@ -166,7 +166,7 @@ pub async fn list_worktrees(
 ///
 /// Returns the same information as list_worktrees (status is included in ls output).
 /// Runs on a background thread to keep the UI responsive.
-/// Callable from frontend as: invoke('get_worktree_status', { repoName: 'scooda' })
+/// Callable from frontend as: invoke('get_worktree_status', { repoName: 'my-project' })
 #[command(rename_all = "camelCase")]
 pub async fn get_worktree_status(
     repo_name: String,

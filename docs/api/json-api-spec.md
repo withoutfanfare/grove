@@ -223,7 +223,7 @@ wt repos --json
     "worktrees": 4
   },
   {
-    "name": "scooda",
+    "name": "my-project",
     "worktrees": 2
   }
 ]
@@ -481,10 +481,10 @@ wt recent [count] --json
     "dirty": false
   },
   {
-    "repo": "scooda",
+    "repo": "my-project",
     "branch": "develop",
-    "path": "/Users/danny/Herd/scooda--develop",
-    "url": "http://scooda--develop.test",
+    "path": "/Users/danny/Herd/my-project--develop",
+    "url": "http://my-project--develop.test",
     "accessed_at": "2026-01-07T12:15:00Z",
     "dirty": true
   }

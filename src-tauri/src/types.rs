@@ -71,7 +71,7 @@ impl std::fmt::Display for HealthGrade {
 /// Repository information from `wt repos --json`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Repository {
-    /// Repository name (e.g., "scooda")
+    /// Repository name (e.g., "my-project")
     pub name: String,
     /// Number of worktrees in this repository
     pub worktrees: u32,
@@ -1081,9 +1081,9 @@ mod tests {
 
     #[test]
     fn test_repository_deserialize() {
-        let json = r#"{"name": "scooda", "worktrees": 6}"#;
+        let json = r#"{"name": "my-project", "worktrees": 6}"#;
         let repo: Repository = serde_json::from_str(json).unwrap();
-        assert_eq!(repo.name, "scooda");
+        assert_eq!(repo.name, "my-project");
         assert_eq!(repo.worktrees, 6);
     }
 

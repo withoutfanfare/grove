@@ -364,12 +364,12 @@ Commands needing JSON output enhancement:
 │  wt Worktree Manager                        [+ New] [↻ Refresh] │
 ├─────────────────┬───────────────────────────────────────────────┤
 │                 │                                               │
-│  REPOSITORIES   │   scooda (7 worktrees)          [Pull All]   │
+│  REPOSITORIES   │   my-project (7 worktrees)      [Pull All]   │
 │  ─────────────  │   ─────────────────────────────────────────   │
 │                 │                                               │
 │  ○ Recent       │   ┌─────────────────┐  ┌─────────────────┐   │
 │                 │   │ feature/login   │  │ bugfix/cart     │   │
-│  ● scooda (7)   │   │ ────────────────│  │ ────────────────│   │
+│  ● my-proj (7)  │   │ ────────────────│  │ ────────────────│   │
 │  ○ knotbook (3) │   │ [A] Clean  +0-0 │  │ [B] Dirty  +3-1 │   │
 │  ○ myapp (2)    │   │                 │  │                 │   │
 │                 │   │ [Code][Term][🌐]│  │ [Pull][Sync]    │   │

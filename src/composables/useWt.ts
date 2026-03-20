@@ -6,7 +6,6 @@ import type {
   DirtyDetails,
   DiffStats,
   RepoDiskUsage,
-  CreateWorktreeResult,
   CreateWorktreeResponse,
   CreateWorktreeOptions,
   RemoveWorktreeResponse,
