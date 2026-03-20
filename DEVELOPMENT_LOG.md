@@ -9,5 +9,5 @@
 - Items attempted but failed: none
 - Branch: feature/status-indicators-and-filtering
 - Tests passing: yes (cargo test 79/79, cargo check clean, cargo clippy clean, vue-tsc clean)
-- Build status: pending
+- Build status: success (Grove-20260320-0223.app copied to ~/Desktop/TauriBuilds/grove/)
 - Notes: All three items are S-sized P2 features batched into one cycle. The ahead/behind and dirty state improvements enhance the existing StatusBadge component. The filtering/sorting adds a new composable and toolbar to the Dashboard. The `DirtyDetails` type was added to both Rust (`types.rs`) and TypeScript (`wt.ts`) with the new Tauri command registered in `lib.rs`.
