@@ -2389,6 +2389,35 @@ pub fn generate_health_report(app: &tauri::AppHandle, repo_name: &str) -> WtResu
     Ok(report)
 }
 
+// ============================================================================
+// Background Fetch
+// ============================================================================
+
+/// Run git fetch for a repository.
+///
+/// Executes `grove fetch <repo>` via the sidecar.
+pub fn fetch_repository(app: &tauri::AppHandle, repo_name: &str) -> WtResult<()> {
+    validate_repo_name(repo_name)?;
+    // Use the sidecar to run fetch; ignore output, just check for errors
+    execute_wt(app, &["fetch", repo_name])?;
+    Ok(())
+}
+
+// ============================================================================
+// Repository Registration
+// ============================================================================
+
+/// Register an existing git repository by path.
+///
+/// Executes `grove register <path>` via the sidecar.
+pub fn register_repo(app: &tauri::AppHandle, path: &std::path::Path) -> WtResult<()> {
+    let path_str = path.to_str().ok_or_else(|| {
+        WtError::new("INVALID_PATH", "Path contains non-UTF-8 characters")
+    })?;
+    execute_wt(app, &["register", path_str])?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

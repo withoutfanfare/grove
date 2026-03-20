@@ -13,8 +13,8 @@ import { storeToRefs } from 'pinia'
 import { useHooksStore, useSettingsStore } from '../../stores'
 import type { HookEvent, HookScope, HookScriptMeta } from '../../types'
 import { getHookEventLabel, getHookScopeLabel } from '../../types'
-import { SButton } from '@stuntrocket/ui'
-import { Input, ConfirmDialog, Dropdown, DropdownItem } from '../ui'
+import { SButton, SInput, SConfirmDialog } from '@stuntrocket/ui'
+import { Dropdown, DropdownItem } from '../ui'
 import { copyToClipboard } from '../../utils/clipboard'
 
 const props = defineProps<{
@@ -376,7 +376,7 @@ function handleEditorKeydown(e: KeyboardEvent) {
           </div>
         </div>
 
-        <Input
+        <SInput
           v-model="newHookFileName"
           label="Filename"
           :placeholder="newHookScope === 'single' ? 'post-add' : '01-setup.sh'"
@@ -619,15 +619,15 @@ function handleEditorKeydown(e: KeyboardEvent) {
       </div>
     </div>
 
-    <ConfirmDialog
+    <SConfirmDialog
       :open="showDeleteConfirm"
       title="Delete Hook"
       :message="`Delete '${hookToDelete?.name}'? This cannot be undone.`"
       confirm-label="Delete"
       variant="danger"
-      :loading="isDeleting"
       @confirm="confirmDelete"
       @cancel="cancelDelete"
+      @close="cancelDelete"
     />
   </div>
 </template>

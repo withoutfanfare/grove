@@ -819,6 +819,78 @@ export interface ChangesResult {
 }
 
 // ============================================================================
+// Disk Usage Types
+// ============================================================================
+
+/**
+ * Disk usage for a single worktree
+ */
+export interface WorktreeDiskUsage {
+  /** Worktree branch name */
+  branch: string;
+  /** Full path to the worktree */
+  path: string;
+  /** Size in bytes */
+  size_bytes: number;
+  /** Human-readable size (e.g., "1.2 GB") */
+  size_display: string;
+}
+
+/**
+ * Disk usage summary for a repository
+ */
+export interface RepoDiskUsage {
+  /** Repository name */
+  repo: string;
+  /** Total size in bytes */
+  total_bytes: number;
+  /** Human-readable total size */
+  total_display: string;
+  /** Per-worktree sizes */
+  worktrees: WorktreeDiskUsage[];
+}
+
+// ============================================================================
+// Diff Stats Types
+// ============================================================================
+
+/**
+ * Diff statistics for a worktree relative to its base branch
+ */
+export interface DiffStats {
+  /** Number of files changed */
+  files_changed: number;
+  /** Number of lines added */
+  lines_added: number;
+  /** Number of lines removed */
+  lines_removed: number;
+  /** Short display string (e.g., "5 files, +120/-45") */
+  display: string;
+  /** Full file list for tooltip */
+  file_list: string[];
+}
+
+// ============================================================================
+// Worktree Template Types
+// ============================================================================
+
+/**
+ * A worktree creation template
+ */
+export interface WorktreeTemplate {
+  /** Template name (e.g., "feature") */
+  name: string;
+  /** Branch prefix (e.g., "feature/") */
+  branch_prefix: string;
+  /** Default base branch (e.g., "origin/main") */
+  default_base: string;
+  /** Optional post-create script */
+  post_create_script?: string;
+  /** Whether this is a built-in template */
+  builtin: boolean;
+}
+
+// ============================================================================
 // Configuration Types
 // ============================================================================
 

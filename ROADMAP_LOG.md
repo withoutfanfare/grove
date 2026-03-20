@@ -100,3 +100,24 @@
 - **Items added:** none
 - **Items archived:** none
 - **Observations:** Grove remains at 15 pending items (13 functional + 2 design system) — at the rebalancing threshold. Four completed items (Foundation DS, ahead/behind indicators, dirty state indicators, filtering/sorting) give Grove the joint-strongest execution velocity. The UI Migration item (P1, XL) is marked as needing Danny's input. The command palette (P2, M) remains the highest-impact power-user feature. The worktree creation wizard (P2, S) and stale detection (P2, S) pair provides the best quality-of-life improvement for daily use. No additions until execution reduces the pending count.
+
+## Cycle: 2026-03-20 — Batch implementation of all pending functional items
+- **Items completed (12):**
+  - [UX/UI] Drag-and-drop repository registration (P2, S) — Finder drop zone with validation
+  - [Feature] Worktree quick-switch command palette (P2, M) — Cmd+K fuzzy search via existing CommandPalette
+  - [Quality] Accessibility improvements for keyboard-only navigation (P3, M) — ARIA labels, roles, focus management
+  - [Performance] Lazy loading for repository worktree lists (P2, S) — Session-cached worktree data per repo
+  - [Innovation] Worktree templates for common branching workflows (P3, M) — Built-in feature/hotfix/release templates
+  - [Quality] Stale worktree detection with cleanup suggestions (P2, S) — Configurable threshold (default 14 days)
+  - [UX/UI] Per-repository disk usage display (P3, S) — Async size calculation per worktree
+  - [Feature] Recent worktree switch history (P3, S) — Last 10 switches persisted in localStorage
+  - [UX/UI] System tray badge for worktrees needing attention (P2, S) — Badge count from dirty/behind/stale
+  - [Feature] Worktree diff stats (P2, S) — Files changed, lines +/- vs base branch
+  - [Performance] Periodic background fetch (P3, S) — Configurable interval (default 5 minutes)
+  - [Feature] Worktree creation wizard with remote branch browsing (P2, S) — Searchable remote branch picker
+- **Items skipped:**
+  - [Distribution] Tauri auto-updater — Requires update endpoint infrastructure
+  - [UI Migration] Replace bespoke components — XL item needing Danny's input
+  - [Polish] Scooda visual conformance — Depends on UI Migration
+- **Items archived:** none
+- **Observations:** Massive execution cycle completing all 12 functional pending items in one batch. The implementation follows the existing architecture patterns: Rust backend (wt.rs → commands.rs), TypeScript types (types/wt.ts), useWt.ts composable, and Vue component integration. New Rust commands: get_repo_disk_usage, get_diff_stats, fetch_repo, get_remote_branches, register_repository. New composables: useBackgroundFetch, useStaleDetection, useTrayBadge, useRecentSwitches. New store: templates.ts. Settings extended with backgroundFetchInterval, staleThresholdDays, trayBadgeEnabled. Grove now has 3 pending items (1 functional + 2 design system) and 16 completed items — the highest execution velocity in the portfolio.

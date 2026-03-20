@@ -4,6 +4,8 @@ import type {
   Worktree,
   WtError,
   DirtyDetails,
+  DiffStats,
+  RepoDiskUsage,
   CreateWorktreeResult,
   CreateWorktreeResponse,
   CreateWorktreeOptions,
@@ -432,6 +434,64 @@ export function useWt() {
     });
   }
 
+  // ============================================================================
+  // Disk Usage
+  // ============================================================================
+
+  /**
+   * Get disk usage for all worktrees in a repository
+   */
+  async function getRepoDiskUsage(repoName: string): Promise<RepoDiskUsage> {
+    return await invoke<RepoDiskUsage>('get_repo_disk_usage', { repoName });
+  }
+
+  // ============================================================================
+  // Diff Stats
+  // ============================================================================
+
+  /**
+   * Get diff statistics for a worktree relative to its base branch
+   */
+  async function getDiffStats(worktreePath: string, baseBranch?: string): Promise<DiffStats> {
+    return await invoke<DiffStats>('get_diff_stats', {
+      worktreePath,
+      baseBranch: baseBranch ?? null,
+    });
+  }
+
+  // ============================================================================
+  // Background Fetch
+  // ============================================================================
+
+  /**
+   * Run git fetch for a repository
+   */
+  async function fetchRepo(repoName: string): Promise<void> {
+    await invoke<void>('fetch_repo', { repoName });
+  }
+
+  // ============================================================================
+  // Remote Branches
+  // ============================================================================
+
+  /**
+   * Get remote branches for a repository
+   */
+  async function getRemoteBranches(repoName: string): Promise<BranchesResult> {
+    return await invoke<BranchesResult>('get_remote_branches', { repoName });
+  }
+
+  // ============================================================================
+  // Repository Registration
+  // ============================================================================
+
+  /**
+   * Register an existing git repository by path (for drag-and-drop)
+   */
+  async function registerRepository(path: string): Promise<void> {
+    await invoke<void>('register_repository', { path });
+  }
+
   /**
    * Convert an unknown error to a WtError
    */
@@ -495,6 +555,16 @@ export function useWt() {
     deriveRepoName,
     getDirtyDetails,
     showWorktreeContextMenu,
+    // Disk usage
+    getRepoDiskUsage,
+    // Diff stats
+    getDiffStats,
+    // Background fetch
+    fetchRepo,
+    // Remote branches
+    getRemoteBranches,
+    // Repository registration
+    registerRepository,
     toWtError,
   };
 }

@@ -19,6 +19,10 @@ export const useWorktreeStore = defineStore('worktrees', () => {
   const focusedBranch = ref<string | null>(null);
   // Flag to expand details when focusing a worktree (e.g., from Recent list)
   const expandOnFocus = ref(false);
+  // Lazy loading: track which repos have had worktrees fetched this session
+  const loadedRepos = ref<Set<string>>(new Set());
+  // Cache of worktrees per repo for lazy loading
+  const worktreeCache = ref<Record<string, Worktree[]>>({});
 
   // Getters
   const selectedRepo = computed(() => {
@@ -62,6 +66,25 @@ export const useWorktreeStore = defineStore('worktrees', () => {
 
   function setWorktrees(wts: Worktree[]) {
     worktrees.value = wts;
+    // Cache for lazy loading
+    if (selectedRepoName.value) {
+      loadedRepos.value.add(selectedRepoName.value);
+      worktreeCache.value[selectedRepoName.value] = wts;
+    }
+  }
+
+  /**
+   * Check if a repo's worktrees have been loaded this session
+   */
+  function isRepoLoaded(repoName: string): boolean {
+    return loadedRepos.value.has(repoName);
+  }
+
+  /**
+   * Get cached worktrees for a repo (returns empty array if not loaded)
+   */
+  function getCachedWorktrees(repoName: string): Worktree[] {
+    return worktreeCache.value[repoName] ?? [];
   }
 
   function selectRepository(name: string) {
@@ -172,5 +195,9 @@ export const useWorktreeStore = defineStore('worktrees', () => {
     focusWorktree,
     clearFocusedWorktree,
     clearExpandOnFocus,
+    // Lazy loading
+    loadedRepos,
+    isRepoLoaded,
+    getCachedWorktrees,
   };
 });

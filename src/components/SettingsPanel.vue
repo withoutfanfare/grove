@@ -9,8 +9,7 @@ import { ref, watch, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useSettingsStore, EDITOR_OPTIONS, TERMINAL_OPTIONS, GIT_CLIENT_OPTIONS } from '../stores'
 import type { EditorChoice, TerminalChoice, GitClientChoice } from '../stores'
-import { SPanel, SButton } from '@stuntrocket/ui'
-import { Input, Select, Toggle } from './ui'
+import { SPanel, SButton, SInput, SSelect, SToggle } from '@stuntrocket/ui'
 
 const props = defineProps<{
   isOpen: boolean
@@ -158,11 +157,14 @@ const gitClientDescription = computed(() => {
         </h3>
 
         <div class="space-y-4">
-          <Select
+          <SSelect
             v-model="editor"
             label="Code Editor"
-            :options="EDITOR_OPTIONS"
-          />
+          >
+            <option v-for="opt in EDITOR_OPTIONS" :key="opt.value" :value="opt.value">
+              {{ opt.label }}
+            </option>
+          </SSelect>
           <p class="text-2xs text-text-muted -mt-2">{{ editorDescription }}</p>
 
           <Transition
@@ -173,7 +175,7 @@ const gitClientDescription = computed(() => {
             leave-from-class="opacity-100 translate-y-0"
             leave-to-class="opacity-0 -translate-y-1"
           >
-            <Input
+            <SInput
               v-if="editor === 'custom'"
               v-model="customEditorPath"
               label="Custom Editor Path"
@@ -183,11 +185,14 @@ const gitClientDescription = computed(() => {
             />
           </Transition>
 
-          <Select
+          <SSelect
             v-model="terminal"
             label="Terminal Application"
-            :options="TERMINAL_OPTIONS"
-          />
+          >
+            <option v-for="opt in TERMINAL_OPTIONS" :key="opt.value" :value="opt.value">
+              {{ opt.label }}
+            </option>
+          </SSelect>
         </div>
       </section>
 
@@ -200,11 +205,14 @@ const gitClientDescription = computed(() => {
         </h3>
 
         <div class="space-y-4">
-          <Select
+          <SSelect
             v-model="gitClient"
             label="Git Client Application"
-            :options="GIT_CLIENT_OPTIONS"
-          />
+          >
+            <option v-for="opt in GIT_CLIENT_OPTIONS" :key="opt.value" :value="opt.value">
+              {{ opt.label }}
+            </option>
+          </SSelect>
           <p class="text-2xs text-text-muted -mt-2">{{ gitClientDescription }}</p>
 
           <Transition
@@ -215,7 +223,7 @@ const gitClientDescription = computed(() => {
             leave-from-class="opacity-100 translate-y-0"
             leave-to-class="opacity-0 -translate-y-1"
           >
-            <Input
+            <SInput
               v-if="gitClient === 'custom'"
               v-model="customGitClientPath"
               label="Custom Git Client Path"
@@ -235,7 +243,7 @@ const gitClientDescription = computed(() => {
           Git Defaults
         </h3>
 
-        <Input
+        <SInput
           v-model="defaultBaseBranch"
           label="Default Base Branch"
           placeholder="origin/staging"
@@ -252,7 +260,7 @@ const gitClientDescription = computed(() => {
           Notifications
         </h3>
 
-        <Toggle
+        <SToggle
           v-model="enableNotifications"
           label="Enable Notifications"
           description="Show toast notifications for operations"
@@ -316,7 +324,7 @@ const gitClientDescription = computed(() => {
           </p>
         </div>
 
-        <Toggle
+        <SToggle
           v-model="trayBadgeEnabled"
           label="System Tray Badge"
           description="Show attention count on the system tray icon"

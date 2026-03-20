@@ -17,8 +17,7 @@ import { useTemplateStore } from '../stores/templates'
 import type { ConfigLayer, CreateWorktreeResponse, WorktreeTemplate } from '../types'
 import { useWorktrees, useWt, useToast } from '../composables'
 import { copyPath } from '../utils/clipboard'
-import { SButton } from '@stuntrocket/ui'
-import { Modal, Input } from './ui'
+import { SButton, SModal, SInput } from '@stuntrocket/ui'
 import type { Branch } from '../types'
 
 type ModalPhase = 'form' | 'creating' | 'results'
@@ -325,29 +324,30 @@ function handleClose() {
 </script>
 
 <template>
-  <Modal
+  <SModal
     :open="isOpen"
-    :title="modalTitle"
-    :size="modalSize"
-    :closable="phase !== 'creating'"
+    :max-width="modalSize === 'xl' ? 'max-w-2xl' : 'max-w-md'"
     @close="handleClose"
   >
-    <template #icon>
-      <!-- Form phase: plus icon -->
-      <svg v-if="phase === 'form'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-      </svg>
-      <!-- Creating phase: spinner icon -->
-      <svg v-else-if="phase === 'creating'" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-      </svg>
-      <!-- Results phase: check icon -->
-      <svg v-else class="w-5 h-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
+    <template #header>
+      <div class="flex items-center gap-3">
+        <!-- Form phase: plus icon -->
+        <svg v-if="phase === 'form'" class="w-5 h-5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+        </svg>
+        <!-- Creating phase: spinner icon -->
+        <svg v-else-if="phase === 'creating'" class="w-5 h-5 animate-spin text-text-muted" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+        <!-- Results phase: check icon -->
+        <svg v-else class="w-5 h-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <h3 class="text-[14px] font-semibold tracking-tight text-text-primary">{{ modalTitle }}</h3>
+      </div>
     </template>
 
     <!-- ============================================================ -->
@@ -390,13 +390,12 @@ function handleClose() {
       <!-- Branch name -->
       <div class="flex items-end gap-2">
         <div class="flex-1">
-          <Input
+          <SInput
             ref="branchInputRef"
             v-model="branch"
             label="Branch Name"
             placeholder="feature/my-feature"
             :disabled="isSubmitting"
-            autofocus
           />
         </div>
         <!-- Browse remote branches button -->
@@ -710,5 +709,5 @@ function handleClose() {
         </SButton>
       </div>
     </template>
-  </Modal>
+  </SModal>
 </template>
