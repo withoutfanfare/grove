@@ -6,7 +6,7 @@
  * Shows SHA, message, author, and relative date.
  */
 import type { Commit } from '../types'
-import Skeleton from './ui/Skeleton.vue'
+import { SSkeleton } from '@stuntrocket/ui'
 
 defineProps<{
   commits: Commit[]
@@ -64,11 +64,11 @@ function getShortSha(sha: string): string {
         :key="i"
         class="flex items-center gap-3 p-2.5 rounded-lg bg-surface-overlay/50"
       >
-        <Skeleton width="w-14" height="h-4" />
+        <SSkeleton width="3.5rem" height="1rem" />
         <div class="flex-1 min-w-0">
-          <Skeleton width="w-3/4" height="h-4" />
+          <SSkeleton width="75%" height="1rem" />
         </div>
-        <Skeleton width="w-16" height="h-3" />
+        <SSkeleton width="4rem" height="0.75rem" />
       </div>
     </template>
 

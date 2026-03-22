@@ -15,6 +15,7 @@ import WorktreeStatusBadges from './WorktreeStatusBadges.vue'
 import WorktreeDetailsPanel from './WorktreeDetailsPanel.vue'
 import { useWorktrees, useToast, formatRelativeTime, useWt } from '../composables'
 import { useSettingsStore } from '../stores/settings'
+import { SKbd } from '@stuntrocket/ui'
 import { Dropdown, DropdownItem } from './ui'
 // Dropdown/DropdownItem kept custom — library SDropdownMenu has incompatible API (items prop vs slot-based)
 import { copyPath, copyBranch, copyUrl, copyCdCommand } from '../utils/clipboard'
@@ -329,9 +330,7 @@ async function handleOpenAll() {
           </h3>
 
           <!-- SHA -->
-          <code class="text-text-muted text-2xs font-mono flex-shrink-0 px-1.5 py-0.5 bg-surface-overlay rounded">
-            {{ shortSha }}
-          </code>
+          <SKbd class="flex-shrink-0">{{ shortSha }}</SKbd>
 
           <!-- Health grade -->
           <GradeBadge v-if="worktree.health_grade" :grade="worktree.health_grade" :score="worktree.health_score"

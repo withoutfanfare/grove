@@ -6,7 +6,7 @@
  * Shows status icon, colour-coded status, and file path.
  */
 import type { FileChange, FileChangeStatus } from '../types'
-import Skeleton from './ui/Skeleton.vue'
+import { SSkeleton } from '@stuntrocket/ui'
 
 defineProps<{
   files: FileChange[]
@@ -117,8 +117,8 @@ function getDirectory(path: string): string {
         :key="i"
         class="flex items-center gap-2 p-2 rounded-lg"
       >
-        <Skeleton width="w-5" height="h-5" />
-        <Skeleton width="w-full" height="h-4" />
+        <SSkeleton width="1.25rem" height="1.25rem" />
+        <SSkeleton width="100%" height="1rem" />
       </div>
     </template>
 

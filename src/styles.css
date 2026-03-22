@@ -340,7 +340,7 @@ button:disabled {
   background: var(--color-surface-hover);
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm), inset 0 1px 0 0 rgba(255, 255, 255, 0.03);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 0 rgba(255, 255, 255, 0.02);
   position: relative;
   overflow: hidden;
   transition: all var(--duration-slow) var(--ease-spring);
@@ -363,7 +363,7 @@ button:disabled {
   background: color-mix(in srgb, var(--color-surface-hover) 200%, transparent);
   border-color: var(--color-border-default);
   box-shadow: var(--shadow-md),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.04),
     0 0 0 1px color-mix(in srgb, var(--color-accent) 8%, transparent),
     0 0 20px color-mix(in srgb, var(--color-accent) 8%, transparent);
   transform: translateY(-1px);
@@ -372,7 +372,7 @@ button:disabled {
 .card-interactive.card-expanded {
   background: color-mix(in srgb, var(--color-surface-hover) 300%, transparent);
   border-color: var(--color-border-default);
-  box-shadow: var(--shadow-md), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow-md), inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
 }
 
 /* Panel pattern (sidebars, slide-outs) */

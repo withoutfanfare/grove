@@ -8,8 +8,7 @@
 import { ref, watch, computed } from 'vue'
 import { useWorktrees } from '../composables'
 import type { HealthResult, HealthGrade } from '../types'
-import { SPanel, SButton } from '@stuntrocket/ui'
-import { Skeleton } from './ui'
+import { SPanel, SButton, SSkeleton } from '@stuntrocket/ui'
 import GradeBadge from './GradeBadge.vue'
 
 const props = defineProps<{
@@ -105,12 +104,12 @@ function getSeverityStyle(severity: string) {
       <div class="p-5 rounded-xl bg-surface-overlay ring-1 ring-inset ring-border-subtle">
         <div class="flex items-center justify-between">
           <div class="space-y-2">
-            <Skeleton width="w-24" height="h-3" />
-            <Skeleton width="w-16" height="h-12" />
+            <SSkeleton width="6rem" height="0.75rem" />
+            <SSkeleton width="4rem" height="3rem" />
           </div>
           <div class="text-right space-y-2">
-            <Skeleton width="w-12" height="h-3" />
-            <Skeleton width="w-20" height="h-8" />
+            <SSkeleton width="3rem" height="0.75rem" />
+            <SSkeleton width="5rem" height="2rem" />
           </div>
         </div>
       </div>
@@ -119,34 +118,34 @@ function getSeverityStyle(severity: string) {
       <div class="grid grid-cols-3 gap-3">
         <div v-for="i in 3" :key="i" class="rounded-lg p-4 bg-surface-overlay ring-1 ring-inset ring-border-subtle">
           <div class="flex flex-col items-center gap-2">
-            <Skeleton width="w-8" height="h-6" />
-            <Skeleton width="w-12" height="h-3" />
+            <SSkeleton width="2rem" height="1.5rem" />
+            <SSkeleton width="3rem" height="0.75rem" />
           </div>
         </div>
       </div>
 
       <!-- Issues List skeleton -->
       <div class="space-y-3">
-        <Skeleton width="w-20" height="h-3" />
+        <SSkeleton width="5rem" height="0.75rem" />
         <div class="space-y-2">
           <div
             v-for="i in 2"
             :key="i"
             class="flex items-start gap-3 p-3 bg-surface-overlay rounded-lg border border-border-subtle"
           >
-            <Skeleton width="w-5" height="h-5" class="flex-shrink-0 mt-0.5" />
+            <SSkeleton width="1.25rem" height="1.25rem" class="flex-shrink-0 mt-0.5" />
             <div class="flex-1 min-w-0 space-y-1.5">
-              <Skeleton width="w-24" height="h-4" />
-              <Skeleton width="w-full" height="h-3" />
+              <SSkeleton width="6rem" height="1rem" />
+              <SSkeleton width="100%" height="0.75rem" />
             </div>
-            <Skeleton width="w-14" height="h-5" class="flex-shrink-0" />
+            <SSkeleton width="3.5rem" height="1.25rem" class="flex-shrink-0" />
           </div>
         </div>
       </div>
 
       <!-- Per-Worktree Health skeleton -->
       <div class="space-y-3">
-        <Skeleton width="w-28" height="h-3" />
+        <SSkeleton width="7rem" height="0.75rem" />
         <div class="space-y-2">
           <div
             v-for="i in 3"
@@ -154,10 +153,10 @@ function getSeverityStyle(severity: string) {
             class="flex items-center justify-between p-3 bg-surface-overlay rounded-lg border border-border-subtle"
           >
             <div class="flex items-center gap-3 min-w-0">
-              <Skeleton width="w-8" height="h-5" rounded />
-              <Skeleton width="w-32" height="h-4" />
+              <SSkeleton width="2rem" height="1.25rem" />
+              <SSkeleton width="8rem" height="1rem" />
             </div>
-            <Skeleton width="w-16" height="h-3" />
+            <SSkeleton width="4rem" height="0.75rem" />
           </div>
         </div>
       </div>

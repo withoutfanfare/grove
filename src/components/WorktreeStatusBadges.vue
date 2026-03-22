@@ -11,6 +11,7 @@
  * Each badge has a tooltip explaining its meaning.
  */
 import { computed } from 'vue'
+import { SBadge } from '@stuntrocket/ui'
 
 const props = defineProps<{
   /** Whether the branch has been merged into the base branch */
@@ -35,10 +36,10 @@ const hasAnyBadge = computed(() => showMerged.value || showUnmerged.value || sho
     role="group"
     aria-label="Worktree status badges"
   >
-    <!-- MERGED badge - green tag -->
-    <span
+    <!-- MERGED badge -->
+    <SBadge
       v-if="showMerged"
-      class="inline-flex items-center gap-1 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide rounded bg-success-muted text-success ring-1 ring-inset ring-success/20 transition-colors duration-150"
+      variant="success"
       title="This branch has been merged into the base branch and can be safely removed"
       role="status"
       aria-label="Branch merged into base"
@@ -59,12 +60,12 @@ const hasAnyBadge = computed(() => showMerged.value || showUnmerged.value || sho
         />
       </svg>
       Merged
-    </span>
+    </SBadge>
 
-    <!-- UNMERGED badge - subtle warning -->
-    <span
+    <!-- UNMERGED badge -->
+    <SBadge
       v-if="showUnmerged"
-      class="inline-flex items-center gap-1 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide rounded bg-warning-muted text-warning ring-1 ring-inset ring-warning/20 transition-colors duration-150"
+      variant="warning"
       title="This branch has not been merged into the base branch"
       role="status"
       aria-label="Branch not merged"
@@ -85,12 +86,12 @@ const hasAnyBadge = computed(() => showMerged.value || showUnmerged.value || sho
         />
       </svg>
       Unmerged
-    </span>
+    </SBadge>
 
-    <!-- STALE badge - orange with clock -->
-    <span
+    <!-- STALE badge -->
+    <SBadge
       v-if="showStale"
-      class="inline-flex items-center gap-1 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide rounded bg-warning-muted text-warning ring-1 ring-inset ring-warning/20 transition-colors duration-150"
+      variant="warning"
       title="This worktree is significantly behind the base branch (>50 commits). Consider syncing or removing it."
       role="status"
       aria-label="Worktree is stale"
@@ -111,12 +112,12 @@ const hasAnyBadge = computed(() => showMerged.value || showUnmerged.value || sho
         />
       </svg>
       Stale
-    </span>
+    </SBadge>
 
-    <!-- MISMATCH badge - yellow warning -->
-    <span
+    <!-- MISMATCH badge -->
+    <SBadge
       v-if="showMismatch"
-      class="inline-flex items-center gap-1 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide rounded bg-accent-muted text-accent ring-1 ring-inset ring-accent/20 transition-colors duration-150"
+      variant="error"
       title="The directory name does not match the branch name. This may cause confusion when navigating between worktrees."
       role="status"
       aria-label="Directory name mismatch"
@@ -137,6 +138,6 @@ const hasAnyBadge = computed(() => showMerged.value || showUnmerged.value || sho
         />
       </svg>
       Mismatch
-    </span>
+    </SBadge>
   </div>
 </template>

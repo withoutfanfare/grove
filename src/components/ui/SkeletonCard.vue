@@ -5,7 +5,7 @@
  * Skeleton placeholder matching the WorktreeCard layout.
  * Shows branch name, SHA, grade badge, status row, and action buttons area.
  */
-import Skeleton from './Skeleton.vue'
+import { SSkeleton } from '@stuntrocket/ui'
 </script>
 
 <template>
@@ -17,27 +17,27 @@ import Skeleton from './Skeleton.vue'
         <!-- Branch name and metadata row -->
         <div class="flex items-center gap-3">
           <!-- Branch name -->
-          <Skeleton width="w-32" height="h-5" />
+          <SSkeleton width="8rem" height="1.25rem" />
           <!-- SHA badge -->
-          <Skeleton width="w-14" height="h-5" />
+          <SSkeleton width="3.5rem" height="1.25rem" />
           <!-- Grade badge -->
-          <Skeleton width="w-8" height="h-5" rounded />
+          <SSkeleton width="2rem" height="1.25rem" />
         </div>
 
         <!-- Status row -->
         <div class="flex items-center gap-3 mt-1">
           <!-- Status badge -->
-          <Skeleton width="w-16" height="h-4" />
+          <SSkeleton width="4rem" height="1rem" />
           <!-- Path -->
-          <Skeleton width="w-24" height="h-3" />
+          <SSkeleton width="6rem" height="0.75rem" />
           <!-- Age -->
-          <Skeleton width="w-10" height="h-3" />
+          <SSkeleton width="2.5rem" height="0.75rem" />
         </div>
       </div>
 
       <!-- Right: Actions menu skeleton -->
       <div class="flex-shrink-0">
-        <Skeleton width="w-8" height="h-8" />
+        <SSkeleton width="2rem" height="2rem" />
       </div>
     </div>
   </div>

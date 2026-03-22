@@ -10,8 +10,9 @@ import { storeToRefs } from 'pinia'
 import { useDebounceFn } from '@vueuse/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useWorktreeStore } from '../stores'
-import { useRepos, useWorktrees, useWt, useOperationProgress, useAutoRefresh, useSearch, useKeyboardShortcuts, useShortcutTooltip, useToast, useWorktreeWatcher, useResizableSidebar, useCommandRegistry, useWorktreeFilters, useBackgroundFetch, useStaleDetection, useTrayBadge, useRecentSwitches } from '../composables'
+import { useRepos, useWorktrees, useWt, useOperationProgress, useAutoRefresh, useSearch, useKeyboardShortcuts, useShortcutTooltip, useToast, useWorktreeWatcher, useCommandRegistry, useWorktreeFilters, useBackgroundFetch, useStaleDetection, useTrayBadge, useRecentSwitches } from '../composables'
 import type { Worktree } from '../types'
+import type { WorktreeFilter, WorktreeSort } from '../composables'
 
 // Components
 import RepoList from './RepoList.vue'
@@ -27,8 +28,8 @@ import OperationProgressPanel from './OperationProgressPanel.vue'
 import ErrorBoundary from './ErrorBoundary.vue'
 import SearchInput from './SearchInput.vue'
 import CommandPalette from './CommandPalette.vue'
-import { SButton, SIconButton } from '@stuntrocket/ui'
-import { SkeletonCard, ResizeHandle } from './ui'
+import { SButton, SIconButton, SResizableSplit, SSegmentedControl, SSelect, SDivider } from '@stuntrocket/ui'
+import { SkeletonCard } from './ui'
 import { copyPath, copyBranch, copyUrl, copyCdCommand } from '../utils/clipboard'
 
 /**
@@ -138,18 +139,6 @@ const { toast } = useToast()
 // File system watching for real-time updates
 const { isWatching, startWatching, stopWatching, onWorktreeChanged } = useWorktreeWatcher()
 
-// Resizable sidebar
-const {
-  width: sidebarWidth,
-  isResizing: isSidebarResizing,
-  startResize: startSidebarResize,
-  resetWidth: resetSidebarWidth,
-} = useResizableSidebar({
-  defaultWidth: 300,
-  minWidth: 200,
-  maxWidth: 400,
-  storageKey: 'wt-sidebar-width',
-})
 
 // Background fetch for remote tracking status
 const { start: startBackgroundFetch, stop: stopBackgroundFetch } = useBackgroundFetch()
@@ -786,15 +775,13 @@ async function handleTitlebarDrag(e: MouseEvent) {
 
     <!-- Main layout when grove is available -->
     <template v-else>
-      <div class="flex-1 flex min-h-0" :class="{ 'select-none': isSidebarResizing }">
-        <!-- Sidebar -->
-        <RepoList class="flex-shrink-0" :width="sidebarWidth" @open-repo-management="openRepoManagementPanel" />
+      <SResizableSplit direction="horizontal" :initial-size="21" :min-size="14" :max-size="28" storage-key="wt-sidebar-width" class="flex-1 min-h-0">
+        <template #first>
+          <RepoList @open-repo-management="openRepoManagementPanel" />
+        </template>
 
-        <!-- Resize handle -->
-        <ResizeHandle :is-resizing="isSidebarResizing" @drag-start="startSidebarResize" @reset="resetSidebarWidth" />
-
-        <!-- Main content area -->
-        <main class="flex-1 flex flex-col min-w-0 bg-surface-base overflow-y-auto relative">
+        <template #second>
+        <main class="flex flex-col min-w-0 h-full bg-surface-base overflow-y-auto relative">
           <!-- Header (Sticky & Glassmorphic) -->
           <header class="sticky top-0 border-b border-white/5"
             style="background-color: rgba(3, 7, 18, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); z-index: 100;">
@@ -853,7 +840,7 @@ async function handleTitlebarDrag(e: MouseEvent) {
                   <span class="hidden sm:inline">Clean Up</span>
                 </SButton>
 
-                <div class="divider-vertical mx-1 h-6" />
+                <SDivider orientation="vertical" :subtle="true" class="mx-1 h-6" />
 
                 <SButton variant="primary" size="sm" @click="openCreateModal">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -924,18 +911,10 @@ async function handleTitlebarDrag(e: MouseEvent) {
             class="flex-shrink-0 px-6 py-2 border-b border-white/5 flex items-center gap-3"
             style="background-color: rgba(3, 7, 18, 0.8);">
             <!-- Filter toggles -->
-            <div class="flex items-center gap-1">
-              <button v-for="opt in filterOptions" :key="opt.value"
-                :class="[
-                  'px-2.5 py-1 text-2xs font-medium rounded-md transition-colors duration-100',
-                  activeFilter === opt.value
-                    ? 'bg-accent/15 text-accent border border-accent/30'
-                    : 'text-text-muted hover:text-text-secondary hover:bg-surface-overlay border border-transparent'
-                ]"
-                @click="setFilter(opt.value)">
-                {{ opt.label }}
-              </button>
-            </div>
+            <SSegmentedControl
+              :options="filterOptions"
+              :model-value="activeFilter"
+              @update:model-value="(v: string) => setFilter(v as WorktreeFilter)" />
 
             <!-- Active filter pill with clear -->
             <span v-if="hasActiveFilter"
@@ -953,14 +932,10 @@ async function handleTitlebarDrag(e: MouseEvent) {
             <!-- Sort selector -->
             <div class="flex items-center gap-1.5">
               <span class="text-2xs text-text-muted">Sort:</span>
-              <select
-                :value="activeSort"
-                class="text-2xs bg-surface-overlay text-text-secondary border border-border-subtle rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-accent/50"
-                @change="setSort(($event.target as HTMLSelectElement).value as any)">
-                <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">
-                  {{ opt.label }}
-                </option>
-              </select>
+              <SSelect
+                :options="sortOptions"
+                :model-value="activeSort"
+                @update:model-value="(v: string) => setSort(v as WorktreeSort)" />
             </div>
           </div>
 
@@ -1057,7 +1032,8 @@ async function handleTitlebarDrag(e: MouseEvent) {
             </ErrorBoundary>
           </div>
         </main>
-      </div>
+        </template>
+      </SResizableSplit>
     </template>
 
     <!-- Modals and Panels -->

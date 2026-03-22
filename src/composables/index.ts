@@ -21,8 +21,6 @@ export type {
 export { useToast } from './useToast';
 export type { ToastVariant, ToastOptions } from './useToast';
 export { useWorktreeWatcher } from './useWorktreeWatcher';
-export { useResizableSidebar } from './useResizableSidebar';
-export type { ResizableSidebarOptions } from './useResizableSidebar';
 export { useRelativeTime, formatRelativeTime } from './useRelativeTime';
 export type { RelativeTimeResult } from './useRelativeTime';
 export { useCommandRegistry } from './useCommandRegistry';

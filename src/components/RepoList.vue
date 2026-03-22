@@ -13,18 +13,12 @@ import { storeToRefs } from 'pinia'
 import { useWorktreeStore } from '../stores'
 import { useRepos, useWorktrees, useRecent, useListNavigation, useKeyboardShortcuts, useShortcutTooltip, useSearch, useToast, useWt } from '../composables'
 import { SIconButton } from '@stuntrocket/ui'
-import { SkeletonList, Skeleton, Dropdown, DropdownItem } from './ui'
+import { SkeletonList, Dropdown, DropdownItem } from './ui'
+import { SSkeleton } from '@stuntrocket/ui'
 import SearchInput from './SearchInput.vue'
 import CloneRepositoryModal from './CloneRepositoryModal.vue'
 import GlobalConfigPanel from './GlobalConfigPanel.vue'
 // Clipboard utility (used by other functions)
-
-const props = withDefaults(defineProps<{
-  /** Sidebar width in pixels (for resizable sidebar) */
-  width?: number;
-}>(), {
-  width: 300,
-});
 
 const emit = defineEmits<{
   /** Emitted when user wants to open repo management modal */
@@ -304,8 +298,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <aside class="bg-surface-raised border-r border-border-subtle flex flex-col h-full"
-    :style="{ width: `${props.width}px` }">
+  <aside class="bg-surface-raised border-r border-border-subtle flex flex-col h-full">
     <!-- Tab header (pt-8 clears the native traffic light buttons in overlay mode) -->
     <div class="flex-shrink-0 border-b border-border-subtle p-3 pt-8">
       <div class="flex p-1 bg-surface-overlay/40 rounded-lg relative isolate">
@@ -585,19 +578,19 @@ onMounted(() => {
               <!-- Header skeleton -->
               <div class="flex items-start gap-2">
                 <!-- Status dot skeleton -->
-                <Skeleton width="w-2" height="h-2" rounded class="mt-1.5 flex-shrink-0" />
+                <SSkeleton width="0.5rem" height="0.5rem" class="mt-1.5 flex-shrink-0" />
                 <!-- Content skeleton -->
                 <div class="flex-1 min-w-0 space-y-1.5">
-                  <Skeleton width="w-28" height="h-4" />
-                  <Skeleton width="w-20" height="h-3" />
-                  <Skeleton width="w-16" height="h-3" />
+                  <SSkeleton width="7rem" height="1rem" />
+                  <SSkeleton width="5rem" height="0.75rem" />
+                  <SSkeleton width="4rem" height="0.75rem" />
                 </div>
               </div>
               <!-- Action buttons skeleton -->
               <div class="flex items-center gap-1 mt-2.5">
-                <Skeleton width="w-6" height="h-6" />
-                <Skeleton width="w-6" height="h-6" />
-                <Skeleton width="w-6" height="h-6" />
+                <SSkeleton width="1.5rem" height="1.5rem" />
+                <SSkeleton width="1.5rem" height="1.5rem" />
+                <SSkeleton width="1.5rem" height="1.5rem" />
               </div>
             </div>
           </li>
