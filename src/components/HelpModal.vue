@@ -39,6 +39,7 @@ const shortcuts = [
   { keys: ['⌘', 'M'], action: 'Repository management' },
   { keys: ['⌘', 'K'], action: 'Command palette' },
   { keys: ['⌘', 'P'], action: 'Pull all worktrees' },
+  { keys: ['⌘', 'O'], action: 'Open focused worktree in editor' },
   { keys: ['⌘', '⏎'], action: 'Quick Launch (editor, terminal, browser)' },
   { keys: ['Esc'], action: 'Close modal / Clear search' },
   { keys: ['↑', '↓'], action: 'Navigate repository list' },
@@ -73,7 +74,7 @@ async function openExternalDocs() {
 
     <div class="flex flex-col h-[500px]">
       <!-- Tab Navigation -->
-      <div class="flex items-center gap-1 pb-4 border-b border-border-subtle overflow-x-auto">
+      <div class="flex items-center gap-1 pb-4 border-b border-white/[0.04] overflow-x-auto">
         <button
           v-for="tab in tabs"
           :key="tab.id"
@@ -387,7 +388,7 @@ echo "Docker services removed for $WT_BRANCH"</code></pre>
                 <kbd
                   v-for="key in shortcut.keys"
                   :key="key"
-                  class="px-2 py-1 text-xs font-mono bg-surface-base border border-border-subtle rounded"
+                  class="px-2 py-1 text-xs font-mono bg-surface-base border border-white/[0.04] rounded"
                 >
                   {{ key }}
                 </kbd>
@@ -408,7 +409,7 @@ echo "Docker services removed for $WT_BRANCH"</code></pre>
                 <kbd
                   v-for="key in shortcut.keys"
                   :key="key"
-                  class="px-2 py-1 text-xs font-mono bg-surface-base border border-border-subtle rounded"
+                  class="px-2 py-1 text-xs font-mono bg-surface-base border border-white/[0.04] rounded"
                 >
                   {{ key }}
                 </kbd>

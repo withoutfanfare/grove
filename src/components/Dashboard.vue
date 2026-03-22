@@ -712,6 +712,7 @@ useKeyboardShortcuts({
   onCloseModal: () => closeAllModals(),
   onFocusSearch: () => focusSearch(),  // L12
   onCommandPalette: () => toggleCommandPalette(),
+  onOpenEditor: () => { void handlePaletteOpenInEditor() },
 })
 
 async function handleTitlebarDrag(e: MouseEvent) {
@@ -918,7 +919,7 @@ async function handleTitlebarDrag(e: MouseEvent) {
 
             <!-- Active filter pill with clear -->
             <span v-if="hasActiveFilter"
-              class="inline-flex items-center gap-1 px-2 py-0.5 text-2xs font-medium rounded-full bg-accent/10 text-accent border border-accent/20">
+              class="inline-flex items-center gap-1 px-2 py-0.5 text-2xs font-medium rounded-full bg-accent/10 text-accent">
               {{ filterCount }} of {{ worktrees.length }}
               <button class="ml-0.5 hover:text-text-primary transition-colors" @click="resetFilter" title="Clear filter">
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -933,9 +934,13 @@ async function handleTitlebarDrag(e: MouseEvent) {
             <div class="flex items-center gap-1.5">
               <span class="text-2xs text-text-muted">Sort:</span>
               <SSelect
-                :options="sortOptions"
                 :model-value="activeSort"
-                @update:model-value="(v: string) => setSort(v as WorktreeSort)" />
+                size="sm"
+                @update:model-value="(v: string) => setSort(v as WorktreeSort)">
+                <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">
+                  {{ opt.label }}
+                </option>
+              </SSelect>
             </div>
           </div>
 

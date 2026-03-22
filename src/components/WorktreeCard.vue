@@ -15,7 +15,7 @@ import WorktreeStatusBadges from './WorktreeStatusBadges.vue'
 import WorktreeDetailsPanel from './WorktreeDetailsPanel.vue'
 import { useWorktrees, useToast, formatRelativeTime, useWt } from '../composables'
 import { useSettingsStore } from '../stores/settings'
-import { SKbd } from '@stuntrocket/ui'
+import { SKbd, SBadge } from '@stuntrocket/ui'
 import { Dropdown, DropdownItem } from './ui'
 // Dropdown/DropdownItem kept custom — library SDropdownMenu has incompatible API (items prop vs slot-based)
 import { copyPath, copyBranch, copyUrl, copyCdCommand } from '../utils/clipboard'
@@ -345,18 +345,18 @@ async function handleOpenAll() {
           <WorktreeStatusBadges :merged="worktree.merged" :stale="worktree.stale" :mismatch="hasMismatch" />
 
           <!-- Stale worktree badge (configurable threshold) -->
-          <span v-if="isStaleWorktree && !worktree.stale"
-            class="inline-flex items-center px-1.5 py-0.5 text-2xs font-medium rounded bg-warning/10 text-warning border border-warning/20"
+          <SBadge v-if="isStaleWorktree && !worktree.stale"
+            variant="warning"
+            class="!border-transparent"
             title="Worktree not accessed within stale threshold">
             Stale
-          </span>
+          </SBadge>
 
           <!-- Diff stats badge -->
-          <span v-if="diffStats && diffStats.files_changed > 0"
-            class="inline-flex items-center px-1.5 py-0.5 text-2xs font-mono rounded bg-surface-overlay text-text-muted border border-border-subtle"
+          <SKbd v-if="diffStats && diffStats.files_changed > 0"
             :title="diffStats.file_list.join('\n')">
             {{ diffStats.display }}
-          </span>
+          </SKbd>
 
           <span class="text-text-muted text-2xs font-mono truncate" :title="worktree.path">
             {{ shortPath }}
@@ -370,8 +370,20 @@ async function handleOpenAll() {
         </div>
       </div>
 
-      <!-- Right: Actions menu -->
-      <div class="flex-shrink-0" @click.stop>
+      <!-- Right: Open in Editor button + Actions menu -->
+      <div class="flex items-center gap-1.5 flex-shrink-0" @click.stop>
+        <!-- Open in Editor icon button -->
+        <button
+          class="w-8 h-8 rounded-lg text-text-secondary hover:text-accent bg-surface-overlay hover:bg-surface-raised flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+          aria-label="Open in editor"
+          title="Open in editor (⌘O)"
+          @click="handleOpenInEditor"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+          </svg>
+        </button>
+
         <Dropdown align="right">
           <template #trigger>
             <button class="w-8 h-8 rounded-lg text-text-secondary bg-surface-overlay hover:bg-surface-raised flex items-center justify-center transition-colors" aria-label="Worktree actions" title="Actions">
@@ -412,7 +424,7 @@ async function handleOpenAll() {
             </DropdownItem>
 
             <!-- Divider -->
-            <div class="my-1 border-t border-border-subtle" />
+            <div class="my-1 border-t border-white/[0.04]" />
 
             <!-- Open actions -->
             <div class="px-2 py-1.5 text-2xs font-medium text-text-muted uppercase tracking-wider">Open in</div>
@@ -448,7 +460,7 @@ async function handleOpenAll() {
             </DropdownItem>
 
             <!-- Divider -->
-            <div class="my-1 border-t border-border-subtle" />
+            <div class="my-1 border-t border-white/[0.04]" />
 
             <!-- Copy actions -->
             <div class="px-2 py-1.5 text-2xs font-medium text-text-muted uppercase tracking-wider">Copy</div>
@@ -478,7 +490,7 @@ async function handleOpenAll() {
             </DropdownItem>
 
             <!-- Divider -->
-            <div class="my-1 border-t border-border-subtle" />
+            <div class="my-1 border-t border-white/[0.04]" />
 
             <!-- Danger zone -->
             <DropdownItem danger :disabled="isBusy" @click="() => { handleDelete(); close() }">
