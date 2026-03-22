@@ -1,5 +1,15 @@
 # Grove Development Log
 
+## Cycle: 2026-03-22
+- App: Grove
+- Items completed:
+  - [Feature] Add one-click IDE launcher for opening worktrees in configured editor (P2/S) — Added visible "Open in Editor" icon button on each WorktreeCard (appears on hover), wired the existing Cmd+O keyboard shortcut in Dashboard.vue to the existing `openInEditor` composable function, and documented the shortcut in HelpModal.vue. The Rust backend (`open_in_editor` command) and settings store (`EditorChoice` type) were already in place; this feature connected the UI surface to the existing infrastructure.
+- Items attempted but failed: none
+- Branch: feature/ide-launcher
+- Tests passing: yes (87/87 Rust tests, cargo check clean, cargo clippy clean, vue-tsc clean, vite build success)
+- Build status: pending
+- Notes: Minimal three-file change — WorktreeCard.vue (icon button), Dashboard.vue (one-line shortcut wiring), HelpModal.vue (shortcut docs). Leveraged existing `useKeyboardShortcuts` composable which already had Cmd+O defined but not connected.
+
 ## Cycle: 2026-03-20 00:19
 - App: Grove
 - Items completed:

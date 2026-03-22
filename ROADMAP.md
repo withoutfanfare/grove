@@ -239,6 +239,35 @@ Desktop GUI for git worktree management — visual interface for the `wt` CLI.
   - Manual entry still available for creating new branches (not forced to select from remote)
   - Fetch-from-remote button to refresh the branch list without closing the dialog
 
+### [Feature] Add one-click IDE launcher for opening worktrees in configured editor
+- **Priority:** P2 (important)
+- **Size:** S (< 1hr)
+- **Added:** 2026-03-22
+- **Status:** completed
+- **Completed:** 2026-03-22
+- **Description:** The most common action after locating a worktree in Grove is opening it in an editor — VS Code, Cursor, Zed, or another IDE. Currently this requires opening a terminal, navigating to the worktree path, and running the editor command manually. A single-click "Open in Editor" action on each worktree card, using the editor configured in Grove's existing settings (editor preference is already stored), would eliminate the most frequent context switch in the worktree workflow. This is especially valuable when jumping between worktrees for code review, where the developer needs to quickly inspect code in their IDE.
+- **Acceptance criteria:**
+  - "Open in Editor" button on each worktree card (icon button, not text, to save space)
+  - Editor command derived from Grove's existing settings.editor preference (VS Code: `code`, Cursor: `cursor`, Zed: `zed`, etc.)
+  - Opens the worktree directory as a workspace/folder in the configured editor
+  - Keyboard shortcut: Enter or Cmd+O on a selected worktree opens in editor
+  - Error toast if the editor command is not found on PATH (with link to settings to configure)
+  - Works via the existing tauri-plugin-shell integration (no new plugins required)
+
+### [Feature] Add worktree comparison view showing diff between two worktrees
+- **Priority:** P3 (nice-to-have)
+- **Size:** M (1-3hrs)
+- **Added:** 2026-03-22
+- **Status:** pending
+- **Description:** Developers often need to compare the state of two worktrees in the same repository — for example, comparing a feature branch worktree against a release branch worktree to understand divergence before merging, or checking what changed between two long-lived worktrees. Currently this requires opening a terminal and manually running `git diff` between worktree paths. A built-in comparison view showing file-level differences between any two selected worktrees would streamline code review and merge preparation workflows, leveraging the diff stats data already computed per worktree (completed) to provide a deeper level of comparison detail.
+- **Acceptance criteria:**
+  - "Compare" action available when two worktrees in the same repository are selected
+  - Comparison view shows: files changed, lines added/removed, per-file diff summary
+  - File list sortable by: name, change size, change type (added/modified/deleted)
+  - Click on a file shows the unified diff (using the existing diff rendering if available, or plain text)
+  - Diff computed via `git diff` between the two worktree branch heads (not working directory state)
+  - Comparison result exportable as a text summary for inclusion in PR descriptions
+
 ## Design System Adoption
 
 These items implement the @stuntrocket/ui design system (derived from the Dalil app styleguide) to achieve premium visual uniformity across all Tauri applications. Items are ordered by dependency — foundation must complete before migration, migration before polish.
