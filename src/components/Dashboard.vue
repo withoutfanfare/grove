@@ -712,6 +712,7 @@ useKeyboardShortcuts({
   onCloseModal: () => closeAllModals(),
   onFocusSearch: () => focusSearch(),  // L12
   onCommandPalette: () => toggleCommandPalette(),
+  onOpenEditor: () => { void handlePaletteOpenInEditor() },
 })
 
 async function handleTitlebarDrag(e: MouseEvent) {

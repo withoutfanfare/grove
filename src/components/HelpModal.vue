@@ -39,6 +39,7 @@ const shortcuts = [
   { keys: ['⌘', 'M'], action: 'Repository management' },
   { keys: ['⌘', 'K'], action: 'Command palette' },
   { keys: ['⌘', 'P'], action: 'Pull all worktrees' },
+  { keys: ['⌘', 'O'], action: 'Open focused worktree in editor' },
   { keys: ['⌘', '⏎'], action: 'Quick Launch (editor, terminal, browser)' },
   { keys: ['Esc'], action: 'Close modal / Clear search' },
   { keys: ['↑', '↓'], action: 'Navigate repository list' },
@@ -387,6 +388,7 @@ echo "Docker services removed for $WT_BRANCH"</code></pre>
                 <SKbd
                   v-for="key in shortcut.keys"
                   :key="key"
+                  class="px-2 py-1 text-xs font-mono bg-surface-base border border-white/[0.04] rounded"
                 >
                   {{ key }}
                 </SKbd>
@@ -407,6 +409,7 @@ echo "Docker services removed for $WT_BRANCH"</code></pre>
                 <SKbd
                   v-for="key in shortcut.keys"
                   :key="key"
+                  class="px-2 py-1 text-xs font-mono bg-surface-base border border-white/[0.04] rounded"
                 >
                   {{ key }}
                 </SKbd>

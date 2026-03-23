@@ -372,8 +372,20 @@ async function handleOpenAll() {
         </div>
       </div>
 
-      <!-- Right: Actions menu -->
-      <div class="flex-shrink-0" @click.stop>
+      <!-- Right: Open in Editor button + Actions menu -->
+      <div class="flex items-center gap-1.5 flex-shrink-0" @click.stop>
+        <!-- Open in Editor icon button -->
+        <button
+          class="w-8 h-8 rounded-lg text-text-secondary hover:text-accent bg-surface-overlay hover:bg-surface-raised flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+          aria-label="Open in editor"
+          title="Open in editor (⌘O)"
+          @click="handleOpenInEditor"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+          </svg>
+        </button>
+
         <Dropdown align="right">
           <template #trigger>
             <button class="w-8 h-8 rounded-lg text-text-secondary bg-surface-overlay hover:bg-surface-raised flex items-center justify-center transition-colors" aria-label="Worktree actions" title="Actions">
