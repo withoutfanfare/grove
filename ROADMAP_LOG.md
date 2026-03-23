@@ -1,5 +1,41 @@
 # Grove Roadmap Log
 
+## Cycle: 2026-03-23 15:00
+- **Items added:** none
+- **Items archived:** none
+- **Observations:** Grove has 6 functional pending items + 2 design system = 8 total — tied with Fuse for the leanest pending count. The IDE launcher was completed in the 2026-03-22 cycle, continuing Grove's strong execution record (16+ completed items — highest in the portfolio). The PR-based worktree creation (P2, S) and branch protection (P2, S) form the strongest pair for the next session — PR creation streamlines the most common review workflow (enter PR number → create worktree → open in editor), and branch protection prevents the most damaging cleanup mistake. The auto-updater (P2, M) would make Grove the first app ready for real-world distribution, which is appropriate given it's the most production-ready app in the portfolio. The worktree comparison (P3, M) and repository grouping (P3, S) are natural next-phase features for power users managing many worktrees. The UI Migration (P1, XL) remains skipped as too large for autonomous cycles.
+
+## Cycle: 2026-03-23 09:00
+- **Items added:**
+  - [Quality] Add worktree branch protection preventing accidental deletion of worktrees on protected branches (P2, S)
+- **Items archived:** none
+- **Observations:** Added one item filling the Quality category gap — Grove had no pending Quality items after the stale worktree detection and accessibility improvements were completed. Branch protection is a safety net that complements the existing stale detection and batch cleanup features, preventing the most consequential worktree management error. Grove has 6 functional pending items + 2 design system = 8 total. The PR-based worktree creation (P2, S) and worktree comparison (P3, M) pair would deliver the strongest review workflow improvement — together they make Grove a complete code review environment when paired with Fuse.
+
+## Cycle: 2026-03-23 03:00
+- **Items added:**
+  - [UX/UI] Add worktree purpose notes for context retention across sessions (P3, S)
+- **Items archived:** none
+- **Observations:** Grove has 6 pending functional items + 2 design system = 8 total. Added worktree notes to address a daily-use context problem — developers with 5+ active worktrees forget why each exists, and branch names are often cryptic (feature/abc-123). Brief purpose notes on cards ("Reviewing Sarah's auth refactor", "Release candidate for v2.3") help maintain mental context when switching between worktrees or returning after a break. The item complements stale worktree detection (completed) by adding purpose context to cleanup decisions. The IDE launcher was completed since last cycle (2026-03-22). Auto-updater (P2, M) remains the key distribution item. PR-based worktree creation (P2, S) is the strongest daily-workflow improvement.
+
+## Cycle: 2026-03-22 21:00
+- **Items added:**
+  - [Feature] Add worktree creation from GitHub PR number for review workflows (P2, S)
+  - [UX/UI] Add repository grouping with collapsible categories in the sidebar (P3, S)
+- **Items archived:** none
+- **Observations:** Grove has 4 pending functional items + 2 design system = 6 total. PR-based worktree creation (P2, S) streamlines the most common review workflow — entering a PR number instead of finding the branch name eliminates a step that currently requires switching to the terminal or searching the remote branch list. The item leverages `gh pr view` via the existing tauri-plugin-shell integration and pairs naturally with the IDE launcher (completed) for an end-to-end review flow: enter PR number → create worktree → open in editor. Repository grouping (P3, S) addresses sidebar organisation for users with 10+ repositories — the existing filtering and sorting (completed) help find specific repos, but don't provide persistent organisation. The auto-updater (P2, M) and worktree comparison (P3, M) remain pending alongside the new additions. The IDE launcher was completed since last cycle.
+
+## Cycle: 2026-03-22 15:00
+- **Items added:**
+  - [Feature] Add worktree comparison view showing diff between two worktrees (P3, M)
+- **Items archived:** none
+- **Observations:** Grove has 3 pending functional items + 2 design system = 5 total. Added a worktree comparison view (P3, M) to address the common need to compare divergence between two worktrees before merging or during code review. The diff stats feature (completed) shows per-worktree change summaries against the base branch, but developers also need to compare worktrees against each other — especially when managing parallel feature and release branches. The item leverages existing `git diff` capabilities via the wt CLI sidecar. The IDE launcher (P2, S) and auto-updater (P2, M) remain the highest-priority functional items for daily productivity and distribution readiness.
+
+## Cycle: 2026-03-22 09:00
+- **Items added:**
+  - [Feature] Add one-click IDE launcher for opening worktrees in configured editor (P2, S)
+- **Items archived:** none
+- **Observations:** Grove has 2 pending functional items + 2 design system = 4 total pending after the massive batch execution that completed 12 functional items. The only remaining functional item was the auto-updater (P2, M). Added an IDE launcher (P2, S) to address the most frequent action after locating a worktree: opening it in an editor. Grove already stores editor preferences in settings, making this a natural extension. The action would use the existing tauri-plugin-shell integration (no new plugins). Combined with the auto-updater, these two P2 items represent the path to making Grove a fully self-contained daily-use tool: discover worktrees, open them instantly, and stay up to date automatically.
+
 ## Cycle: 2026-03-19 08:00
 - **Items added:**
   - [UX/UI] Add drag-and-drop repository registration (P2, S)
@@ -121,3 +157,14 @@
   - [Polish] @stuntrocket/ui visual conformance — Depends on UI Migration
 - **Items archived:** none
 - **Observations:** Massive execution cycle completing all 12 functional pending items in one batch. The implementation follows the existing architecture patterns: Rust backend (wt.rs → commands.rs), TypeScript types (types/wt.ts), useWt.ts composable, and Vue component integration. New Rust commands: get_repo_disk_usage, get_diff_stats, fetch_repo, get_remote_branches, register_repository. New composables: useBackgroundFetch, useStaleDetection, useTrayBadge, useRecentSwitches. New store: templates.ts. Settings extended with backgroundFetchInterval, staleThresholdDays, trayBadgeEnabled. Grove now has 3 pending items (1 functional + 2 design system) and 16 completed items — the highest execution velocity in the portfolio.
+
+## Cycle: 2026-03-23 01:30
+
+**Items added:**
+- [Innovation] Add worktree activity timeline showing recent branch operations across all worktrees (P3, M)
+
+**Items archived:**
+- None
+
+**Observations:**
+Grove's pending roadmap has strong coverage across Distribution, Feature, UX/UI, and Quality. The Innovation category was the gap — the completed items provide excellent real-time status (dirty state, ahead/behind, diff stats, tray badge), but there's no temporal/historical view. The activity timeline adds the missing time dimension. The IDE launcher (completed 2026-03-22) and branch protection (pending P2) are the highest-impact items in the near-term pipeline. No rebalancing needed (7 pending functional items + 2 design system items).

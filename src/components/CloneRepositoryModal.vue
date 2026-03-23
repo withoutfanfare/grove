@@ -168,7 +168,7 @@ function handleClose() {
         enter-from-class="opacity-0 -translate-y-1"
         enter-to-class="opacity-100 translate-y-0"
       >
-        <div v-if="isSubmitting" class="p-4 bg-surface-overlay rounded-lg border border-border-subtle">
+        <div v-if="isSubmitting" class="p-4 bg-surface-overlay rounded-lg border border-white/[0.04]">
           <div class="flex items-center gap-3">
             <svg class="w-5 h-5 animate-spin text-accent" viewBox="0 0 24 24" fill="none">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />

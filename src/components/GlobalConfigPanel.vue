@@ -389,7 +389,7 @@ function handleClose() {
           </button>
         </div>
 
-        <div v-else class="p-3 rounded-lg bg-surface-overlay/50 border border-border-subtle space-y-3">
+        <div v-else class="p-3 rounded-lg bg-surface-overlay/50 border border-white/[0.04] space-y-3">
           <div>
             <label class="text-xs text-text-secondary font-medium block mb-1">Key</label>
             <input

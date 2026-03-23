@@ -8,7 +8,7 @@
 import { ref, watch, computed } from 'vue'
 import { useWorktrees } from '../composables'
 import type { HealthResult, HealthGrade } from '../types'
-import { SPanel, SButton, SSkeleton } from '@stuntrocket/ui'
+import { SPanel, SButton, SSkeleton, SSectionHeader } from '@stuntrocket/ui'
 import GradeBadge from './GradeBadge.vue'
 
 const props = defineProps<{
@@ -131,7 +131,7 @@ function getSeverityStyle(severity: string) {
           <div
             v-for="i in 2"
             :key="i"
-            class="flex items-start gap-3 p-3 bg-surface-overlay rounded-lg border border-border-subtle"
+            class="flex items-start gap-3 p-3 bg-surface-overlay rounded-lg border border-white/[0.04]"
           >
             <SSkeleton width="1.25rem" height="1.25rem" class="flex-shrink-0 mt-0.5" />
             <div class="flex-1 min-w-0 space-y-1.5">
@@ -150,7 +150,7 @@ function getSeverityStyle(severity: string) {
           <div
             v-for="i in 3"
             :key="i"
-            class="flex items-center justify-between p-3 bg-surface-overlay rounded-lg border border-border-subtle"
+            class="flex items-center justify-between p-3 bg-surface-overlay rounded-lg border border-white/[0.04]"
           >
             <div class="flex items-center gap-3 min-w-0">
               <SSkeleton width="2rem" height="1.25rem" />
@@ -214,14 +214,12 @@ function getSeverityStyle(severity: string) {
 
       <!-- Issues List -->
       <section v-if="health.issues.length > 0" class="space-y-3">
-        <h3 class="text-xs font-semibold text-text-muted uppercase tracking-wider">
-          Issues ({{ health.issues.length }})
-        </h3>
+        <SSectionHeader title="Issues" :count="health.issues.length" />
         <div class="space-y-2">
           <div
             v-for="(issue, idx) in health.issues"
             :key="idx"
-            class="flex items-start gap-3 p-3 bg-surface-overlay rounded-lg border border-border-subtle"
+            class="flex items-start gap-3 p-3 bg-surface-overlay rounded-lg border border-white/[0.04]"
           >
             <svg
               :class="getSeverityStyle(issue.severity).text"
@@ -255,14 +253,12 @@ function getSeverityStyle(severity: string) {
 
       <!-- Per-Worktree Health -->
       <section class="space-y-3">
-        <h3 class="text-xs font-semibold text-text-muted uppercase tracking-wider">
-          Worktrees ({{ health.worktree_count }})
-        </h3>
+        <SSectionHeader title="Worktrees" :count="health.worktree_count" />
         <div class="space-y-2">
           <div
             v-for="wt in health.worktrees"
             :key="wt.branch"
-            class="flex items-center justify-between p-3 bg-surface-overlay rounded-lg border border-border-subtle group hover:border-border-default transition-colors"
+            class="flex items-center justify-between p-3 bg-surface-overlay rounded-lg border border-white/[0.04] group hover:border-white/[0.06] transition-colors"
           >
             <div class="flex items-center gap-3 min-w-0">
               <GradeBadge :grade="wt.grade" :score="wt.score" />

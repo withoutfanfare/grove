@@ -355,7 +355,7 @@ function hasError(item: ProgressItem): boolean {
             :key="item.item"
             :class="[
               'p-3 bg-surface-overlay rounded-lg border',
-              item.status === 'conflict' ? 'border-warning/30' : 'border-border-subtle'
+              item.status === 'conflict' ? 'border-warning/30' : 'border-white/[0.04]'
             ]"
           >
             <div class="flex items-start gap-3">

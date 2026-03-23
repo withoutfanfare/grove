@@ -12,7 +12,7 @@ import { copyPath, copyUrl } from '../utils/clipboard'
 import CommitList from './CommitList.vue'
 import FileChangesList from './FileChangesList.vue'
 import GradeBadge from './GradeBadge.vue'
-import { SIconButton } from '@stuntrocket/ui'
+import { SIconButton, SSectionHeader } from '@stuntrocket/ui'
 
 const props = defineProps<{
   worktree: Worktree
@@ -165,7 +165,7 @@ const syncExplanation = computed(() => {
   <div class="details-grid" :class="{ 'is-expanded': isExpanded }">
     <div class="details-inner">
       <div
-        class="border-t border-border-subtle bg-surface-base/50"
+        class="border-t border-white/[0.04] bg-surface-base/50"
       >
         <div class="px-4 py-4 space-y-5 relative">
           <!-- Refresh button -->
@@ -188,9 +188,7 @@ const syncExplanation = computed(() => {
 
           <!-- Path and URL section -->
           <section class="space-y-2">
-            <h4 class="text-xs font-semibold text-text-muted uppercase tracking-wider">
-              Location
-            </h4>
+            <SSectionHeader title="Location" />
 
             <!-- Path -->
             <div class="flex items-center gap-2 group">
@@ -245,9 +243,7 @@ const syncExplanation = computed(() => {
 
           <!-- Health and Sync Status -->
           <section class="space-y-2">
-            <h4 class="text-xs font-semibold text-text-muted uppercase tracking-wider">
-              Status
-            </h4>
+            <SSectionHeader title="Status" />
 
             <!-- Health breakdown -->
             <div v-if="worktree.health_grade" class="flex items-start gap-3 p-3 rounded-lg bg-surface-overlay/50">
@@ -295,9 +291,7 @@ const syncExplanation = computed(() => {
 
           <!-- Recent Commits -->
           <section class="space-y-2">
-            <h4 class="text-xs font-semibold text-text-muted uppercase tracking-wider">
-              Recent Commits
-            </h4>
+            <SSectionHeader title="Recent Commits" />
             <CommitList
               :commits="commits"
               :loading="commitsLoading"
@@ -307,12 +301,7 @@ const syncExplanation = computed(() => {
 
           <!-- Uncommitted Files -->
           <section class="space-y-2">
-            <h4 class="text-xs font-semibold text-text-muted uppercase tracking-wider">
-              Uncommitted Files
-              <span v-if="!filesLoading && fileCount > 0" class="text-warning">
-                ({{ fileCount }})
-              </span>
-            </h4>
+            <SSectionHeader title="Uncommitted Files" :count="!filesLoading && fileCount > 0 ? fileCount : undefined" />
             <FileChangesList
               :files="files"
               :loading="filesLoading"

@@ -6,7 +6,7 @@
  * covering Getting Started, Features, Configuration, Hooks, and Shortcuts.
  */
 import { ref } from 'vue'
-import { SModal, SButton } from '@stuntrocket/ui'
+import { SModal, SButton, SKbd } from '@stuntrocket/ui'
 import { useWt } from '../composables'
 
 defineProps<{
@@ -73,7 +73,7 @@ async function openExternalDocs() {
 
     <div class="flex flex-col h-[500px]">
       <!-- Tab Navigation -->
-      <div class="flex items-center gap-1 pb-4 border-b border-border-subtle overflow-x-auto">
+      <div class="flex items-center gap-1 pb-4 border-b border-white/[0.04] overflow-x-auto">
         <button
           v-for="tab in tabs"
           :key="tab.id"
@@ -384,13 +384,12 @@ echo "Docker services removed for $WT_BRANCH"</code></pre>
             >
               <span class="text-sm text-text-secondary">{{ shortcut.action }}</span>
               <div class="flex items-center gap-1">
-                <kbd
+                <SKbd
                   v-for="key in shortcut.keys"
                   :key="key"
-                  class="px-2 py-1 text-xs font-mono bg-surface-base border border-border-subtle rounded"
                 >
                   {{ key }}
-                </kbd>
+                </SKbd>
               </div>
             </div>
           </div>
@@ -405,19 +404,18 @@ echo "Docker services removed for $WT_BRANCH"</code></pre>
             >
               <span class="text-sm text-text-secondary">{{ shortcut.action }}</span>
               <div class="flex items-center gap-1">
-                <kbd
+                <SKbd
                   v-for="key in shortcut.keys"
                   :key="key"
-                  class="px-2 py-1 text-xs font-mono bg-surface-base border border-border-subtle rounded"
                 >
                   {{ key }}
-                </kbd>
+                </SKbd>
               </div>
             </div>
           </div>
 
           <p class="text-xs text-text-muted mt-4">
-            Tip: Most shortcuts work when no modal is open. Press <kbd class="px-1 py-0.5 bg-surface-overlay rounded">?</kbd> anywhere to see this list.
+            Tip: Most shortcuts work when no modal is open. Press <SKbd>?</SKbd> anywhere to see this list.
           </p>
         </div>
       </div>

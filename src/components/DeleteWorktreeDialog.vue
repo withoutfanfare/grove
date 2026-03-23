@@ -10,7 +10,7 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import type { Worktree, RemoveWorktreeResponse } from '../types'
 import { useWorktrees, useToast } from '../composables'
-import { SButton, SModal, SCheckbox } from '@stuntrocket/ui'
+import { SButton, SModal, SCheckbox, SBadge } from '@stuntrocket/ui'
 
 type ModalPhase = 'confirm' | 'deleting' | 'results'
 
@@ -331,7 +331,7 @@ function handleClose() {
       <!-- Deletion details -->
       <div class="space-y-2">
         <h4 class="text-xs font-medium text-text-muted uppercase tracking-wider">Details</h4>
-        <div class="bg-surface-overlay rounded-lg border border-border-subtle divide-y divide-border-subtle">
+        <div class="bg-surface-overlay rounded-lg border border-white/[0.04] divide-y divide-white/[0.04]">
           <!-- Path -->
           <div class="px-3 py-2.5 flex items-center gap-3">
             <span class="text-text-muted text-xs flex-shrink-0 w-20">Path</span>
@@ -343,14 +343,9 @@ function handleClose() {
           <!-- Branch deleted -->
           <div class="px-3 py-2.5 flex items-center gap-3">
             <span class="text-text-muted text-xs flex-shrink-0 w-20">Branch deleted</span>
-            <span
-              class="text-2xs font-medium px-1.5 py-0.5 rounded"
-              :class="deletionResult.result.branch_deleted
-                ? 'bg-success-muted text-success'
-                : 'bg-surface-base text-text-muted'"
-            >
+            <SBadge :variant="deletionResult.result.branch_deleted ? 'success' : 'default'">
               {{ deletionResult.result.branch_deleted ? 'yes' : 'no' }}
-            </span>
+            </SBadge>
           </div>
 
           <!-- Database dropped (only show if drop was requested) -->
@@ -359,14 +354,9 @@ function handleClose() {
             class="px-3 py-2.5 flex items-center gap-3"
           >
             <span class="text-text-muted text-xs flex-shrink-0 w-20">Database dropped</span>
-            <span
-              class="text-2xs font-medium px-1.5 py-0.5 rounded"
-              :class="deletionResult.result.db_dropped
-                ? 'bg-success-muted text-success'
-                : 'bg-surface-base text-text-muted'"
-            >
+            <SBadge :variant="deletionResult.result.db_dropped ? 'success' : 'default'">
               {{ deletionResult.result.db_dropped ? 'yes' : 'no' }}
-            </span>
+            </SBadge>
           </div>
         </div>
       </div>
@@ -386,7 +376,7 @@ function handleClose() {
           </p>
         </div>
 
-        <div v-if="hasHooks" class="bg-surface-overlay rounded-lg border border-border-subtle divide-y divide-border-subtle max-h-48 overflow-y-auto">
+        <div v-if="hasHooks" class="bg-surface-overlay rounded-lg border border-white/[0.04] divide-y divide-white/[0.04] max-h-48 overflow-y-auto">
           <div
             v-for="hook in deletionResult.hooks"
             :key="hook.name"
@@ -395,14 +385,9 @@ function handleClose() {
             <span class="text-text-secondary text-xs font-mono truncate mr-3">
               {{ hook.name }}
             </span>
-            <span
-              class="flex-shrink-0 text-2xs font-medium px-1.5 py-0.5 rounded"
-              :class="hook.status === 'success'
-                ? 'bg-success-muted text-success'
-                : 'bg-danger-muted text-danger'"
-            >
+            <SBadge :variant="hook.status === 'success' ? 'success' : 'error'" class="flex-shrink-0">
               {{ hook.status === 'success' ? 'passed' : 'failed' }}
-            </span>
+            </SBadge>
           </div>
         </div>
 

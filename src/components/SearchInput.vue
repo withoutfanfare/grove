@@ -11,7 +11,7 @@
 import { ref, watch, computed } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
 import { usePlatform } from '../composables/useKeyboardShortcuts'
-import { SSearchInput } from '@stuntrocket/ui'
+import { SSearchInput, SKbd } from '@stuntrocket/ui'
 
 interface Props {
   modelValue: string
@@ -96,11 +96,9 @@ function handleKeydown(event: KeyboardEvent) {
       v-if="shortcut && !localValue && !isFocused"
       class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none"
     >
-      <kbd
-        class="hidden sm:inline-flex h-5 items-center gap-0.5 px-1.5 text-[10px] font-medium text-text-tertiary bg-white/5 border border-border-subtle rounded font-sans"
-      >
+      <SKbd class="hidden sm:inline-flex">
         {{ shortcutHint }}
-      </kbd>
+      </SKbd>
     </div>
   </div>
 </template>

@@ -12,7 +12,7 @@ import { computed, ref, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useWorktreeStore } from '../stores'
 import { useRepos, useWorktrees, useRecent, useListNavigation, useKeyboardShortcuts, useShortcutTooltip, useSearch, useToast, useWt } from '../composables'
-import { SIconButton } from '@stuntrocket/ui'
+import { SIconButton, SListRow } from '@stuntrocket/ui'
 import { SkeletonList, Dropdown, DropdownItem } from './ui'
 import { SSkeleton } from '@stuntrocket/ui'
 import SearchInput from './SearchInput.vue'
@@ -30,7 +30,7 @@ const { repositories, selectedRepoName, loading, recentWorktrees, loadingRecent 
 const { selectRepository, refreshRepositories } = useRepos()
 const { fetchWorktrees, openInEditor, openInTerminal, openInBrowser } = useWorktrees()
 const { fetchRecentWorktrees } = useRecent()
-const { tooltipWithShortcut } = useShortcutTooltip()
+const { tooltipWithShortcut: _tooltipWithShortcut } = useShortcutTooltip()
 const { toast } = useToast()
 const { repairRepository, unlockRepository, saveReportToDesktop } = useWt()
 
@@ -65,7 +65,7 @@ const loadingRepoName = ref<string | null>(null)
 
 // Keyboard navigation for repository list
 const {
-  focusedIndex,
+  focusedIndex: _focusedIndex,
   navigateUp,
   navigateDown,
   selectIndex,
@@ -298,9 +298,9 @@ onMounted(() => {
 </script>
 
 <template>
-  <aside class="bg-surface-raised border-r border-border-subtle flex flex-col h-full">
+  <aside class="bg-surface-raised border-r border-white/[0.04] flex flex-col h-full">
     <!-- Tab header (pt-8 clears the native traffic light buttons in overlay mode) -->
-    <div class="flex-shrink-0 border-b border-border-subtle p-3 pt-8">
+    <div class="flex-shrink-0 border-b border-white/[0.04] p-3 pt-8">
       <div class="flex p-1 bg-surface-overlay/40 rounded-lg relative isolate">
         <!-- Sliding background pill -->
         <div class="absolute inset-y-1 transition-all duration-200 ease-out gradient-tab rounded-md" :class="[
@@ -427,66 +427,53 @@ onMounted(() => {
             role="option"
             :id="`repo-${repo.name}`"
             :aria-selected="repo.name === selectedRepoName">
-            <button @click="handleSelectRepo(repo.name)" :disabled="loadingRepoName === repo.name"
+            <SListRow
+              :selected="repo.name === selectedRepoName"
+              :disabled="loadingRepoName === repo.name"
               :aria-label="`${repo.name}, ${repo.worktrees} worktree${repo.worktrees === 1 ? '' : 's'}`"
-              :class="[
-              'group w-full text-left px-3 py-2.5 rounded-lg transition-all duration-150',
-              'flex items-center gap-3',
-              repo.name === selectedRepoName
-                ? 'bg-accent/10 border border-accent/20'
-                : index === focusedIndex && repo.name !== selectedRepoName
-                  ? 'bg-white/5 border border-white/10 ring-1 ring-accent/30'
-                  : 'hover:bg-white/5 border border-transparent',
-              loadingRepoName === repo.name ? 'cursor-wait' : ''
-            ]">
+              class="group py-1.5"
+              @click="handleSelectRepo(repo.name)">
               <!-- Icon/Avatar with loading spinner -->
-              <div :class="[
-                'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors',
-                repo.name === selectedRepoName
-                  ? 'bg-accent text-white'
-                  : 'bg-surface-overlay text-text-tertiary group-hover:text-text-secondary'
-              ]">
-                <!-- Loading spinner -->
-                <svg v-if="loadingRepoName === repo.name" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                <!-- Folder icon -->
-                <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                </svg>
+              <div class="flex items-center gap-3 flex-1 min-w-0">
+                <div :class="[
+                  'w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 transition-colors',
+                  repo.name === selectedRepoName
+                    ? 'bg-accent text-white'
+                    : 'bg-surface-overlay text-text-tertiary group-hover:text-text-secondary'
+                ]">
+                  <svg v-if="loadingRepoName === repo.name" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                  </svg>
+                </div>
+
+                <div class="flex-1 min-w-0">
+                  <span :class="[
+                    'block text-[13px] font-medium truncate transition-colors',
+                    repo.name === selectedRepoName ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary'
+                  ]">
+                    {{ repo.name }}
+                  </span>
+                  <span :class="[
+                    'block text-[11px] transition-colors',
+                    repo.name === selectedRepoName ? 'text-accent' : 'text-text-muted'
+                  ]">
+                    {{ repo.worktrees }} worktree{{ repo.worktrees === 1 ? '' : 's' }}
+                  </span>
+                </div>
               </div>
 
-              <!-- Content -->
-              <div class="flex-1 min-w-0">
-                <span :class="[
-                  'block text-sm font-semibold truncate transition-colors',
-                  repo.name === selectedRepoName ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary'
-                ]">
-                  {{ repo.name }}
+              <template #actions>
+                <span v-if="index < 9"
+                  class="text-[11px] text-text-muted font-mono opacity-0 group-hover:opacity-60 transition-opacity">
+                  {{ index + 1 }}
                 </span>
-                <span :class="[
-                  'block text-2xs transition-colors',
-                  repo.name === selectedRepoName ? 'text-accent' : 'text-text-muted'
-                ]">
-                  {{ repo.worktrees }} worktree{{ repo.worktrees === 1 ? '' : 's' }}
-                </span>
-              </div>
-
-              <!-- Quick select shortcut hint (for first 9 repos) -->
-              <span v-if="index < 9"
-                class="text-2xs text-text-muted font-mono opacity-0 group-hover:opacity-60 transition-opacity flex-shrink-0"
-                :title="tooltipWithShortcut(`Select ${repo.name}`, String(index + 1))">
-                {{ index + 1 }}
-              </span>
-
-              <!-- Chevron -->
-              <svg v-if="repo.name === selectedRepoName" class="w-4 h-4 text-accent flex-shrink-0" fill="none"
-                stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
+              </template>
+            </SListRow>
 
             <!-- Repository actions menu (only for selected repo) -->
             <div v-if="repo.name === selectedRepoName" class="absolute right-1 top-1/2 -translate-y-1/2 z-10">
@@ -671,7 +658,7 @@ onMounted(() => {
     </template>
 
     <!-- Footer with grove version -->
-    <div class="flex-shrink-0 px-4 py-3 border-t border-border-subtle">
+    <div class="flex-shrink-0 px-4 py-3 border-t border-white/[0.04]">
       <div class="flex items-center justify-between text-2xs text-text-muted">
         <span>grove CLI</span>
         <span v-if="store.wtVersion" class="font-mono">v{{ store.wtVersion }}</span>

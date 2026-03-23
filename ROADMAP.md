@@ -268,6 +268,95 @@ Desktop GUI for git worktree management — visual interface for the `wt` CLI.
   - Diff computed via `git diff` between the two worktree branch heads (not working directory state)
   - Comparison result exportable as a text summary for inclusion in PR descriptions
 
+### [Feature] Add worktree creation from GitHub PR number for review workflows
+- **Priority:** P2 (important)
+- **Size:** S (< 1hr)
+- **Added:** 2026-03-22
+- **Status:** pending
+- **Description:** Developers frequently create worktrees specifically to review pull requests — checking out the PR branch in an isolated worktree to inspect, test, and review the code. Currently this requires knowing the PR's branch name, finding it in the remote branch list (via the worktree creation wizard, completed), and creating the worktree. Entering a PR number and having Grove fetch the branch name from GitHub (via `gh pr view`), create a worktree, and optionally open it in the configured editor (via the IDE launcher, completed) would streamline the most common review-oriented worktree workflow to a single input.
+- **Acceptance criteria:**
+  - "Create from PR" option available in the worktree creation dialog alongside the existing branch picker
+  - User enters a PR number; Grove fetches the branch name via `gh pr view <number> --json headRefName`
+  - Worktree created from the fetched branch with a descriptive name (e.g. `review-pr-123`)
+  - PR title displayed in the creation dialog for confirmation before creating
+  - Optional "Open in editor" checkbox (using the IDE launcher) to immediately start reviewing
+  - Error handling for: invalid PR number, PR from a fork (cross-repo), gh CLI not authenticated
+  - Works via the existing tauri-plugin-shell integration for gh CLI execution
+
+### [UX/UI] Add repository grouping with collapsible categories in the sidebar
+- **Priority:** P3 (nice-to-have)
+- **Size:** S (< 1hr)
+- **Added:** 2026-03-22
+- **Status:** pending
+- **Description:** Users with 10+ registered repositories see a flat list in the sidebar, with no organisational structure beyond alphabetical sorting and the filtering options (completed). As repository counts grow — especially for developers working across multiple teams or maintaining personal and work projects — the sidebar becomes a long undifferentiated list. User-defined groups (e.g. "Work", "Personal", "Client Projects") with collapsible sections would help developers organise and navigate their repository collections, matching the folder/group patterns found in sidebar-heavy tools like VS Code workspaces and Finder favourites.
+- **Acceptance criteria:**
+  - "Create group" action available in the sidebar header
+  - Repositories assignable to groups via drag-and-drop or context menu
+  - Groups displayed as collapsible sections in the sidebar with repository count badges
+  - Ungrouped repositories shown in a default "Ungrouped" section at the bottom
+  - Group order customisable via drag-and-drop reordering
+  - Collapsed/expanded state persisted across sessions
+  - Groups stored in app settings (not modifying repository configuration)
+  - Filtering and sorting (completed) work within and across groups
+
+### [UX/UI] Add worktree purpose notes for context retention across sessions
+- **Priority:** P3 (nice-to-have)
+- **Size:** S (< 1hr)
+- **Added:** 2026-03-22
+- **Status:** pending
+- **Description:** Developers managing multiple worktrees often forget why a specific worktree was created — was it for reviewing PR #247, experimenting with a new auth approach, or testing a performance fix? Branch names provide some context but are frequently cryptic (feature/abc-123, hotfix/urgent). A brief user-editable note on each worktree card ("Reviewing Sarah's auth refactor", "Performance testing with 10K records", "Release candidate for v2.3") would help developers maintain mental context when switching between worktrees, especially after returning to Grove after a break. This complements the stale worktree detection (completed) by adding purpose context to the cleanup decision — a worktree with the note "keeping for reference until Q2 release" should not be cleaned up just because it's old.
+- **Acceptance criteria:**
+  - "Add note" action on each worktree card (click to edit inline text field)
+  - Note displayed as a subtitle on the worktree card below the branch name
+  - Notes persisted in app settings alongside existing worktree metadata (not in git — notes are local to the Grove user)
+  - Notes editable and deletable from the worktree card (click to edit, Escape to cancel)
+  - Maximum note length: 120 characters (enough for context, short enough for card layout)
+  - Notes searchable via the command palette (Cmd+K) alongside branch names and repo names
+  - Notes visible in the stale worktree review dialog for informed cleanup decisions
+
+### [Quality] Add worktree branch protection preventing accidental deletion of worktrees on protected branches
+- **Priority:** P2 (important)
+- **Size:** S (< 1hr)
+- **Added:** 2026-03-23
+- **Status:** pending
+- **Description:** The stale worktree detection (completed) suggests cleanup for worktrees that haven't been accessed recently, and batch cleanup is available for fully-merged branches. However, there is no protection against accidentally deleting worktrees on important long-lived branches — main, develop, release/*, or team-designated protected branches. A configurable branch protection list that blocks deletion (with override) for worktrees on protected branches would prevent the most damaging worktree management mistake, especially during batch cleanup operations where users may not individually verify every worktree being removed.
+- **Acceptance criteria:**
+  - Protected branch patterns configurable per repository in settings (default: main, master, develop)
+  - Glob patterns supported (e.g. release/*, hotfix/*)
+  - Deletion blocked with a clear warning when a worktree is on a protected branch
+  - Override available via explicit confirmation ("Type branch name to confirm deletion")
+  - Protected branch indicator visible on worktree cards alongside existing status badges
+  - Batch cleanup automatically excludes protected-branch worktrees from the cleanup set
+
+### [Innovation] Add worktree activity timeline showing recent branch operations across all worktrees
+- **Priority:** P3 (nice-to-have)
+- **Size:** M (1-3hrs)
+- **Added:** 2026-03-23
+- **Status:** pending
+- **Description:** The existing worktree cards show per-worktree status (dirty state, ahead/behind, diff stats — all completed), but there is no unified view of development activity across all worktrees over time. Developers managing many worktrees cannot easily answer "what happened across my repositories in the last few days?" without checking each worktree individually. A timeline view aggregating recent git operations (commits, merges, rebases, branch creations) from all worktrees into a single chronological feed would provide a bird's-eye view of development activity, helping developers recall context when returning to work after a break and identify which worktrees have been most active. This complements the background fetch (completed) and system tray badge (completed) by adding a historical dimension to the awareness model.
+- **Acceptance criteria:**
+  - Timeline view accessible from the main navigation alongside the existing repository tree
+  - Events sourced from `git log` across all worktrees in registered repositories (last 7 days by default)
+  - Each event shows: commit message (truncated), author, timestamp, branch name, repository name
+  - Events grouped by day with clear date separators
+  - Click on an event navigates to the corresponding worktree in the main view
+  - Filterable by repository and by event type (commits, merges, branch operations)
+  - Timeline scope configurable: last 1/3/7/14 days
+
+### [Feature] Add worktree terminal launcher opening a new terminal session in the worktree directory
+- **Priority:** P2 (important)
+- **Size:** S (< 1hr)
+- **Added:** 2026-03-23
+- **Status:** pending
+- **Description:** The IDE launcher (completed) covers the most common post-navigation action — opening a worktree in an editor — but the second most common action is opening a terminal in the worktree directory to run commands (builds, tests, git operations, dependency installs). Developers currently must open a terminal separately and manually `cd` to the worktree path. A "Open terminal" button on worktree cards — using the terminal preference already stored in Grove's settings alongside the editor preference — would complete the pair of primary worktree interaction patterns (edit code + run commands) without leaving the app, matching the dual-launcher pattern found in VS Code's remote explorer and JetBrains' project manager.
+- **Acceptance criteria:**
+  - "Open terminal" icon button on each worktree card alongside the existing "Open in editor" button
+  - Terminal application derived from settings (Terminal.app, iTerm2, Warp, Kitty, Alacritty)
+  - Terminal opens with the working directory set to the worktree path
+  - Keyboard shortcut: Cmd+T on a selected worktree opens terminal (complementing Cmd+O for editor)
+  - Error toast if the terminal application is not found on PATH (with link to settings to configure)
+  - Works via the existing tauri-plugin-shell integration (no new plugins required)
+
 ## Design System Adoption
 
 These items implement the @stuntrocket/ui design system (derived from the Dalil app styleguide) to achieve premium visual uniformity across all Tauri applications. Items are ordered by dependency — foundation must complete before migration, migration before polish.

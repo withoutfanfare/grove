@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@stuntrocket/ui": "^0.8.2",
-    "@tailwindcss/vite": "^4.1.18",
+    "@tailwindcss/vite": "^4.2.2",
     "@tanstack/vue-virtual": "^3.13.18",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-clipboard-manager": "^2",
@@ -41,9 +41,9 @@
     "autoprefixer": "^10.4.24",
     "happy-dom": "^20.4.0",
     "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.18",
+    "tailwindcss": "^4.2.2",
     "typescript": "^5.9.3",
-    "vite": "^7.3.1",
+    "vite": "^6.4.1",
     "vitest": "^4.0.18",
     "vue-tsc": "^3.2.4"
   }

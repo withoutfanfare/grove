@@ -359,7 +359,7 @@ function handleClose() {
         <label class="block text-sm font-medium text-text-secondary mb-1.5">
           Repository
         </label>
-        <div class="px-3 py-2.5 bg-surface-overlay rounded-lg text-text-muted border border-border-subtle font-mono text-sm">
+        <div class="px-3 py-2.5 bg-surface-overlay rounded-lg text-text-muted border border-white/[0.04] font-mono text-sm">
           {{ selectedRepoName || 'No repository selected' }}
         </div>
       </div>
@@ -401,7 +401,7 @@ function handleClose() {
         <!-- Browse remote branches button -->
         <button
           type="button"
-          class="px-3 py-2 text-xs font-medium rounded-lg bg-surface-overlay text-text-secondary hover:text-text-primary hover:bg-surface-raised border border-border-subtle transition-colors flex-shrink-0"
+          class="px-3 py-2 text-xs font-medium rounded-lg bg-surface-overlay text-text-secondary hover:text-text-primary hover:bg-surface-raised border border-white/[0.04] transition-colors flex-shrink-0"
           :disabled="loadingRemoteBranches"
           @click="showRemoteBranchPicker = !showRemoteBranchPicker"
           title="Browse remote branches">
@@ -417,12 +417,12 @@ function handleClose() {
       </div>
 
       <!-- Remote branch picker -->
-      <div v-if="showRemoteBranchPicker" class="border border-border-subtle rounded-lg bg-surface-overlay p-3">
+      <div v-if="showRemoteBranchPicker" class="border border-white/[0.04] rounded-lg bg-surface-overlay p-3">
         <div class="flex items-center gap-2 mb-2">
           <input
             v-model="remoteBranchFilter"
             type="text"
-            class="flex-1 text-sm bg-surface-base text-text-primary border border-border-subtle rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-accent/50"
+            class="flex-1 text-sm bg-surface-base text-text-primary border border-white/[0.04] rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-accent/50"
             placeholder="Filter remote branches..."
           />
           <button
@@ -460,7 +460,7 @@ function handleClose() {
           v-model="branchFilter"
           type="text"
           :placeholder="baseBranch || settingsStore.settings.defaultBaseBranch"
-          class="w-full px-3 py-2.5 bg-surface-overlay border border-border-default rounded-lg text-text-primary placeholder-text-muted text-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
+          class="w-full px-3 py-2.5 bg-surface-overlay border border-white/[0.06] rounded-lg text-text-primary placeholder-text-muted text-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
           :disabled="isSubmitting"
           @focus="handleBranchInputFocus"
           @blur="handleBranchInputBlur"
@@ -479,7 +479,7 @@ function handleClose() {
         >
           <div
             v-if="showBranchDropdown && filteredBranches.length > 0"
-            class="absolute z-10 w-full mt-1 bg-surface-raised border border-border-subtle rounded-lg shadow-elevated max-h-48 overflow-y-auto"
+            class="absolute z-10 w-full mt-1 bg-surface-raised border border-white/[0.04] rounded-lg shadow-elevated max-h-48 overflow-y-auto"
             @mouseenter="handleDropdownMouseEnter"
             @mouseleave="handleDropdownMouseLeave"
           >
@@ -579,7 +579,7 @@ function handleClose() {
       <!-- Worktree details -->
       <div class="space-y-2">
         <h4 class="text-xs font-medium text-text-muted uppercase tracking-wider">Details</h4>
-        <div class="bg-surface-overlay rounded-lg border border-border-subtle divide-y divide-border-subtle">
+        <div class="bg-surface-overlay rounded-lg border border-white/[0.04] divide-y divide-white/[0.04]">
           <!-- Path: click to copy -->
           <button
             type="button"
@@ -643,7 +643,7 @@ function handleClose() {
           </p>
         </div>
 
-        <div v-if="hasHooks" class="bg-surface-overlay rounded-lg border border-border-subtle divide-y divide-border-subtle max-h-48 overflow-y-auto">
+        <div v-if="hasHooks" class="bg-surface-overlay rounded-lg border border-white/[0.04] divide-y divide-white/[0.04] max-h-48 overflow-y-auto">
           <div
             v-for="hook in creationResult.hooks"
             :key="hook.name"

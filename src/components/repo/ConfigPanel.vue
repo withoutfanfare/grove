@@ -201,8 +201,8 @@ function handleEditorKeydown(e: KeyboardEvent) {
 <template>
   <div class="h-full flex flex-col">
     <!-- View Mode Toggle - Premium pill switcher -->
-    <div class="flex items-center justify-between mb-5 pb-4 border-b border-border-subtle/50">
-      <div class="inline-flex items-center p-1 rounded-xl bg-surface-base/80 backdrop-blur-sm border border-border-subtle/30">
+    <div class="flex items-center justify-between mb-5 pb-4 border-b border-white/[0.04]/50">
+      <div class="inline-flex items-center p-1 rounded-xl bg-surface-base/80 backdrop-blur-sm border border-white/[0.04]/30">
         <button
           :class="[
             'px-4 py-2 text-xs font-medium rounded-lg transition-all duration-200',
@@ -290,7 +290,7 @@ function handleEditorKeydown(e: KeyboardEvent) {
                       'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium',
                       effectiveConfig.hooks_enabled
                         ? 'bg-success/10 text-success border border-success/20'
-                        : 'bg-surface-overlay text-text-muted border border-border-subtle'
+                        : 'bg-surface-overlay text-text-muted border border-white/[0.04]'
                     ]"
                   >
                     <span
@@ -390,7 +390,7 @@ function handleEditorKeydown(e: KeyboardEvent) {
                       'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium',
                       effectiveConfig.database.enabled
                         ? 'bg-success/10 text-success border border-success/20'
-                        : 'bg-surface-overlay text-text-muted border border-border-subtle'
+                        : 'bg-surface-overlay text-text-muted border border-white/[0.04]'
                     ]"
                   >
                     {{ effectiveConfig.database.enabled ? 'Yes' : 'No' }}
@@ -487,7 +487,7 @@ function handleEditorKeydown(e: KeyboardEvent) {
         </div>
 
         <div class="flex-1 min-h-0 flex rounded-xl overflow-hidden editor-container">
-          <div class="flex-shrink-0 py-3 px-3 bg-surface-base border-r border-border-subtle/30 select-none">
+          <div class="flex-shrink-0 py-3 px-3 bg-surface-base border-r border-white/[0.04]/30 select-none">
             <div
               v-for="num in lineNumbers"
               :key="num"
@@ -543,7 +543,7 @@ function handleEditorKeydown(e: KeyboardEvent) {
                     getFileStatus(file).variant === 'success' ? 'bg-success/10 text-success border-success/20' :
                     getFileStatus(file).variant === 'warning' ? 'bg-warning/10 text-warning border-warning/20' :
                     getFileStatus(file).variant === 'danger' ? 'bg-danger/10 text-danger border-danger/20' :
-                    'bg-surface-overlay text-text-muted border-border-subtle'
+                    'bg-surface-overlay text-text-muted border-white/[0.04]'
                   ]"
                 >
                   <span v-if="getFileStatus(file).variant === 'success'" class="w-1.5 h-1.5 rounded-full bg-success" />

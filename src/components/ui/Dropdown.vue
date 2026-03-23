@@ -122,7 +122,7 @@ defineExpose({
           v-if="isOpen"
           ref="dropdownRef"
           :style="{ ...menuStyle, transformOrigin: (opensUpward ? 'bottom' : 'top') + (align === 'right' ? ' right' : ' left') }"
-          class="z-[var(--z-dropdown)] py-1 min-w-[160px] overflow-y-auto bg-surface-raised border border-border-subtle rounded-lg shadow-elevated"
+          class="z-[var(--z-dropdown)] py-1 min-w-[160px] overflow-y-auto bg-surface-raised border border-white/[0.04] rounded-lg shadow-elevated"
         >
           <slot :close="close" />
         </div>

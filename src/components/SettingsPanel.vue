@@ -9,7 +9,7 @@ import { ref, watch, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useSettingsStore, EDITOR_OPTIONS, TERMINAL_OPTIONS, GIT_CLIENT_OPTIONS } from '../stores'
 import type { EditorChoice, TerminalChoice, GitClientChoice } from '../stores'
-import { SPanel, SButton, SInput, SSelect, SToggle } from '@stuntrocket/ui'
+import { SPanel, SButton, SInput, SSelect, SToggle, SSectionHeader, SDivider } from '@stuntrocket/ui'
 
 const props = defineProps<{
   isOpen: boolean
@@ -152,9 +152,7 @@ const gitClientDescription = computed(() => {
     <div class="space-y-6">
       <!-- Editor Section -->
       <section class="space-y-4">
-        <h3 class="text-xs font-semibold text-text-muted uppercase tracking-wider">
-          Editor & Terminal
-        </h3>
+        <SSectionHeader title="Editor & Terminal" />
 
         <div class="space-y-4">
           <SSelect
@@ -196,13 +194,11 @@ const gitClientDescription = computed(() => {
         </div>
       </section>
 
-      <div class="divider-horizontal" />
+      <SDivider />
 
       <!-- Git Client Section -->
       <section class="space-y-4">
-        <h3 class="text-xs font-semibold text-text-muted uppercase tracking-wider">
-          Git Client
-        </h3>
+        <SSectionHeader title="Git Client" />
 
         <div class="space-y-4">
           <SSelect
@@ -235,13 +231,11 @@ const gitClientDescription = computed(() => {
         </div>
       </section>
 
-      <div class="divider-horizontal" />
+      <SDivider />
 
       <!-- Git Defaults Section -->
       <section class="space-y-4">
-        <h3 class="text-xs font-semibold text-text-muted uppercase tracking-wider">
-          Git Defaults
-        </h3>
+        <SSectionHeader title="Git Defaults" />
 
         <SInput
           v-model="defaultBaseBranch"
@@ -252,13 +246,11 @@ const gitClientDescription = computed(() => {
         />
       </section>
 
-      <div class="divider-horizontal" />
+      <SDivider />
 
       <!-- Notifications Section -->
       <section class="space-y-4">
-        <h3 class="text-xs font-semibold text-text-muted uppercase tracking-wider">
-          Notifications
-        </h3>
+        <SSectionHeader title="Notifications" />
 
         <SToggle
           v-model="enableNotifications"
@@ -267,13 +259,11 @@ const gitClientDescription = computed(() => {
         />
       </section>
 
-      <div class="divider-horizontal" />
+      <SDivider />
 
       <!-- Background Fetch Section -->
       <section class="space-y-4">
-        <h3 class="text-xs font-semibold text-text-muted uppercase tracking-wider">
-          Background Fetch
-        </h3>
+        <SSectionHeader title="Background Fetch" />
 
         <div>
           <label class="block text-sm font-medium text-text-secondary mb-1.5">
@@ -281,7 +271,7 @@ const gitClientDescription = computed(() => {
           </label>
           <select
             v-model.number="backgroundFetchInterval"
-            class="w-full text-sm bg-surface-overlay text-text-primary border border-border-subtle rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-accent/50"
+            class="w-full text-sm bg-surface-overlay text-text-primary border border-white/[0.04] rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-accent/50"
           >
             <option :value="0">Disabled</option>
             <option :value="1">Every minute</option>
@@ -297,13 +287,11 @@ const gitClientDescription = computed(() => {
         </div>
       </section>
 
-      <div class="divider-horizontal" />
+      <SDivider />
 
       <!-- Stale Detection Section -->
       <section class="space-y-4">
-        <h3 class="text-xs font-semibold text-text-muted uppercase tracking-wider">
-          Stale Detection
-        </h3>
+        <SSectionHeader title="Stale Detection" />
 
         <div>
           <label class="block text-sm font-medium text-text-secondary mb-1.5">
@@ -311,7 +299,7 @@ const gitClientDescription = computed(() => {
           </label>
           <select
             v-model.number="staleThresholdDays"
-            class="w-full text-sm bg-surface-overlay text-text-primary border border-border-subtle rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-accent/50"
+            class="w-full text-sm bg-surface-overlay text-text-primary border border-white/[0.04] rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-accent/50"
           >
             <option :value="7">7 days</option>
             <option :value="14">14 days</option>

@@ -94,7 +94,7 @@ function handleRefresh() {
 
     <div class="flex flex-col h-full">
       <!-- Tab Bar -->
-      <div class="flex items-center gap-1 border-b border-border-subtle px-1 -mx-6 -mt-2 mb-4">
+      <div class="flex items-center gap-1 border-b border-white/[0.04] px-1 -mx-6 -mt-2 mb-4">
         <button
           v-for="tab in tabs"
           :key="tab.id"

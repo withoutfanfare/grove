@@ -301,7 +301,7 @@ function handleEditorKeydown(e: KeyboardEvent) {
 <template>
   <div class="h-full flex flex-col">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-5 pb-4 border-b border-border-subtle/50">
+    <div class="flex items-center justify-between mb-5 pb-4 border-b border-white/[0.04]/50">
       <div class="flex items-center gap-3">
         <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-accent/20 to-accent/5 flex items-center justify-center">
           <svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -384,7 +384,7 @@ function handleEditorKeydown(e: KeyboardEvent) {
           :error="createError || undefined"
         />
 
-        <div class="flex justify-end gap-2 mt-5 pt-4 border-t border-border-subtle/50">
+        <div class="flex justify-end gap-2 mt-5 pt-4 border-t border-white/[0.04]/50">
           <SButton variant="ghost" size="sm" @click="cancelCreate">Cancel</SButton>
           <SButton variant="primary" size="sm" :disabled="saving" @click="createHook">
             {{ saving ? 'Creating...' : 'Create Hook' }}
@@ -405,7 +405,7 @@ function handleEditorKeydown(e: KeyboardEvent) {
                 getSecurityBadge(openHook.meta).variant === 'success' ? 'bg-success/10 text-success border-success/20' :
                 getSecurityBadge(openHook.meta).variant === 'warning' ? 'bg-warning/10 text-warning border-warning/20' :
                 getSecurityBadge(openHook.meta).variant === 'danger' ? 'bg-danger/10 text-danger border-danger/20' :
-                'bg-surface-overlay text-text-muted border-border-subtle'
+                'bg-surface-overlay text-text-muted border-white/[0.04]'
               ]"
             >
               {{ getSecurityBadge(openHook.meta).label }}
@@ -440,7 +440,7 @@ function handleEditorKeydown(e: KeyboardEvent) {
       </div>
 
       <div class="flex-1 min-h-0 flex rounded-xl overflow-hidden editor-container">
-        <div class="flex-shrink-0 py-3 px-3 bg-surface-base border-r border-border-subtle/30 select-none">
+        <div class="flex-shrink-0 py-3 px-3 bg-surface-base border-r border-white/[0.04]/30 select-none">
           <div
             v-for="num in lineNumbers"
             :key="num"
@@ -517,7 +517,7 @@ function handleEditorKeydown(e: KeyboardEvent) {
           leave-to-class="opacity-0 -translate-y-1"
         >
           <div v-if="expandedEvents.has(event)" class="event-content">
-            <div v-if="hooksByEvent[event]?.length" class="divide-y divide-border-subtle/30">
+            <div v-if="hooksByEvent[event]?.length" class="divide-y divide-white/[0.04]/30">
               <div
                 v-for="hook in hooksByEvent[event]"
                 :key="hook.path"
@@ -532,7 +532,7 @@ function handleEditorKeydown(e: KeyboardEvent) {
                         getSecurityBadge(hook).variant === 'success' ? 'bg-success/10 text-success border-success/20' :
                         getSecurityBadge(hook).variant === 'warning' ? 'bg-warning/10 text-warning border-warning/20' :
                         getSecurityBadge(hook).variant === 'danger' ? 'bg-danger/10 text-danger border-danger/20' :
-                        'bg-surface-overlay text-text-muted border-border-subtle'
+                        'bg-surface-overlay text-text-muted border-white/[0.04]'
                       ]"
                     >
                       {{ getSecurityBadge(hook).label }}
@@ -582,7 +582,7 @@ function handleEditorKeydown(e: KeyboardEvent) {
                         Copy Path
                       </DropdownItem>
 
-                      <div class="my-1 border-t border-border-subtle" />
+                      <div class="my-1 border-t border-white/[0.04]" />
 
                       <DropdownItem @click="() => { toggleExecutable(hook); close() }">
                         <svg class="w-4 h-4" :class="hook.security.executable ? 'text-success' : 'text-text-muted'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -592,7 +592,7 @@ function handleEditorKeydown(e: KeyboardEvent) {
                         {{ hook.security.executable ? 'Disable Hook' : 'Enable Hook' }}
                       </DropdownItem>
 
-                      <div class="my-1 border-t border-border-subtle" />
+                      <div class="my-1 border-t border-white/[0.04]" />
 
                       <DropdownItem danger @click="() => { requestDelete(hook); close() }">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

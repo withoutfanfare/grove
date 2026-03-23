@@ -15,7 +15,7 @@ import WorktreeStatusBadges from './WorktreeStatusBadges.vue'
 import WorktreeDetailsPanel from './WorktreeDetailsPanel.vue'
 import { useWorktrees, useToast, formatRelativeTime, useWt } from '../composables'
 import { useSettingsStore } from '../stores/settings'
-import { SKbd } from '@stuntrocket/ui'
+import { SKbd, SBadge, SDivider } from '@stuntrocket/ui'
 import { Dropdown, DropdownItem } from './ui'
 // Dropdown/DropdownItem kept custom — library SDropdownMenu has incompatible API (items prop vs slot-based)
 import { copyPath, copyBranch, copyUrl, copyCdCommand } from '../utils/clipboard'
@@ -324,8 +324,8 @@ async function handleOpenAll() {
       <!-- Left: Branch info -->
       <div class="flex-1 min-w-0">
         <!-- Branch name and metadata -->
-        <div class="flex items-center gap-3">
-          <h3 class="text-text-primary text-base font-semibold truncate tracking-tight" :title="branchName">
+        <div class="flex items-center gap-2.5">
+          <h3 class="text-text-primary text-[15px] font-semibold truncate tracking-tight" :title="branchName">
             {{ branchName }}
           </h3>
 
@@ -338,25 +338,27 @@ async function handleOpenAll() {
         </div>
 
         <!-- Status row -->
-        <div class="flex items-center gap-3 mt-1">
+        <div class="flex items-center gap-2.5 mt-1.5">
           <StatusBadge :dirty="worktree.dirty" :ahead="worktree.ahead" :behind="worktree.behind" :dirty-details="dirtyDetails" />
 
           <!-- Phase 2: Status badges (MERGED, STALE, MISMATCH) -->
           <WorktreeStatusBadges :merged="worktree.merged" :stale="worktree.stale" :mismatch="hasMismatch" />
 
           <!-- Stale worktree badge (configurable threshold) -->
-          <span v-if="isStaleWorktree && !worktree.stale"
-            class="inline-flex items-center px-1.5 py-0.5 text-2xs font-medium rounded bg-warning/10 text-warning border border-warning/20"
+          <SBadge v-if="isStaleWorktree && !worktree.stale"
+            variant="warning"
+            class="!border-transparent gap-1.5"
             title="Worktree not accessed within stale threshold">
             Stale
-          </span>
+          </SBadge>
 
           <!-- Diff stats badge -->
-          <span v-if="diffStats && diffStats.files_changed > 0"
-            class="inline-flex items-center px-1.5 py-0.5 text-2xs font-mono rounded bg-surface-overlay text-text-muted border border-border-subtle"
+          <SBadge v-if="diffStats && diffStats.files_changed > 0"
+            variant="default"
+            class="font-mono"
             :title="diffStats.file_list.join('\n')">
             {{ diffStats.display }}
-          </span>
+          </SBadge>
 
           <span class="text-text-muted text-2xs font-mono truncate" :title="worktree.path">
             {{ shortPath }}
@@ -412,7 +414,7 @@ async function handleOpenAll() {
             </DropdownItem>
 
             <!-- Divider -->
-            <div class="my-1 border-t border-border-subtle" />
+            <SDivider />
 
             <!-- Open actions -->
             <div class="px-2 py-1.5 text-2xs font-medium text-text-muted uppercase tracking-wider">Open in</div>
@@ -448,7 +450,7 @@ async function handleOpenAll() {
             </DropdownItem>
 
             <!-- Divider -->
-            <div class="my-1 border-t border-border-subtle" />
+            <SDivider />
 
             <!-- Copy actions -->
             <div class="px-2 py-1.5 text-2xs font-medium text-text-muted uppercase tracking-wider">Copy</div>
@@ -478,7 +480,7 @@ async function handleOpenAll() {
             </DropdownItem>
 
             <!-- Divider -->
-            <div class="my-1 border-t border-border-subtle" />
+            <SDivider />
 
             <!-- Danger zone -->
             <DropdownItem danger :disabled="isBusy" @click="() => { handleDelete(); close() }">

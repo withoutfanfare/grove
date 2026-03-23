@@ -88,12 +88,12 @@ function handleRetry() {
       >
         <details
           v-if="showDetails && errorMessage"
-          class="mb-6 text-left bg-surface-overlay rounded-lg border border-border-subtle overflow-hidden"
+          class="mb-6 text-left bg-surface-overlay rounded-lg border border-white/[0.04] overflow-hidden"
         >
           <summary class="px-4 py-3 text-xs font-medium text-text-tertiary cursor-pointer hover:bg-surface-elevated transition-colors">
             Technical details
           </summary>
-          <div class="px-4 py-3 border-t border-border-subtle bg-surface-base">
+          <div class="px-4 py-3 border-t border-white/[0.04] bg-surface-base">
             <p class="text-xs font-mono text-danger mb-2 break-words">
               {{ errorMessage }}
             </p>

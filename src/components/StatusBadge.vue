@@ -51,13 +51,13 @@ const syncState = computed<SyncState>(() => {
 const syncBadgeClasses = computed(() => {
   switch (syncState.value) {
     case 'ahead':
-      return 'border-success/20 bg-success/5 text-success'
+      return '!border-transparent bg-success/5 text-success'
     case 'behind':
-      return 'border-warning/20 bg-warning/5 text-warning'
+      return '!border-transparent bg-warning/5 text-warning'
     case 'diverged':
-      return 'border-danger/20 bg-danger/5 text-danger'
+      return '!border-transparent bg-danger/5 text-danger'
     default:
-      return 'border-success/20 bg-success/5 text-success'
+      return '!border-transparent bg-success/5 text-success'
   }
 })
 
@@ -115,6 +115,7 @@ const dirtyShortLabel = computed(() => {
     <!-- Clean/Dirty badge -->
     <SBadge
       variant="default"
+      class="gap-1.5"
       role="status"
       :title="dirtyTooltip"
       :aria-label="dirty ? 'Worktree has uncommitted changes' : 'Worktree is clean'"
@@ -147,10 +148,11 @@ const dirtyShortLabel = computed(() => {
       </span>
     </SBadge>
 
-    <!-- Up to date indicator (subtle check mark) -->
-    <span
+    <!-- Up to date indicator -->
+    <SBadge
       v-else-if="isUpToDate"
-      class="inline-flex items-center gap-1 px-1.5 py-0.5 text-2xs font-medium rounded-full text-success/70"
+      variant="success"
+      class="!border-transparent gap-1.5"
       :title="commitStatusTooltip"
       role="status"
       aria-label="Up to date with remote"
@@ -158,6 +160,7 @@ const dirtyShortLabel = computed(() => {
       <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
       </svg>
-    </span>
+      Synced
+    </SBadge>
   </div>
 </template>

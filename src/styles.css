@@ -89,6 +89,34 @@
   --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.6), 0 10px 10px rgba(0, 0, 0, 0.4);
 }
 
+/* ============================================================================
+   Border Softening
+   The library's --color-border (#303030) is too visible on Grove's dark surfaces.
+   Direct element targeting since Tailwind v4 strips CSS variable overrides.
+   ============================================================================ */
+
+input,
+select,
+textarea,
+.ui-select,
+aside,
+[role="separator"] {
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+kbd {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
+  background-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+.ui-select:focus {
+  border-color: var(--color-accent) !important;
+}
+
 
 /* ============================================================================
    Selection Styles
@@ -335,12 +363,12 @@ button:disabled {
    Component Base Patterns
    ============================================================================ */
 
-/* Card pattern */
+/* Card pattern — surface contrast defines the card, not borders */
 .card {
-  background: var(--color-surface-hover);
-  border: 1px solid var(--color-border-subtle);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.04);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm), inset 0 1px 0 0 rgba(255, 255, 255, 0.02);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
   position: relative;
   overflow: hidden;
   transition: all var(--duration-slow) var(--ease-spring);
@@ -351,7 +379,7 @@ button:disabled {
 }
 
 .card:hover {
-  border-color: var(--color-border-default);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 /* Interactive card */
@@ -360,25 +388,23 @@ button:disabled {
 }
 
 .card-interactive:hover {
-  background: color-mix(in srgb, var(--color-surface-hover) 200%, transparent);
-  border-color: var(--color-border-default);
-  box-shadow: var(--shadow-md),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.04),
-    0 0 0 1px color-mix(in srgb, var(--color-accent) 8%, transparent),
-    0 0 20px color-mix(in srgb, var(--color-accent) 8%, transparent);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(99, 102, 241, 0.06);
   transform: translateY(-1px);
 }
 
 .card-interactive.card-expanded {
-  background: color-mix(in srgb, var(--color-surface-hover) 300%, transparent);
-  border-color: var(--color-border-default);
-  box-shadow: var(--shadow-md), inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 /* Panel pattern (sidebars, slide-outs) */
 .panel {
   background-color: var(--color-surface-raised);
-  border: 1px solid var(--color-border-subtle);
+  border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 /* Modal backdrop */
