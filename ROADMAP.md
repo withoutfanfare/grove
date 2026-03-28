@@ -272,7 +272,8 @@ Desktop GUI for git worktree management — visual interface for the `wt` CLI.
 - **Priority:** P2 (important)
 - **Size:** S (< 1hr)
 - **Added:** 2026-03-22
-- **Status:** pending
+- **Status:** completed
+- **Completed:** 2026-03-28
 - **Description:** Developers frequently create worktrees specifically to review pull requests — checking out the PR branch in an isolated worktree to inspect, test, and review the code. Currently this requires knowing the PR's branch name, finding it in the remote branch list (via the worktree creation wizard, completed), and creating the worktree. Entering a PR number and having Grove fetch the branch name from GitHub (via `gh pr view`), create a worktree, and optionally open it in the configured editor (via the IDE launcher, completed) would streamline the most common review-oriented worktree workflow to a single input.
 - **Acceptance criteria:**
   - "Create from PR" option available in the worktree creation dialog alongside the existing branch picker
@@ -318,7 +319,8 @@ Desktop GUI for git worktree management — visual interface for the `wt` CLI.
 - **Priority:** P2 (important)
 - **Size:** S (< 1hr)
 - **Added:** 2026-03-23
-- **Status:** pending
+- **Status:** completed
+- **Completed:** 2026-03-28
 - **Description:** The stale worktree detection (completed) suggests cleanup for worktrees that haven't been accessed recently, and batch cleanup is available for fully-merged branches. However, there is no protection against accidentally deleting worktrees on important long-lived branches — main, develop, release/*, or team-designated protected branches. A configurable branch protection list that blocks deletion (with override) for worktrees on protected branches would prevent the most damaging worktree management mistake, especially during batch cleanup operations where users may not individually verify every worktree being removed.
 - **Acceptance criteria:**
   - Protected branch patterns configurable per repository in settings (default: main, master, develop)
@@ -327,6 +329,21 @@ Desktop GUI for git worktree management — visual interface for the `wt` CLI.
   - Override available via explicit confirmation ("Type branch name to confirm deletion")
   - Protected branch indicator visible on worktree cards alongside existing status badges
   - Batch cleanup automatically excludes protected-branch worktrees from the cleanup set
+
+### [Quality] Add orphaned worktree detection for branches with deleted remote tracking references
+- **Priority:** P2 (important)
+- **Size:** S (< 1hr)
+- **Added:** 2026-03-28
+- **Status:** completed
+- **Completed:** 2026-03-28
+- **Description:** After a PR is merged and the feature branch is deleted on GitHub, the local worktree's branch becomes orphaned — it has no remote counterpart and is likely ready for cleanup. Detecting these orphaned worktrees automatically after each background fetch cycle and displaying a visual indicator on the worktree card would help developers identify cleanup candidates without manually checking each worktree's remote tracking status. This complements the stale detection (time-based) with a state-based signal that is more actionable — an orphaned worktree with a merged branch is almost certainly safe to delete.
+- **Acceptance criteria:**
+  - Orphaned detection runs after each background fetch cycle for all registered repositories
+  - A worktree is orphaned when its branch has no corresponding remote branch (excluding main/master/develop)
+  - Orphaned badge displayed on worktree cards alongside existing status badges
+  - Detection uses the existing `listBranches` composable to compare local vs remote branches
+  - Module-level state ensures detection results are shared across all component instances
+  - Non-fatal: detection failures are logged silently and do not disrupt normal operation
 
 ### [Innovation] Add worktree activity timeline showing recent branch operations across all worktrees
 - **Priority:** P3 (nice-to-have)
@@ -347,7 +364,8 @@ Desktop GUI for git worktree management — visual interface for the `wt` CLI.
 - **Priority:** P2 (important)
 - **Size:** S (< 1hr)
 - **Added:** 2026-03-23
-- **Status:** pending
+- **Status:** completed
+- **Completed:** 2026-03-28
 - **Description:** The IDE launcher (completed) covers the most common post-navigation action — opening a worktree in an editor — but the second most common action is opening a terminal in the worktree directory to run commands (builds, tests, git operations, dependency installs). Developers currently must open a terminal separately and manually `cd` to the worktree path. A "Open terminal" button on worktree cards — using the terminal preference already stored in Grove's settings alongside the editor preference — would complete the pair of primary worktree interaction patterns (edit code + run commands) without leaving the app, matching the dual-launcher pattern found in VS Code's remote explorer and JetBrains' project manager.
 - **Acceptance criteria:**
   - "Open terminal" icon button on each worktree card alongside the existing "Open in editor" button
