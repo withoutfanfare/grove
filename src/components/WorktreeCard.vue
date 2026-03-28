@@ -13,8 +13,9 @@ import StatusBadge from './StatusBadge.vue'
 import GradeBadge from './GradeBadge.vue'
 import WorktreeStatusBadges from './WorktreeStatusBadges.vue'
 import WorktreeDetailsPanel from './WorktreeDetailsPanel.vue'
-import { useWorktrees, useToast, formatRelativeTime, useWt } from '../composables'
+import { useWorktrees, useToast, formatRelativeTime, useWt, useOrphanedDetection } from '../composables'
 import { useSettingsStore } from '../stores/settings'
+import { useRepoConfigStore } from '../stores/repoConfig'
 import { SKbd, SBadge, SDivider } from '@stuntrocket/ui'
 import { Dropdown, DropdownItem } from './ui'
 // Dropdown/DropdownItem kept custom — library SDropdownMenu has incompatible API (items prop vs slot-based)
@@ -35,12 +36,28 @@ const { openInEditor, openInGitClient, openInTerminal, openInBrowser, openInFind
 const { toast } = useToast()
 const { getDirtyDetails, getDiffStats } = useWt()
 const settingsStore = useSettingsStore()
+const repoConfigStore = useRepoConfigStore()
+const { isOrphaned } = useOrphanedDetection()
 
 // Check if git client is configured
 const hasGitClient = computed(() => settingsStore.settings.gitClient !== 'none')
 
 // Diff stats (lazy-loaded)
 const diffStats = ref<import('../types').DiffStats | undefined>(undefined)
+
+// Branch protection detection
+const isProtectedBranch = computed(() => {
+  const branch = props.worktree.branch
+  const patterns = repoConfigStore.effectiveConfig?.protected_branches ?? []
+  return patterns.some(pattern => {
+    if (pattern === branch) return true
+    const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')
+    return new RegExp(`^${escaped}$`).test(branch)
+  })
+})
+
+// Orphaned worktree detection (remote branch deleted)
+const isOrphanedWorktree = computed(() => isOrphaned(props.repoName, props.worktree))
 
 // Stale detection
 const isStaleWorktree = computed(() => {
@@ -312,7 +329,7 @@ async function handleOpenAll() {
 <template>
   <div class="card card-interactive group relative"
     role="article"
-    :aria-label="`Worktree ${branchName}${worktree.dirty ? ', has uncommitted changes' : ''}${isStaleWorktree ? ', stale' : ''}`"
+    :aria-label="`Worktree ${branchName}${worktree.dirty ? ', has uncommitted changes' : ''}${isStaleWorktree ? ', stale' : ''}${isOrphanedWorktree ? ', orphaned' : ''}`"
     :class="{
       'opacity-75': isBusy,
       'ring-2 ring-accent ring-offset-2 ring-offset-surface-primary': focused,
@@ -343,6 +360,28 @@ async function handleOpenAll() {
 
           <!-- Phase 2: Status badges (MERGED, STALE, MISMATCH) -->
           <WorktreeStatusBadges :merged="worktree.merged" :stale="worktree.stale" :mismatch="hasMismatch" />
+
+          <!-- Protected branch badge -->
+          <SBadge v-if="isProtectedBranch"
+            variant="default"
+            class="!border-transparent gap-1"
+            title="Branch is protected — deletion requires confirmation">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            Protected
+          </SBadge>
+
+          <!-- Orphaned worktree badge (remote branch deleted) -->
+          <SBadge v-if="isOrphanedWorktree"
+            variant="warning"
+            class="!border-transparent gap-1"
+            title="Remote branch has been deleted — this worktree may be ready for cleanup">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878l4.242 4.242M15 12a3 3 0 00-3-3m0 0l7.5 7.5" />
+            </svg>
+            Orphaned
+          </SBadge>
 
           <!-- Stale worktree badge (configurable threshold) -->
           <SBadge v-if="isStaleWorktree && !worktree.stale"
@@ -383,6 +422,18 @@ async function handleOpenAll() {
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+          </svg>
+        </button>
+
+        <!-- Open in Terminal icon button -->
+        <button
+          class="w-8 h-8 rounded-lg text-text-secondary hover:text-accent bg-surface-overlay hover:bg-surface-raised flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+          aria-label="Open in terminal"
+          title="Open in terminal (⌘T)"
+          @click="handleOpenInTerminal"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
         </button>
 

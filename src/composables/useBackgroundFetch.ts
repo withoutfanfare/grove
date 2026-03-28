@@ -2,6 +2,7 @@ import { ref, watch, onUnmounted } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useWorktreeStore, useSettingsStore } from '../stores';
 import { useWt } from './useWt';
+import { useOrphanedDetection } from './useOrphanedDetection';
 
 /**
  * Composable for periodic background git fetch.
@@ -9,12 +10,14 @@ import { useWt } from './useWt';
  * Runs `git fetch` for all registered repositories on a configurable interval.
  * Fetches sequentially to avoid saturating network/SSH connections.
  * Errors are logged silently to avoid notification spam during offline periods.
+ * After each fetch cycle, runs orphaned worktree detection.
  */
 export function useBackgroundFetch() {
   const store = useWorktreeStore();
   const settingsStore = useSettingsStore();
   const { settings } = storeToRefs(settingsStore);
   const wt = useWt();
+  const { detectOrphaned } = useOrphanedDetection();
 
   const isRunning = ref(false);
   const lastFetchTime = ref<number | null>(null);
@@ -34,6 +37,8 @@ export function useBackgroundFetch() {
         try {
           await wt.fetchRepo(repo.name);
           lastFetchTimes.value[repo.name] = Date.now();
+          // Detect orphaned worktrees after successful fetch
+          await detectOrphaned(repo.name);
         } catch (error) {
           // Log silently — do not toast or set store error
           console.debug(`[useBackgroundFetch] Fetch failed for ${repo.name}:`, error);

@@ -10,7 +10,8 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import type { Worktree, RemoveWorktreeResponse } from '../types'
 import { useWorktrees, useToast } from '../composables'
-import { SButton, SModal, SCheckbox, SBadge } from '@stuntrocket/ui'
+import { useRepoConfigStore } from '../stores/repoConfig'
+import { SButton, SModal, SCheckbox, SBadge, SInput } from '@stuntrocket/ui'
 
 type ModalPhase = 'confirm' | 'deleting' | 'results'
 
@@ -27,12 +28,14 @@ const emit = defineEmits<{
 
 const { removeWorktree } = useWorktrees()
 const { toast } = useToast()
+const repoConfigStore = useRepoConfigStore()
 
 const deleteBranch = ref(false)
 const dropDatabase = ref(false)
 const skipBackup = ref(false)
 const isSubmitting = ref(false)
 const error = ref<string | null>(null)
+const protectionConfirmText = ref('')
 
 // Multi-phase state
 const phase = ref<ModalPhase>('confirm')
@@ -45,6 +48,23 @@ let elapsedInterval: ReturnType<typeof setInterval> | null = null
 
 // M9: Ref for cancel button focus management
 const cancelButtonRef = ref<InstanceType<typeof SButton> | null>(null)
+
+// Branch protection
+const isProtectedBranch = computed(() => {
+  if (!props.worktree) return false
+  const branch = props.worktree.branch
+  const patterns = repoConfigStore.effectiveConfig?.protected_branches ?? []
+  return patterns.some(pattern => {
+    if (pattern === branch) return true
+    const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')
+    return new RegExp(`^${escaped}$`).test(branch)
+  })
+})
+
+const protectionOverridden = computed(() => {
+  if (!isProtectedBranch.value) return true
+  return protectionConfirmText.value === props.worktree?.branch
+})
 
 // Computed helpers for results phase
 const hasHooks = computed(() => (deletionResult.value?.hooks.length ?? 0) > 0)
@@ -98,6 +118,14 @@ watch(() => props.isOpen, async (open) => {
     phase.value = 'confirm'
     deletionResult.value = null
     requestedDropDb.value = false
+    protectionConfirmText.value = ''
+
+    // Load config for branch protection check
+    try {
+      await repoConfigStore.loadEffectiveConfig(props.repoName)
+    } catch {
+      // Non-fatal: protection check defaults to empty (no protection)
+    }
 
     // M9: Focus cancel button when dialog opens for safer default
     await nextTick()
@@ -218,6 +246,40 @@ function handleClose() {
               <p class="text-warning/80 text-xs mt-0.5">
                 This worktree has uncommitted changes that will be lost.
               </p>
+            </div>
+          </div>
+        </div>
+      </Transition>
+
+      <!-- Protected branch warning -->
+      <Transition
+        enter-active-class="transition ease-out duration-150"
+        enter-from-class="opacity-0 scale-95"
+        enter-to-class="opacity-100 scale-100"
+      >
+        <div
+          v-if="isProtectedBranch"
+          class="p-3 bg-danger-muted rounded-lg border border-danger/20 space-y-3"
+        >
+          <div class="flex items-start gap-2">
+            <svg class="w-4 h-4 text-danger flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <div class="flex-1">
+              <p class="text-danger text-sm font-medium">Protected branch</p>
+              <p class="text-danger/80 text-xs mt-0.5">
+                This branch is protected. Type the branch name to confirm deletion.
+              </p>
+              <div class="mt-2">
+                <SInput
+                  v-model="protectionConfirmText"
+                  :placeholder="worktree?.branch"
+                  size="sm"
+                  class="font-mono"
+                  :disabled="isSubmitting"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -412,6 +474,7 @@ function handleClose() {
         <SButton
           variant="danger"
           :loading="isSubmitting"
+          :disabled="!protectionOverridden"
           @click="handleDelete"
         >
           Delete Worktree
