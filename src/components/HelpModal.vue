@@ -40,6 +40,7 @@ const shortcuts = [
   { keys: ['⌘', 'K'], action: 'Command palette' },
   { keys: ['⌘', 'P'], action: 'Pull all worktrees' },
   { keys: ['⌘', 'O'], action: 'Open focused worktree in editor' },
+  { keys: ['⌘', 'T'], action: 'Open focused worktree in terminal' },
   { keys: ['⌘', '⏎'], action: 'Quick Launch (editor, terminal, browser)' },
   { keys: ['Esc'], action: 'Close modal / Clear search' },
   { keys: ['↑', '↓'], action: 'Navigate repository list' },

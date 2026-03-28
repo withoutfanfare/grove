@@ -15,6 +15,7 @@ import WorktreeStatusBadges from './WorktreeStatusBadges.vue'
 import WorktreeDetailsPanel from './WorktreeDetailsPanel.vue'
 import { useWorktrees, useToast, formatRelativeTime, useWt } from '../composables'
 import { useSettingsStore } from '../stores/settings'
+import { useRepoConfigStore } from '../stores/repoConfig'
 import { SKbd, SBadge, SDivider } from '@stuntrocket/ui'
 import { Dropdown, DropdownItem } from './ui'
 // Dropdown/DropdownItem kept custom — library SDropdownMenu has incompatible API (items prop vs slot-based)
@@ -35,12 +36,24 @@ const { openInEditor, openInGitClient, openInTerminal, openInBrowser, openInFind
 const { toast } = useToast()
 const { getDirtyDetails, getDiffStats } = useWt()
 const settingsStore = useSettingsStore()
+const repoConfigStore = useRepoConfigStore()
 
 // Check if git client is configured
 const hasGitClient = computed(() => settingsStore.settings.gitClient !== 'none')
 
 // Diff stats (lazy-loaded)
 const diffStats = ref<import('../types').DiffStats | undefined>(undefined)
+
+// Branch protection detection
+const isProtectedBranch = computed(() => {
+  const branch = props.worktree.branch
+  const patterns = repoConfigStore.effectiveConfig?.protected_branches ?? []
+  return patterns.some(pattern => {
+    if (pattern === branch) return true
+    const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')
+    return new RegExp(`^${escaped}$`).test(branch)
+  })
+})
 
 // Stale detection
 const isStaleWorktree = computed(() => {
@@ -344,6 +357,17 @@ async function handleOpenAll() {
           <!-- Phase 2: Status badges (MERGED, STALE, MISMATCH) -->
           <WorktreeStatusBadges :merged="worktree.merged" :stale="worktree.stale" :mismatch="hasMismatch" />
 
+          <!-- Protected branch badge -->
+          <SBadge v-if="isProtectedBranch"
+            variant="default"
+            class="!border-transparent gap-1"
+            title="Branch is protected — deletion requires confirmation">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            Protected
+          </SBadge>
+
           <!-- Stale worktree badge (configurable threshold) -->
           <SBadge v-if="isStaleWorktree && !worktree.stale"
             variant="warning"
@@ -383,6 +407,18 @@ async function handleOpenAll() {
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+          </svg>
+        </button>
+
+        <!-- Open in Terminal icon button -->
+        <button
+          class="w-8 h-8 rounded-lg text-text-secondary hover:text-accent bg-surface-overlay hover:bg-surface-raised flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+          aria-label="Open in terminal"
+          title="Open in terminal (⌘T)"
+          @click="handleOpenInTerminal"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
         </button>
 
