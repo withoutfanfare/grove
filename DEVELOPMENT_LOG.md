@@ -10,7 +10,7 @@
 - Items attempted but failed: none
 - Branch: feature/branch-protection-pr-creation
 - Tests passing: yes (cargo check clean, cargo clippy clean — only pre-existing warning about unused WorktreeTemplate struct; vue-tsc has one pre-existing error about missing PrBranchInfo import in useWt.ts)
-- Build status: pending
+- Build status: success (Grove.app deployed to /Applications/)
 - Notes: Four P2/S items batched into one cycle. Branch protection and orphaned detection are complementary quality features for worktree lifecycle management. Terminal launcher completes the dual-launcher pattern (editor + terminal) on worktree cards. PR creation leverages the GitHub CLI for seamless review workflows.
 
 ## Cycle: 2026-03-22
