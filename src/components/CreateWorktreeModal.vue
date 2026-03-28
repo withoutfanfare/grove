@@ -35,7 +35,7 @@ const store = useWorktreeStore()
 const settingsStore = useSettingsStore()
 const { selectedRepoName } = storeToRefs(store)
 const { createWorktree, listBranches, openInEditor, openInBrowser } = useWorktrees()
-const { readConfigFile } = useWt()
+const { readConfigFile, fetchPrBranch } = useWt()
 const { toast } = useToast()
 
 const templateStore = useTemplateStore()
@@ -53,6 +53,12 @@ const remoteBranches = ref<Branch[]>([])
 const loadingRemoteBranches = ref(false)
 const showRemoteBranchPicker = ref(false)
 const remoteBranchFilter = ref('')
+
+// PR creation state
+const prNumber = ref('')
+const prTitle = ref('')
+const loadingPr = ref(false)
+const prError = ref<string | null>(null)
 
 // Filtered remote branches
 const filteredRemoteBranches = computed(() => {
@@ -98,6 +104,29 @@ function selectRemoteBranch(branchName: string) {
   const localName = branchName.replace(/^origin\//, '')
   branch.value = localName
   showRemoteBranchPicker.value = false
+}
+
+// Fetch branch from a GitHub PR number
+async function handleFetchPr() {
+  const num = parseInt(prNumber.value, 10)
+  if (isNaN(num) || num <= 0 || !selectedRepoName.value) return
+
+  loadingPr.value = true
+  prError.value = null
+  prTitle.value = ''
+
+  try {
+    const result = await fetchPrBranch(selectedRepoName.value, num)
+    branch.value = result.headRefName
+    prTitle.value = result.title
+    toast.success(`PR #${num}: ${result.headRefName}`)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    prError.value = msg
+    toast.error(`Failed to fetch PR #${num}`)
+  } finally {
+    loadingPr.value = false
+  }
 }
 
 // Multi-phase state
@@ -207,6 +236,11 @@ watch(() => props.isOpen, async (open) => {
     selectedTemplate.value = null
     remoteBranchFilter.value = ''
     showRemoteBranchPicker.value = false
+
+    // Clear PR state
+    prNumber.value = ''
+    prTitle.value = ''
+    prError.value = null
 
     // Fetch branches for the selected repo
     if (selectedRepoName.value) {
@@ -385,6 +419,41 @@ function handleClose() {
             {{ template.name }}
           </button>
         </div>
+      </div>
+
+      <!-- Create from PR -->
+      <div>
+        <label class="block text-sm font-medium text-text-secondary mb-1.5">
+          Create from PR
+          <span class="text-text-muted text-xs">(optional — requires gh CLI)</span>
+        </label>
+        <div class="flex items-center gap-2">
+          <input
+            v-model="prNumber"
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            class="w-24 px-3 py-2 bg-surface-overlay border border-white/[0.06] rounded-lg text-text-primary placeholder-text-muted text-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
+            placeholder="#123"
+            :disabled="isSubmitting || loadingPr"
+            @keydown.enter.prevent="handleFetchPr"
+          />
+          <button
+            type="button"
+            class="px-3 py-2 text-xs font-medium rounded-lg bg-surface-overlay text-text-secondary hover:text-text-primary hover:bg-surface-raised border border-white/[0.04] transition-colors flex-shrink-0"
+            :disabled="!prNumber || loadingPr || isSubmitting"
+            @click="handleFetchPr">
+            <svg v-if="loadingPr" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <span v-else>Fetch Branch</span>
+          </button>
+          <span v-if="prTitle" class="text-xs text-text-muted truncate flex-1" :title="prTitle">
+            {{ prTitle }}
+          </span>
+        </div>
+        <p v-if="prError" class="text-danger text-xs mt-1">{{ prError }}</p>
       </div>
 
       <!-- Branch name -->

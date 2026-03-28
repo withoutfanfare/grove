@@ -26,6 +26,7 @@ import type {
   ConfigLayer,
   ConfigFileContents,
   ConfigKeyUpdate,
+  PrBranchInfo,
 } from '../types';
 import { isWtError } from '../types';
 
@@ -481,6 +482,17 @@ export function useWt() {
   }
 
   // ============================================================================
+  // GitHub PR Integration
+  // ============================================================================
+
+  /**
+   * Fetch PR branch name and title from GitHub via the `gh` CLI
+   */
+  async function fetchPrBranch(repoName: string, prNumber: number): Promise<PrBranchInfo> {
+    return await invoke<PrBranchInfo>('fetch_pr_branch', { repoName, prNumber });
+  }
+
+  // ============================================================================
   // Repository Registration
   // ============================================================================
 
@@ -562,6 +574,8 @@ export function useWt() {
     fetchRepo,
     // Remote branches
     getRemoteBranches,
+    // GitHub PR integration
+    fetchPrBranch,
     // Repository registration
     registerRepository,
     toWtError,

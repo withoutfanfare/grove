@@ -32,6 +32,8 @@ export { useNotifications } from './useNotifications';
 export { useBackgroundFetch } from './useBackgroundFetch';
 export { useStaleDetection } from './useStaleDetection';
 export type { StaleWorktreeInfo } from './useStaleDetection';
+export { useOrphanedDetection } from './useOrphanedDetection';
+export type { OrphanedWorktreeInfo } from './useOrphanedDetection';
 export { useTrayBadge } from './useTrayBadge';
 export { useRecentSwitches } from './useRecentSwitches';
 export type { RecentSwitchEntry } from './useRecentSwitches';

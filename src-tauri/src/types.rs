@@ -1075,6 +1075,16 @@ pub struct ConfigDatabase {
     pub user: Option<String>,
 }
 
+/// PR branch information returned by `gh pr view`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrBranchInfo {
+    /// Branch name of the PR head
+    pub head_ref_name: String,
+    /// PR title
+    pub title: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

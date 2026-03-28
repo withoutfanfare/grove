@@ -1119,3 +1119,15 @@ export function getConfigLayerLabel(layer: ConfigLayer): string {
       return layer;
   }
 }
+
+// ============================================================================
+// GitHub PR Integration
+// ============================================================================
+
+/** PR branch information from `gh pr view` */
+export interface PrBranchInfo {
+  /** Branch name of the PR head */
+  headRefName: string;
+  /** PR title */
+  title: string;
+}

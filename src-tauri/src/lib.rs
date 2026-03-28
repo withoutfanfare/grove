@@ -18,7 +18,7 @@ pub use types::{Repository, Worktree, WtError, WtResult};
 
 use commands::{
     cancel_operation, check_wt_available, clone_repository, create_hook, create_worktree,
-    delete_hook, derive_repo_name, dismiss_operation, generate_report,
+    delete_hook, derive_repo_name, dismiss_operation, fetch_pr_branch, generate_report,
     save_report_to_desktop, get_config,
     get_config_files, get_diff_stats, get_dirty_details, get_recent_commits, get_recent_worktrees,
     get_remote_branches, get_repo_disk_usage, get_repo_health,
@@ -140,6 +140,8 @@ pub fn run() {
             get_remote_branches,
             // Repository registration (drag-and-drop)
             register_repository,
+            // GitHub PR integration
+            fetch_pr_branch,
             // System integration commands
             open_in_editor,
             open_in_git_client,
