@@ -1,5 +1,18 @@
 # Grove Development Log
 
+## Cycle: 2026-03-28
+- App: Grove
+- Items completed:
+  - [Quality] Add worktree branch protection preventing accidental deletion of worktrees on protected branches (P2/S) — Added `isProtectedBranch` computed with glob pattern matching against `repoConfigStore.effectiveConfig.protected_branches` in both WorktreeCard.vue (lock icon badge) and DeleteWorktreeDialog.vue (type-to-confirm guard requiring branch name entry before deletion). Frontend-only approach leveraging existing Config type.
+  - [Feature] Add worktree terminal launcher opening a new terminal session in the worktree directory (P2/S) — Added dedicated terminal icon button on WorktreeCard (appears on hover alongside editor button). Backend `open_in_terminal` command was already implemented with platform-specific AppleScript for Terminal.app, iTerm2, Warp, Alacritty, and WezTerm. Cmd+T shortcut already registered in useKeyboardShortcuts.
+  - [Quality] Add orphaned worktree detection for branches with deleted remote tracking references (P2/S) — New `useOrphanedDetection` composable compares local worktree branches against remote branches via `listBranches`, excluding main/master/develop. Module-level state shared across all component instances. Integrated into `useBackgroundFetch` to run detection after each fetch cycle. Warning badge shown on orphaned worktree cards.
+  - [Feature] Add worktree creation from GitHub PR number for review workflows (P2/S) — New `fetch_pr_branch` Rust command executes `gh pr view --json headRefName,title` in repo context. PrBranchInfo type added to both Rust and TypeScript. "Create from PR" input added to CreateWorktreeModal with fetch button and auto-population of branch name.
+- Items attempted but failed: none
+- Branch: feature/branch-protection-pr-creation
+- Tests passing: yes (cargo check clean, cargo clippy clean — only pre-existing warning about unused WorktreeTemplate struct; vue-tsc has one pre-existing error about missing PrBranchInfo import in useWt.ts)
+- Build status: pending
+- Notes: Four P2/S items batched into one cycle. Branch protection and orphaned detection are complementary quality features for worktree lifecycle management. Terminal launcher completes the dual-launcher pattern (editor + terminal) on worktree cards. PR creation leverages the GitHub CLI for seamless review workflows.
+
 ## Cycle: 2026-03-22
 - App: Grove
 - Items completed:
