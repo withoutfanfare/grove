@@ -35,7 +35,7 @@ const store = useWorktreeStore()
 const settingsStore = useSettingsStore()
 const { selectedRepoName } = storeToRefs(store)
 const { createWorktree, listBranches, openInEditor, openInBrowser } = useWorktrees()
-const { readConfigFile } = useWt()
+const { readConfigFile, fetchPrBranch } = useWt()
 const { toast } = useToast()
 
 const templateStore = useTemplateStore()
@@ -53,6 +53,12 @@ const remoteBranches = ref<Branch[]>([])
 const loadingRemoteBranches = ref(false)
 const showRemoteBranchPicker = ref(false)
 const remoteBranchFilter = ref('')
+
+// PR creation state
+const prNumber = ref('')
+const prTitle = ref('')
+const loadingPr = ref(false)
+const prError = ref<string | null>(null)
 
 // Filtered remote branches
 const filteredRemoteBranches = computed(() => {
@@ -98,6 +104,29 @@ function selectRemoteBranch(branchName: string) {
   const localName = branchName.replace(/^origin\//, '')
   branch.value = localName
   showRemoteBranchPicker.value = false
+}
+
+// Fetch branch from a GitHub PR number
+async function handleFetchPr() {
+  const num = parseInt(prNumber.value, 10)
+  if (isNaN(num) || num <= 0 || !selectedRepoName.value) return
+
+  loadingPr.value = true
+  prError.value = null
+  prTitle.value = ''
+
+  try {
+    const result = await fetchPrBranch(selectedRepoName.value, num)
+    branch.value = result.headRefName
+    prTitle.value = result.title
+    toast.success(`PR #${num}: ${result.headRefName}`)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    prError.value = msg
+    toast.error(`Failed to fetch PR #${num}`)
+  } finally {
+    loadingPr.value = false
+  }
 }
 
 // Multi-phase state
@@ -207,6 +236,11 @@ watch(() => props.isOpen, async (open) => {
     selectedTemplate.value = null
     remoteBranchFilter.value = ''
     showRemoteBranchPicker.value = false
+
+    // Clear PR state
+    prNumber.value = ''
+    prTitle.value = ''
+    prError.value = null
 
     // Fetch branches for the selected repo
     if (selectedRepoName.value) {

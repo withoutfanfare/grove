@@ -21,13 +21,13 @@ export interface OrphanedWorktreeInfo {
  * cleanup on GitHub). Detection runs after background fetch by
  * comparing worktree branches against the remote branches list.
  */
+// Module-level state — shared across all composable instances
+const orphanedBranches = ref<Set<string>>(new Set())
+
 export function useOrphanedDetection() {
   const store = useWorktreeStore()
   const { worktrees } = storeToRefs(store)
   const wt = useWt()
-
-  // Set of branch names known to be orphaned (keyed by `repo:branch`)
-  const orphanedBranches = ref<Set<string>>(new Set())
 
   /**
    * Check all worktree branches against remote branches for a repository.

@@ -12,9 +12,9 @@ use tokio::task::spawn_blocking;
 use crate::operation_state;
 use crate::types::{
     BranchesResult, ChangesResult, CloneResult, Config, CreateWorktreeResponse, HealthResult,
-    LogResult, PruneResult, PullAllResult, PullResult, RecentWorktree, RemoveWorktreeResponse,
-    RepairResult, Repository, ResumableOperationSummary, SyncResult, UnlockResult, Worktree,
-    WtError,
+    LogResult, PrBranchInfo, PruneResult, PullAllResult, PullResult, RecentWorktree,
+    RemoveWorktreeResponse, RepairResult, Repository, ResumableOperationSummary, SyncResult,
+    UnlockResult, Worktree, WtError,
 };
 use crate::wt;
 
@@ -1227,6 +1227,69 @@ pub async fn save_report_to_desktop(
 #[command]
 pub fn derive_repo_name(url: String) -> Option<String> {
     wt::derive_repo_name_from_url(&url)
+}
+
+/// Fetch PR branch name and title from GitHub using the `gh` CLI
+///
+/// Executes `gh pr view <number> --json headRefName,title` in the context
+/// of a repository's working directory. Requires `gh` CLI to be installed
+/// and authenticated.
+/// Callable from frontend as: invoke('fetch_pr_branch', { repoName, prNumber })
+#[command(rename_all = "camelCase")]
+pub async fn fetch_pr_branch(
+    repo_name: String,
+    pr_number: u32,
+    app: tauri::AppHandle,
+) -> Result<PrBranchInfo, WtError> {
+    let worktrees = spawn_blocking({
+        let app = app.clone();
+        let repo = repo_name.clone();
+        move || wt::get_worktrees(&app, &repo)
+    })
+    .await
+    .map_err(|e| WtError::new("SPAWN_ERROR", format!("Failed to spawn task: {}", e)))??;
+
+    let repo_path = worktrees
+        .first()
+        .map(|w| w.path.clone())
+        .ok_or_else(|| WtError::new("NO_WORKTREES", "Repository has no worktrees".to_string()))?;
+
+    let output = Command::new("gh")
+        .args([
+            "pr",
+            "view",
+            &pr_number.to_string(),
+            "--json",
+            "headRefName,title",
+        ])
+        .current_dir(&repo_path)
+        .output()
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                WtError::new(
+                    "GH_NOT_FOUND",
+                    "GitHub CLI (gh) is not installed or not on PATH. Install it from https://cli.github.com".to_string(),
+                )
+            } else {
+                WtError::new("GH_FAILED", format!("Failed to execute gh: {}", e))
+            }
+        })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(WtError::new(
+            "GH_ERROR",
+            format!("gh pr view failed: {}", stderr.trim()),
+        ));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    serde_json::from_str::<PrBranchInfo>(stdout.trim()).map_err(|e| {
+        WtError::new(
+            "PARSE_ERROR",
+            format!("Failed to parse gh output: {}", e),
+        )
+    })
 }
 
 // ============================================================================
