@@ -421,6 +421,41 @@ function handleClose() {
         </div>
       </div>
 
+      <!-- Create from PR -->
+      <div>
+        <label class="block text-sm font-medium text-text-secondary mb-1.5">
+          Create from PR
+          <span class="text-text-muted text-xs">(optional — requires gh CLI)</span>
+        </label>
+        <div class="flex items-center gap-2">
+          <input
+            v-model="prNumber"
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            class="w-24 px-3 py-2 bg-surface-overlay border border-white/[0.06] rounded-lg text-text-primary placeholder-text-muted text-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
+            placeholder="#123"
+            :disabled="isSubmitting || loadingPr"
+            @keydown.enter.prevent="handleFetchPr"
+          />
+          <button
+            type="button"
+            class="px-3 py-2 text-xs font-medium rounded-lg bg-surface-overlay text-text-secondary hover:text-text-primary hover:bg-surface-raised border border-white/[0.04] transition-colors flex-shrink-0"
+            :disabled="!prNumber || loadingPr || isSubmitting"
+            @click="handleFetchPr">
+            <svg v-if="loadingPr" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <span v-else>Fetch Branch</span>
+          </button>
+          <span v-if="prTitle" class="text-xs text-text-muted truncate flex-1" :title="prTitle">
+            {{ prTitle }}
+          </span>
+        </div>
+        <p v-if="prError" class="text-danger text-xs mt-1">{{ prError }}</p>
+      </div>
+
       <!-- Branch name -->
       <div class="flex items-end gap-2">
         <div class="flex-1">
