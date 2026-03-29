@@ -37,3 +37,5 @@ export type { OrphanedWorktreeInfo } from './useOrphanedDetection';
 export { useTrayBadge } from './useTrayBadge';
 export { useRecentSwitches } from './useRecentSwitches';
 export type { RecentSwitchEntry } from './useRecentSwitches';
+export { useUpdater } from './useUpdater';
+export type { UpdateInfo, UpdateStatus } from './useUpdater';

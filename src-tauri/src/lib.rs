@@ -16,6 +16,8 @@ mod wt;
 // Re-export types for external use
 pub use types::{Repository, Worktree, WtError, WtResult};
 
+mod updater;
+
 use commands::{
     cancel_operation, check_wt_available, clone_repository, create_hook, create_worktree,
     delete_hook, derive_repo_name, dismiss_operation, fetch_pr_branch, generate_report,
@@ -68,6 +70,8 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         // Phase 4: Visual polish
         .plugin(tauri_plugin_positioner::init())
+        // Phase 5: Distribution — auto-updater
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // Set up system tray with worktree menu
             if let Err(e) = tray::setup_tray(app.handle()) {
@@ -167,6 +171,9 @@ pub fn run() {
             refresh_tray_menu,
             // Context menus
             show_worktree_context_menu,
+            // Auto-updater
+            updater::check_for_update,
+            updater::get_app_version,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

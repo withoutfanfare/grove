@@ -9,8 +9,8 @@ import { onMounted, onUnmounted, watch, ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useDebounceFn } from '@vueuse/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { useWorktreeStore } from '../stores'
-import { useRepos, useWorktrees, useWt, useOperationProgress, useAutoRefresh, useSearch, useKeyboardShortcuts, useShortcutTooltip, useToast, useWorktreeWatcher, useCommandRegistry, useWorktreeFilters, useBackgroundFetch, useStaleDetection, useTrayBadge, useRecentSwitches } from '../composables'
+import { useWorktreeStore, useSettingsStore } from '../stores'
+import { useRepos, useWorktrees, useWt, useOperationProgress, useAutoRefresh, useSearch, useKeyboardShortcuts, useShortcutTooltip, useToast, useWorktreeWatcher, useCommandRegistry, useWorktreeFilters, useBackgroundFetch, useStaleDetection, useTrayBadge, useRecentSwitches, useUpdater } from '../composables'
 import type { Worktree } from '../types'
 import type { WorktreeFilter, WorktreeSort } from '../composables'
 
@@ -28,6 +28,7 @@ import OperationProgressPanel from './OperationProgressPanel.vue'
 import ErrorBoundary from './ErrorBoundary.vue'
 import SearchInput from './SearchInput.vue'
 import CommandPalette from './CommandPalette.vue'
+import UpdateBanner from './UpdateBanner.vue'
 import { SButton, SIconButton, SResizableSplit, SSegmentedControl, SSelect, SDivider } from '@stuntrocket/ui'
 import { SkeletonCard } from './ui'
 import { copyPath, copyBranch, copyUrl, copyCdCommand } from '../utils/clipboard'
@@ -152,6 +153,10 @@ useTrayBadge()
 // Recent switches
 const { recordSwitch } = useRecentSwitches()
 
+// Auto-updater
+const settingsStore = useSettingsStore()
+const { checkOnLaunch } = useUpdater()
+
 // Drag-and-drop state
 const isDragOver = ref(false)
 
@@ -183,6 +188,9 @@ onMounted(async () => {
   }
   // Start background fetch for remote tracking
   startBackgroundFetch()
+
+  // Check for updates on launch
+  checkOnLaunch(settingsStore.settings.autoCheckUpdates)
 })
 
 // Cleanup on unmount
@@ -746,6 +754,9 @@ async function handleTitlebarDrag(e: MouseEvent) {
         </div>
       </div>
     </Transition>
+
+    <!-- Update notification banner -->
+    <UpdateBanner />
 
     <!-- grove CLI not available state -->
     <div v-if="!wtAvailable" class="flex-1 flex items-center justify-center p-8">

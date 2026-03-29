@@ -28,6 +28,8 @@ export type GitClientChoice =
   | 'sublime-merge'
   | 'custom';
 
+export type ReleaseChannel = 'stable' | 'beta';
+
 export interface Settings {
   editor: EditorChoice;
   customEditorPath: string;
@@ -44,6 +46,10 @@ export interface Settings {
   trayBadgeEnabled: boolean;
   /** Which states count towards tray badge: dirty, behind, stale */
   trayBadgeStates: string[];
+  /** Release channel for auto-updates */
+  releaseChannel: ReleaseChannel;
+  /** Whether to check for updates automatically on launch */
+  autoCheckUpdates: boolean;
 }
 
 const STORAGE_KEY = 'wt-app-settings';
@@ -60,6 +66,8 @@ export const DEFAULT_SETTINGS: Settings = {
   staleThresholdDays: 14,
   trayBadgeEnabled: true,
   trayBadgeStates: ['dirty', 'behind', 'stale'],
+  releaseChannel: 'stable',
+  autoCheckUpdates: true,
 };
 
 function loadSettings(): Settings {
@@ -118,6 +126,14 @@ export const useSettingsStore = defineStore('settings', () => {
     settings.value.enableNotifications = enabled;
   }
 
+  function setReleaseChannel(channel: ReleaseChannel) {
+    settings.value.releaseChannel = channel;
+  }
+
+  function setAutoCheckUpdates(enabled: boolean) {
+    settings.value.autoCheckUpdates = enabled;
+  }
+
   function resetToDefaults() {
     settings.value = { ...DEFAULT_SETTINGS };
   }
@@ -131,6 +147,8 @@ export const useSettingsStore = defineStore('settings', () => {
     setCustomGitClientPath,
     setDefaultBaseBranch,
     setEnableNotifications,
+    setReleaseChannel,
+    setAutoCheckUpdates,
     resetToDefaults,
   };
 });
@@ -154,6 +172,12 @@ export const TERMINAL_OPTIONS: { value: TerminalChoice; label: string }[] = [
   { value: 'warp', label: 'Warp' },
   { value: 'alacritty', label: 'Alacritty' },
   { value: 'wezterm', label: 'WezTerm' },
+];
+
+// Release channel options
+export const RELEASE_CHANNEL_OPTIONS: { value: ReleaseChannel; label: string; description: string }[] = [
+  { value: 'stable', label: 'Stable', description: 'Production releases — tested and reliable' },
+  { value: 'beta', label: 'Beta', description: 'Early access to new features — may contain bugs' },
 ];
 
 // Git client display names and descriptions
