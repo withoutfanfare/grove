@@ -1,5 +1,16 @@
 # Grove Development Log
 
+## Cycle: 2026-03-29 23:30
+- App: Grove
+- Items completed:
+  - [UX/UI] Add repository grouping with collapsible categories in the sidebar (P3/S) — New `RepositoryGroup` interface and `repositoryGroups` array added to Settings store with full CRUD: `createGroup`, `deleteGroup`, `renameGroup`, `assignRepoToGroup`, `unassignRepo`, `toggleGroupCollapsed`, `moveGroup`. RepoList.vue renders grouped view when groups exist (collapsible sections with chevron, repo count badges, group action menu with move up/down/delete) and flat view when no groups defined. Context menu on repos includes group assignment submenu with checkmark for current group, plus "Remove from Group" and "Create Group" options. Inline text input for new group creation. Ungrouped repos shown in a default section. Collapsed/expanded state persisted via settings auto-save.
+  - [UX/UI] Add worktree purpose notes for context retention across sessions (P3/S) — New `worktreeNotes` record in Settings store keyed by `repoName/branch`, with `setWorktreeNote`, `getWorktreeNote`, `deleteWorktreeNote` methods. 120-character limit enforced. WorktreeCard.vue displays note as italic subtitle below branch name (clickable to edit). Inline editing with text input, save (tick) and cancel (cross) buttons, Enter/Escape keyboard support. Dropdown menu extended with "Add Note" / "Edit Note" and "Delete Note" actions. Notes persisted in localStorage via existing settings auto-save.
+- Items attempted but failed: none
+- Branch: feature/repo-grouping-worktree-notes
+- Tests passing: yes (cargo check clean — only pre-existing WorktreeTemplate warning; cargo clippy clean; vue-tsc clean)
+- Build status: success (Grove.app deployed to /Applications/)
+- Notes: Both features are frontend-only, persisted in localStorage via the existing settings store auto-save mechanism. No Rust backend changes required. Search filtering works within and across groups. The grouped view activates automatically when the first group is created, and falls back to the flat view when all groups are deleted.
+
 ## Cycle: 2026-03-29 22:00
 - App: Grove
 - Items completed:

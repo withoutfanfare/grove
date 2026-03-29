@@ -289,7 +289,8 @@ Desktop GUI for git worktree management — visual interface for the `wt` CLI.
 - **Priority:** P3 (nice-to-have)
 - **Size:** S (< 1hr)
 - **Added:** 2026-03-22
-- **Status:** pending
+- **Status:** completed
+- **Completed:** 2026-03-29
 - **Description:** Users with 10+ registered repositories see a flat list in the sidebar, with no organisational structure beyond alphabetical sorting and the filtering options (completed). As repository counts grow — especially for developers working across multiple teams or maintaining personal and work projects — the sidebar becomes a long undifferentiated list. User-defined groups (e.g. "Work", "Personal", "Client Projects") with collapsible sections would help developers organise and navigate their repository collections, matching the folder/group patterns found in sidebar-heavy tools like VS Code workspaces and Finder favourites.
 - **Acceptance criteria:**
   - "Create group" action available in the sidebar header
@@ -305,7 +306,8 @@ Desktop GUI for git worktree management — visual interface for the `wt` CLI.
 - **Priority:** P3 (nice-to-have)
 - **Size:** S (< 1hr)
 - **Added:** 2026-03-22
-- **Status:** pending
+- **Status:** completed
+- **Completed:** 2026-03-29
 - **Description:** Developers managing multiple worktrees often forget why a specific worktree was created — was it for reviewing PR #247, experimenting with a new auth approach, or testing a performance fix? Branch names provide some context but are frequently cryptic (feature/abc-123, hotfix/urgent). A brief user-editable note on each worktree card ("Reviewing Sarah's auth refactor", "Performance testing with 10K records", "Release candidate for v2.3") would help developers maintain mental context when switching between worktrees, especially after returning to Grove after a break. This complements the stale worktree detection (completed) by adding purpose context to the cleanup decision — a worktree with the note "keeping for reference until Q2 release" should not be cleaned up just because it's old.
 - **Acceptance criteria:**
   - "Add note" action on each worktree card (click to edit inline text field)
