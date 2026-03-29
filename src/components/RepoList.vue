@@ -18,7 +18,8 @@ import { SSkeleton } from '@stuntrocket/ui'
 import SearchInput from './SearchInput.vue'
 import CloneRepositoryModal from './CloneRepositoryModal.vue'
 import GlobalConfigPanel from './GlobalConfigPanel.vue'
-// Clipboard utility (used by other functions)
+import { useSettingsStore } from '../stores/settings'
+import type { Repository } from '../types'
 
 const emit = defineEmits<{
   /** Emitted when user wants to open repo management modal */
@@ -55,6 +56,67 @@ const sortedRepositories = computed(() => {
   )
 })
 const filteredRepositories = computed(() => filterRepositories(sortedRepositories.value))
+
+// Repository grouping
+const settingsStore = useSettingsStore()
+
+interface RepoSection {
+  type: 'group' | 'ungrouped'
+  name: string
+  repos: Repository[]
+  collapsed: boolean
+}
+
+const groupedSections = computed<RepoSection[]>(() => {
+  const groups = settingsStore.settings.repositoryGroups
+  const filtered = filteredRepositories.value
+  const filteredNames = new Set(filtered.map(r => r.name))
+  const assignedNames = new Set<string>()
+
+  const sections: RepoSection[] = []
+
+  for (const group of groups) {
+    const groupRepos = group.repos
+      .filter(name => filteredNames.has(name))
+      .map(name => filtered.find(r => r.name === name)!)
+      .filter(Boolean)
+    group.repos.forEach(n => assignedNames.add(n))
+    if (groupRepos.length > 0 || !repoSearchQuery.value.trim()) {
+      sections.push({
+        type: 'group',
+        name: group.name,
+        repos: groupRepos,
+        collapsed: group.collapsed,
+      })
+    }
+  }
+
+  const ungrouped = filtered.filter(r => !assignedNames.has(r.name))
+  if (ungrouped.length > 0) {
+    sections.push({ type: 'ungrouped', name: 'Ungrouped', repos: ungrouped, collapsed: false })
+  }
+
+  return sections
+})
+
+const hasGroups = computed(() => settingsStore.settings.repositoryGroups.length > 0)
+
+// Group management
+const showNewGroupInput = ref(false)
+const newGroupName = ref('')
+
+function handleCreateGroup() {
+  if (newGroupName.value.trim()) {
+    settingsStore.createGroup(newGroupName.value)
+    newGroupName.value = ''
+    showNewGroupInput.value = false
+  }
+}
+
+function handleCancelNewGroup() {
+  newGroupName.value = ''
+  showNewGroupInput.value = false
+}
 
 // Tab state
 type TabType = 'repos' | 'recent'
@@ -422,136 +484,369 @@ onMounted(() => {
       <nav v-if="!loading && repositories.length > 0 && (filteredRepositories.length > 0 || !repoSearchQuery.trim())"
         class="flex-1 overflow-y-auto py-2 px-2"
         aria-label="Repository list">
-        <ul class="space-y-0.5" role="listbox" :aria-activedescendant="selectedRepoName ? `repo-${selectedRepoName}` : undefined">
-          <li v-for="(repo, index) in filteredRepositories" :key="repo.name" class="relative"
-            role="option"
-            :id="`repo-${repo.name}`"
-            :aria-selected="repo.name === selectedRepoName">
-            <SListRow
-              :selected="repo.name === selectedRepoName"
-              :disabled="loadingRepoName === repo.name"
-              :aria-label="`${repo.name}, ${repo.worktrees} worktree${repo.worktrees === 1 ? '' : 's'}`"
-              class="group py-1.5"
-              @click="handleSelectRepo(repo.name)">
-              <!-- Icon/Avatar with loading spinner -->
-              <div class="flex items-center gap-3 flex-1 min-w-0">
-                <div :class="[
-                  'w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 transition-colors',
-                  repo.name === selectedRepoName
-                    ? 'bg-accent text-white'
-                    : 'bg-surface-overlay text-text-tertiary group-hover:text-text-secondary'
-                ]">
-                  <svg v-if="loadingRepoName === repo.name" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                  </svg>
+
+        <!-- Grouped view (when groups exist) -->
+        <template v-if="hasGroups">
+          <div v-for="section in groupedSections" :key="section.name" class="mb-1">
+            <!-- Group header -->
+            <button
+              class="w-full flex items-center gap-1.5 px-2 py-1.5 text-2xs font-medium text-text-muted uppercase tracking-wider hover:text-text-secondary transition-colors"
+              @click="section.type === 'group' ? settingsStore.toggleGroupCollapsed(section.name) : undefined"
+              :class="{ 'cursor-default': section.type === 'ungrouped' }">
+              <!-- Chevron (only for named groups) -->
+              <svg v-if="section.type === 'group'" class="w-3 h-3 transition-transform" :class="{ '-rotate-90': section.collapsed }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+              <span class="truncate">{{ section.name }}</span>
+              <span class="text-text-muted/60 ml-auto flex-shrink-0">{{ section.repos.length }}</span>
+
+              <!-- Group actions (only for named groups) -->
+              <span v-if="section.type === 'group'" class="flex-shrink-0" @click.stop>
+                <Dropdown align="right">
+                  <template #trigger>
+                    <button class="p-0.5 rounded text-text-muted hover:text-text-secondary transition-colors opacity-0 group-hover:opacity-100"
+                      :class="{ 'opacity-100': true }"
+                      aria-label="Group actions">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                      </svg>
+                    </button>
+                  </template>
+                  <template #default="{ close }">
+                    <DropdownItem @click="settingsStore.moveGroup(section.name, 'up'); close()">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                      </svg>
+                      Move Up
+                    </DropdownItem>
+                    <DropdownItem @click="settingsStore.moveGroup(section.name, 'down'); close()">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                      Move Down
+                    </DropdownItem>
+                    <div class="my-1 h-px bg-border-subtle mx-2" />
+                    <DropdownItem danger @click="settingsStore.deleteGroup(section.name); close()">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Delete Group
+                    </DropdownItem>
+                  </template>
+                </Dropdown>
+              </span>
+            </button>
+
+            <!-- Group repos (collapsible) -->
+            <ul v-if="!section.collapsed" class="space-y-0.5" role="listbox">
+              <li v-for="repo in section.repos" :key="repo.name" class="relative"
+                role="option"
+                :id="`repo-${repo.name}`"
+                :aria-selected="repo.name === selectedRepoName">
+                <SListRow
+                  :selected="repo.name === selectedRepoName"
+                  :disabled="loadingRepoName === repo.name"
+                  :aria-label="`${repo.name}, ${repo.worktrees} worktree${repo.worktrees === 1 ? '' : 's'}`"
+                  class="group py-1.5"
+                  @click="handleSelectRepo(repo.name)">
+                  <div class="flex items-center gap-3 flex-1 min-w-0">
+                    <div :class="[
+                      'w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 transition-colors',
+                      repo.name === selectedRepoName
+                        ? 'bg-accent text-white'
+                        : 'bg-surface-overlay text-text-tertiary group-hover:text-text-secondary'
+                    ]">
+                      <svg v-if="loadingRepoName === repo.name" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <span :class="[
+                        'block text-[13px] font-medium truncate transition-colors',
+                        repo.name === selectedRepoName ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary'
+                      ]">
+                        {{ repo.name }}
+                      </span>
+                      <span :class="[
+                        'block text-[11px] transition-colors',
+                        repo.name === selectedRepoName ? 'text-accent' : 'text-text-muted'
+                      ]">
+                        {{ repo.worktrees }} worktree{{ repo.worktrees === 1 ? '' : 's' }}
+                      </span>
+                    </div>
+                  </div>
+                </SListRow>
+
+                <!-- Repository actions menu (only for selected repo) -->
+                <div v-if="repo.name === selectedRepoName" class="absolute right-1 top-1/2 -translate-y-1/2 z-10">
+                  <Dropdown align="right">
+                    <template #trigger>
+                      <button
+                        class="p-1.5 rounded-md text-text-secondary bg-surface-overlay hover:bg-surface-raised transition-colors"
+                        aria-label="Repository actions"
+                        title="Repository actions" @contextmenu.prevent>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                        </svg>
+                      </button>
+                    </template>
+
+                    <template #default="{ close }">
+                      <!-- Group assignment submenu -->
+                      <div v-if="settingsStore.settings.repositoryGroups.length > 0" class="px-2 py-1.5 text-2xs font-medium text-text-muted uppercase tracking-wider">Group</div>
+                      <DropdownItem v-for="group in settingsStore.settings.repositoryGroups" :key="group.name"
+                        @click="settingsStore.assignRepoToGroup(repo.name, group.name); close()">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path v-if="group.repos.includes(repo.name)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                          <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                        {{ group.name }}
+                      </DropdownItem>
+                      <DropdownItem v-if="settingsStore.getRepoGroup(repo.name)" @click="settingsStore.unassignRepo(repo.name); close()">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Remove from Group
+                      </DropdownItem>
+                      <div v-if="settingsStore.settings.repositoryGroups.length > 0" class="my-1 h-px bg-border-subtle mx-2" />
+
+                      <!-- Primary actions group -->
+                      <DropdownItem @click="handleEditConfig(); close()">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        Edit Config
+                      </DropdownItem>
+
+                      <DropdownItem @click="handleManageHooks(); close()">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                        </svg>
+                        Manage Hooks
+                      </DropdownItem>
+
+                      <DropdownItem @click="handleRefreshRepo(repo.name); close()" :disabled="refreshingRepo === repo.name">
+                        <svg class="w-4 h-4" :class="{ 'animate-spin': refreshingRepo === repo.name }" fill="none"
+                          stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        {{ refreshingRepo === repo.name ? 'Refreshing...' : 'Refresh' }}
+                      </DropdownItem>
+
+                      <div class="my-1 h-px bg-border-subtle mx-2" />
+
+                      <DropdownItem @click="handleRepair(repo.name); close()" :disabled="repairingRepo === repo.name">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        {{ repairingRepo === repo.name ? 'Repairing...' : 'Repair' }}
+                      </DropdownItem>
+
+                      <DropdownItem @click="handleUnlock(repo.name); close()" :disabled="unlockingRepo === repo.name">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                        </svg>
+                        {{ unlockingRepo === repo.name ? 'Unlocking...' : 'Unlock' }}
+                      </DropdownItem>
+
+                      <DropdownItem @click="handleGenerateReport(repo.name); close()"
+                        :disabled="generatingReport === repo.name">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        {{ generatingReport === repo.name ? 'Generating...' : 'Export Report' }}
+                      </DropdownItem>
+                    </template>
+                  </Dropdown>
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <!-- New group inline input -->
+          <div v-if="showNewGroupInput" class="px-2 py-1.5">
+            <input
+              v-model="newGroupName"
+              type="text"
+              class="w-full px-2 py-1 text-xs bg-surface-overlay border border-border-subtle rounded-md text-text-primary placeholder-text-muted focus:outline-none focus:ring-1 focus:ring-accent"
+              placeholder="Group name..."
+              maxlength="30"
+              @keydown.enter="handleCreateGroup"
+              @keydown.escape="handleCancelNewGroup"
+              ref="newGroupInput"
+            />
+          </div>
+
+          <!-- Add group button -->
+          <button v-if="!showNewGroupInput"
+            class="w-full flex items-center gap-1.5 px-2 py-1.5 text-2xs text-text-muted hover:text-text-secondary transition-colors"
+            @click="showNewGroupInput = true">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            New Group
+          </button>
+        </template>
+
+        <!-- Flat view (no groups defined) -->
+        <template v-else>
+          <ul class="space-y-0.5" role="listbox" :aria-activedescendant="selectedRepoName ? `repo-${selectedRepoName}` : undefined">
+            <li v-for="(repo, index) in filteredRepositories" :key="repo.name" class="relative"
+              role="option"
+              :id="`repo-${repo.name}`"
+              :aria-selected="repo.name === selectedRepoName">
+              <SListRow
+                :selected="repo.name === selectedRepoName"
+                :disabled="loadingRepoName === repo.name"
+                :aria-label="`${repo.name}, ${repo.worktrees} worktree${repo.worktrees === 1 ? '' : 's'}`"
+                class="group py-1.5"
+                @click="handleSelectRepo(repo.name)">
+                <!-- Icon/Avatar with loading spinner -->
+                <div class="flex items-center gap-3 flex-1 min-w-0">
+                  <div :class="[
+                    'w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 transition-colors',
+                    repo.name === selectedRepoName
+                      ? 'bg-accent text-white'
+                      : 'bg-surface-overlay text-text-tertiary group-hover:text-text-secondary'
+                  ]">
+                    <svg v-if="loadingRepoName === repo.name" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    </svg>
+                  </div>
+
+                  <div class="flex-1 min-w-0">
+                    <span :class="[
+                      'block text-[13px] font-medium truncate transition-colors',
+                      repo.name === selectedRepoName ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary'
+                    ]">
+                      {{ repo.name }}
+                    </span>
+                    <span :class="[
+                      'block text-[11px] transition-colors',
+                      repo.name === selectedRepoName ? 'text-accent' : 'text-text-muted'
+                    ]">
+                      {{ repo.worktrees }} worktree{{ repo.worktrees === 1 ? '' : 's' }}
+                    </span>
+                  </div>
                 </div>
 
-                <div class="flex-1 min-w-0">
-                  <span :class="[
-                    'block text-[13px] font-medium truncate transition-colors',
-                    repo.name === selectedRepoName ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary'
-                  ]">
-                    {{ repo.name }}
+                <template #actions>
+                  <span v-if="index < 9"
+                    class="text-[11px] text-text-muted font-mono opacity-0 group-hover:opacity-60 transition-opacity">
+                    {{ index + 1 }}
                   </span>
-                  <span :class="[
-                    'block text-[11px] transition-colors',
-                    repo.name === selectedRepoName ? 'text-accent' : 'text-text-muted'
-                  ]">
-                    {{ repo.worktrees }} worktree{{ repo.worktrees === 1 ? '' : 's' }}
-                  </span>
-                </div>
+                </template>
+              </SListRow>
+
+              <!-- Repository actions menu (only for selected repo) -->
+              <div v-if="repo.name === selectedRepoName" class="absolute right-1 top-1/2 -translate-y-1/2 z-10">
+                <Dropdown align="right">
+                  <template #trigger>
+                    <button
+                      class="p-1.5 rounded-md text-text-secondary bg-surface-overlay hover:bg-surface-raised transition-colors"
+                      aria-label="Repository actions"
+                      title="Repository actions" @contextmenu.prevent>
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                      </svg>
+                    </button>
+                  </template>
+
+                  <template #default="{ close }">
+                    <!-- Group assignment -->
+                    <DropdownItem @click="showNewGroupInput = true; close()">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      </svg>
+                      Create Group
+                    </DropdownItem>
+
+                    <div class="my-1 h-px bg-border-subtle mx-2" />
+
+                    <!-- Primary actions group -->
+                    <DropdownItem @click="handleEditConfig(); close()">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      Edit Config
+                    </DropdownItem>
+
+                    <DropdownItem @click="handleManageHooks(); close()">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                      </svg>
+                      Manage Hooks
+                    </DropdownItem>
+
+                    <DropdownItem @click="handleRefreshRepo(repo.name); close()" :disabled="refreshingRepo === repo.name">
+                      <svg class="w-4 h-4" :class="{ 'animate-spin': refreshingRepo === repo.name }" fill="none"
+                        stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      {{ refreshingRepo === repo.name ? 'Refreshing...' : 'Refresh' }}
+                    </DropdownItem>
+
+                    <!-- Divider -->
+                    <div class="my-1 h-px bg-border-subtle mx-2" />
+
+                    <!-- Maintenance actions group -->
+                    <DropdownItem @click="handleRepair(repo.name); close()" :disabled="repairingRepo === repo.name">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      {{ repairingRepo === repo.name ? 'Repairing...' : 'Repair' }}
+                    </DropdownItem>
+
+                    <DropdownItem @click="handleUnlock(repo.name); close()" :disabled="unlockingRepo === repo.name">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                      </svg>
+                      {{ unlockingRepo === repo.name ? 'Unlocking...' : 'Unlock' }}
+                    </DropdownItem>
+
+                    <DropdownItem @click="handleGenerateReport(repo.name); close()"
+                      :disabled="generatingReport === repo.name">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      {{ generatingReport === repo.name ? 'Generating...' : 'Export Report' }}
+                    </DropdownItem>
+                  </template>
+                </Dropdown>
               </div>
-
-              <template #actions>
-                <span v-if="index < 9"
-                  class="text-[11px] text-text-muted font-mono opacity-0 group-hover:opacity-60 transition-opacity">
-                  {{ index + 1 }}
-                </span>
-              </template>
-            </SListRow>
-
-            <!-- Repository actions menu (only for selected repo) -->
-            <div v-if="repo.name === selectedRepoName" class="absolute right-1 top-1/2 -translate-y-1/2 z-10">
-              <Dropdown align="right">
-                <template #trigger>
-                  <button
-                    class="p-1.5 rounded-md text-text-secondary bg-surface-overlay hover:bg-surface-raised transition-colors"
-                    aria-label="Repository actions"
-                    title="Repository actions" @contextmenu.prevent>
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                    </svg>
-                  </button>
-                </template>
-
-                <template #default="{ close }">
-                  <!-- Primary actions group -->
-                  <DropdownItem @click="handleEditConfig(); close()">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                    Edit Config
-                  </DropdownItem>
-
-                  <DropdownItem @click="handleManageHooks(); close()">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                    </svg>
-                    Manage Hooks
-                  </DropdownItem>
-
-                  <DropdownItem @click="handleRefreshRepo(repo.name); close()" :disabled="refreshingRepo === repo.name">
-                    <svg class="w-4 h-4" :class="{ 'animate-spin': refreshingRepo === repo.name }" fill="none"
-                      stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    {{ refreshingRepo === repo.name ? 'Refreshing...' : 'Refresh' }}
-                  </DropdownItem>
-
-                  <!-- Divider -->
-                  <div class="my-1 h-px bg-border-subtle mx-2" />
-
-                  <!-- Maintenance actions group -->
-                  <DropdownItem @click="handleRepair(repo.name); close()" :disabled="repairingRepo === repo.name">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    {{ repairingRepo === repo.name ? 'Repairing...' : 'Repair' }}
-                  </DropdownItem>
-
-                  <DropdownItem @click="handleUnlock(repo.name); close()" :disabled="unlockingRepo === repo.name">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
-                    </svg>
-                    {{ unlockingRepo === repo.name ? 'Unlocking...' : 'Unlock' }}
-                  </DropdownItem>
-
-                  <DropdownItem @click="handleGenerateReport(repo.name); close()"
-                    :disabled="generatingReport === repo.name">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    {{ generatingReport === repo.name ? 'Generating...' : 'Export Report' }}
-                  </DropdownItem>
-                </template>
-              </Dropdown>
-            </div>
-          </li>
-        </ul>
+            </li>
+          </ul>
+        </template>
       </nav>
     </template>
 

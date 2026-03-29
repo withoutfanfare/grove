@@ -30,6 +30,16 @@ export type GitClientChoice =
 
 export type ReleaseChannel = 'stable' | 'beta';
 
+/** A named group of repositories for sidebar organisation */
+export interface RepositoryGroup {
+  /** Display name of the group */
+  name: string;
+  /** Repository names assigned to this group */
+  repos: string[];
+  /** Whether the group section is collapsed in the sidebar */
+  collapsed: boolean;
+}
+
 export interface Settings {
   editor: EditorChoice;
   customEditorPath: string;
@@ -50,6 +60,10 @@ export interface Settings {
   releaseChannel: ReleaseChannel;
   /** Whether to check for updates automatically on launch */
   autoCheckUpdates: boolean;
+  /** User-defined repository groups, ordered by display position */
+  repositoryGroups: RepositoryGroup[];
+  /** Brief purpose notes for worktrees, keyed by "repoName/branch" */
+  worktreeNotes: Record<string, string>;
 }
 
 const STORAGE_KEY = 'wt-app-settings';
@@ -68,6 +82,8 @@ export const DEFAULT_SETTINGS: Settings = {
   trayBadgeStates: ['dirty', 'behind', 'stale'],
   releaseChannel: 'stable',
   autoCheckUpdates: true,
+  repositoryGroups: [],
+  worktreeNotes: {},
 };
 
 function loadSettings(): Settings {
@@ -138,6 +154,82 @@ export const useSettingsStore = defineStore('settings', () => {
     settings.value = { ...DEFAULT_SETTINGS };
   }
 
+  // ── Repository Groups ──────────────────────────────────────────────
+
+  function createGroup(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const exists = settings.value.repositoryGroups.some(g => g.name === trimmed);
+    if (exists) return;
+    settings.value.repositoryGroups.push({ name: trimmed, repos: [], collapsed: false });
+  }
+
+  function deleteGroup(name: string) {
+    settings.value.repositoryGroups = settings.value.repositoryGroups.filter(g => g.name !== name);
+  }
+
+  function renameGroup(oldName: string, newName: string) {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    const group = settings.value.repositoryGroups.find(g => g.name === oldName);
+    if (group) group.name = trimmed;
+  }
+
+  function assignRepoToGroup(repoName: string, groupName: string) {
+    // Remove from any existing group first
+    for (const group of settings.value.repositoryGroups) {
+      group.repos = group.repos.filter(r => r !== repoName);
+    }
+    // Add to the target group
+    const target = settings.value.repositoryGroups.find(g => g.name === groupName);
+    if (target) target.repos.push(repoName);
+  }
+
+  function unassignRepo(repoName: string) {
+    for (const group of settings.value.repositoryGroups) {
+      group.repos = group.repos.filter(r => r !== repoName);
+    }
+  }
+
+  function toggleGroupCollapsed(groupName: string) {
+    const group = settings.value.repositoryGroups.find(g => g.name === groupName);
+    if (group) group.collapsed = !group.collapsed;
+  }
+
+  function moveGroup(groupName: string, direction: 'up' | 'down') {
+    const groups = settings.value.repositoryGroups;
+    const idx = groups.findIndex(g => g.name === groupName);
+    if (idx === -1) return;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= groups.length) return;
+    [groups[idx], groups[swapIdx]] = [groups[swapIdx], groups[idx]];
+  }
+
+  function getRepoGroup(repoName: string): string | null {
+    const group = settings.value.repositoryGroups.find(g => g.repos.includes(repoName));
+    return group ? group.name : null;
+  }
+
+  // ── Worktree Notes ─────────────────────────────────────────────────
+
+  function setWorktreeNote(repoName: string, branch: string, note: string) {
+    const key = `${repoName}/${branch}`;
+    const trimmed = note.trim().slice(0, 120);
+    if (trimmed) {
+      settings.value.worktreeNotes[key] = trimmed;
+    } else {
+      delete settings.value.worktreeNotes[key];
+    }
+  }
+
+  function getWorktreeNote(repoName: string, branch: string): string {
+    return settings.value.worktreeNotes[`${repoName}/${branch}`] ?? '';
+  }
+
+  function deleteWorktreeNote(repoName: string, branch: string) {
+    delete settings.value.worktreeNotes[`${repoName}/${branch}`];
+  }
+
   return {
     settings,
     setEditor,
@@ -150,6 +242,19 @@ export const useSettingsStore = defineStore('settings', () => {
     setReleaseChannel,
     setAutoCheckUpdates,
     resetToDefaults,
+    // Repository groups
+    createGroup,
+    deleteGroup,
+    renameGroup,
+    assignRepoToGroup,
+    unassignRepo,
+    toggleGroupCollapsed,
+    moveGroup,
+    getRepoGroup,
+    // Worktree notes
+    setWorktreeNote,
+    getWorktreeNote,
+    deleteWorktreeNote,
   };
 });
 
