@@ -40,6 +40,15 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": ["binaries/grove"]
+    "externalBin": ["binaries/grove"],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ4M0RGNjFCMkU5OTY0RDAKUldUUVpKa3VHL1k5MkRHUUpjQkJod0JLMDZmMGNORWZiUENna2txTk9lbEZSc1NWQXY3NENMSnAK",
+      "endpoints": [
+        "https://grove-updates.stuntrocket.dev/{{target}}/{{arch}}/{{current_version}}"
+      ]
+    }
   }
 }
