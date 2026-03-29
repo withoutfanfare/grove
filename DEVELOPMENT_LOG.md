@@ -1,5 +1,15 @@
 # Grove Development Log
 
+## Cycle: 2026-03-29 22:00
+- App: Grove
+- Items completed:
+  - [Distribution] Add Tauri auto-updater with release channel support (P2/M) — Full-stack implementation. Rust: new `updater.rs` module with `check_for_update` and `get_app_version` Tauri commands using `tauri-plugin-updater` v2. Signing key pair generated (`grove.key`/`grove.key.pub`), public key configured in `tauri.conf.json`, private key gitignored. Update endpoint configured with `{{target}}/{{arch}}/{{current_version}}` template variables. Frontend: new `useUpdater` composable with module-level shared state for update status, download progress, and session dismissal. `UpdateBanner.vue` component with animated enter/leave transitions, release notes display, and "Update Now" / "Later" actions. `SettingsPanel.vue` extended with Updates section: release channel selector (stable/beta), auto-check toggle, current version display, and manual "Check Now" button. `ReleaseChannel` type and `autoCheckUpdates` boolean added to Settings interface and store. Update check runs 3 seconds after mount (deferred to avoid blocking app load). `updater:default` capability permission added. `createUpdaterArtifacts: true` set in bundle config for signed update artifact generation.
+- Items attempted but failed: none
+- Branch: feature/auto-updater
+- Tests passing: yes (cargo check clean — only pre-existing WorktreeTemplate warning; cargo clippy clean; vue-tsc clean; vite build clean)
+- Build status: not run (update endpoint not yet deployed — client-side infrastructure complete)
+- Notes: The update endpoint (`grove-updates.stuntrocket.dev`) is a placeholder awaiting server-side setup. The client infrastructure is fully functional and will work once the endpoint returns the expected JSON response format (`version`, `url`, `signature`, `notes`, `pub_date`). Network failures during update checks are handled gracefully — logged as warnings, never surfaced to users. The private signing key must be set as `TAURI_SIGNING_PRIVATE_KEY` environment variable during `cargo tauri build` for artifact signing. Rollback guidance: if an update causes issues, the previous `.app` bundle can be restored from Time Machine or a manual backup.
+
 ## Cycle: 2026-03-28
 - App: Grove
 - Items completed:

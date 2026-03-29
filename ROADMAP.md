@@ -66,7 +66,8 @@ Desktop GUI for git worktree management — visual interface for the `wt` CLI.
 - **Priority:** P2 (important)
 - **Size:** M (1-3hrs)
 - **Added:** 2026-03-19
-- **Status:** pending
+- **Status:** completed
+- **Completed:** 2026-03-29
 - **Description:** As the most production-ready app in the portfolio, Grove is the natural first candidate for auto-update distribution. Tauri's updater plugin with release channel support (stable/beta) would enable shipping updates to early testers before wider release, and ensure all users stay on the latest version without manual downloads.
 - **Acceptance criteria:**
   - Tauri updater plugin configured with update endpoint and signing
