@@ -38,6 +38,7 @@ const shortcuts = [
   { keys: ['⌘', ','], action: 'Open settings' },
   { keys: ['⌘', 'M'], action: 'Repository management' },
   { keys: ['⌘', 'K'], action: 'Command palette' },
+  { keys: ['⌘', '0'], action: 'Go to Overview' },
   { keys: ['⌘', 'P'], action: 'Pull all worktrees' },
   { keys: ['⌘', 'O'], action: 'Open focused worktree in editor' },
   { keys: ['⌘', 'T'], action: 'Open focused worktree in terminal' },

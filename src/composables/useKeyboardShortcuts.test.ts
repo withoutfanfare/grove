@@ -145,4 +145,30 @@ describe('useKeyboardShortcuts focus gating', () => {
 
     wrapper.unmount()
   })
+
+  describe('go to overview (⌘0 → onGoToOverview)', () => {
+    it('fires and prevents default with the modifier held', () => {
+      const onGoToOverview = vi.fn()
+      const wrapper = mountWithShortcuts({ onGoToOverview })
+
+      const prevented = dispatchKey({ key: '0', metaKey: true })
+
+      expect(onGoToOverview).toHaveBeenCalledTimes(1)
+      expect(prevented).toBe(true)
+
+      wrapper.unmount()
+    })
+
+    it('does not fire without the modifier', () => {
+      const onGoToOverview = vi.fn()
+      const wrapper = mountWithShortcuts({ onGoToOverview })
+
+      const prevented = dispatchKey({ key: '0' })
+
+      expect(onGoToOverview).not.toHaveBeenCalled()
+      expect(prevented).toBe(false)
+
+      wrapper.unmount()
+    })
+  })
 })

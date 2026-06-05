@@ -103,6 +103,8 @@ export interface KeyboardShortcutHandlers {
   onCopyCdCommand?: () => void
   onOpenAll?: () => void
   onCommandPalette?: () => void
+  /** Go to the cross-repo overview (deselect repository) */
+  onGoToOverview?: () => void
   /** Focus-state probe: returns true when a worktree is focused (gates worktree-targeted shortcuts) */
   onHasFocusedWorktree?: () => boolean
   // J/K worktree list navigation (non-modifier)
@@ -238,6 +240,12 @@ export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers = {}) {
       key: 'f',
       description: 'Focus search input',
       action: () => handlers.onFocusSearch?.(),
+      requiresModifier: true,
+    },
+    {
+      key: '0',
+      description: 'Go to Overview',
+      action: () => handlers.onGoToOverview?.(),
       requiresModifier: true,
     },
   ]

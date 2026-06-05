@@ -775,6 +775,7 @@ const { commands: paletteCommands } = useCommandRegistry({
   },
   onDeleteWorktree: () => { const wt = getFocusedWorktree(); if (wt) handleDeleteWorktree(wt) },
   onSelectRepo: (index: number) => store.selectRepository(store.repositories[index]?.name),
+  onGoToOverview: () => store.deselectRepository(),
 })
 
 // Keyboard shortcuts
@@ -795,6 +796,7 @@ useKeyboardShortcuts({
   onCloseModal: () => closeAllModals(),
   onFocusSearch: () => focusSearch(),  // L12
   onCommandPalette: () => toggleCommandPalette(),
+  onGoToOverview: () => store.deselectRepository(),
   onOpenEditor: () => { void handlePaletteOpenInEditor() },
   onOpenTerminal: () => { void handlePaletteOpenInTerminal() },
   onOpenBrowser: () => { void handlePaletteOpenInBrowser() },
