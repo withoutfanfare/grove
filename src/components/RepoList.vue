@@ -356,6 +356,13 @@ function handleManageHooks() {
   emit('openRepoManagement', 'hooks')
 }
 
+/**
+ * Show the cross-repo overview by deselecting the current repository.
+ */
+function handleGoToOverview() {
+  store.deselectRepository()
+}
+
 
 
 onMounted(() => {
@@ -369,6 +376,21 @@ onMounted(() => {
   <aside class="bg-surface-raised border-r border-white/[0.04] flex flex-col h-full">
     <!-- Tab header (pt-8 clears the native traffic light buttons in overlay mode) -->
     <div class="flex-shrink-0 border-b border-white/[0.04] p-2.5 pt-7">
+      <!-- Overview button: tab-style, distinct from repo rows -->
+      <button
+        class="w-full flex items-center gap-2 px-2.5 py-1.5 mb-2 rounded-md text-[13px] font-medium transition-colors"
+        :class="selectedRepoName === null
+          ? 'bg-accent/15 text-text-primary'
+          : 'text-text-secondary hover:text-text-primary hover:bg-surface-overlay/60'"
+        aria-label="Go to Overview"
+        @click="handleGoToOverview"
+      >
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+        </svg>
+        Overview
+      </button>
       <div class="flex p-0.5 bg-surface-overlay/40 rounded-md relative isolate">
         <!-- Sliding background pill -->
         <div class="absolute inset-y-0.5 transition-all duration-200 ease-out gradient-tab rounded" :class="[
