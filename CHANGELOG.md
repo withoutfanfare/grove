@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Auto-Focus on Creation** - Newly created worktrees are focused and scrolled into view when the create modal closes
 - **Tray Menu Auto-Refresh** - The system tray menu rebuilds (debounced) after create, delete, pull, sync, and prune operations so its quick-switch list always reflects current state
 - **Coloured Diff Stats** - Worktree card diff badge now shows insertions in green and deletions in red instead of a single neutral figure
+- **Plain-English Health Findings** - The health report now groups findings by worktree and explains each in plain English (e.g. "37 uncommitted changes") with why it matters, the exact points deducted, and inline fix actions (Pull, Sync, Open in Editor, Go to Worktree, and Remove… via the usual delete confirmation). Severity chips and summary tiles explain themselves on hover, and an expandable "How scoring works" section shows the full deduction table, grade bands, and severity brackets. The Overview's health attention items show the same translated findings
 
 ### Changed
 
@@ -28,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - **Silent Revalidation Errors** - Background refresh failures on cached repositories no longer raise the error banner over a perfectly usable cached list
+- **Accurate Health Issue Counts** - Health findings are counted individually (one per finding) even with older `grove` CLI builds that joined a worktree's findings into a single comma-separated message, and summary tiles now reflect worktree score brackets rather than issue rows
 - **Stale Toast Tests** - Rewrote useToast tests against the current @stuntrocket/ui wrapper API, eliminating 24 pre-existing failures left over from the component library migration
 
 ## [2026.02] - February 2026

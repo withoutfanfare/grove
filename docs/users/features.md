@@ -37,8 +37,10 @@ Grouped sections, each with a count badge:
 
 - **Repository errors** — repositories Grove couldn't read, with a **Repair**
   action; last-known data is still shown
-- **Health issues** — critical issues first; **View** opens the full health
-  report for that repository
+- **Health issues** — critical issues first, described in plain English
+  (e.g. "37 uncommitted changes · No commits for 105 days"); hover the
+  severity dot for what the severity means, and **View** opens the full
+  health report for that repository
 - **Dirty** — worktrees with uncommitted changes; open them straight in your
   editor
 - **Behind remote** — worktrees with commits to pull; pull individually or use
@@ -170,6 +172,39 @@ Click to reload:
 - Worktree data for selected repository
 
 Grove automatically watches for filesystem changes and refreshes when worktrees are added or removed, but you can manually refresh to ensure the latest data.
+
+## Health Report
+
+Open the health report for the selected repository from the **Repository
+health** button in the top bar, via **Health Report** in the command palette
+(Cmd+K), or with **View** on a health item in the Overview's Needs Attention
+panel.
+
+### What It Shows
+
+- **Overall grade and score** - The repository's letter grade (A-F) and its
+  score out of 100
+- **Summary tiles** - How many worktrees are Healthy (score 80 or above),
+  Warning (60-79), or Critical (below 60); hover a tile for its score range
+- **Findings grouped by worktree** - Each issue is described in plain English
+  with a one-line explanation of why it matters and a chip showing exactly how
+  many points it deducted (e.g. "-10 pts")
+- **Severity chips** - Each worktree group is labelled Warning or Critical;
+  hover the chip for what that means
+- **How scoring works** - An expandable explainer with the full deduction
+  table, grade bands, and severity brackets
+
+### Fixing Issues Inline
+
+Each finding offers the actions that resolve it:
+
+- **Pull** / **Sync** - Catch a worktree up with its base branch
+- **Open in Editor** - Jump straight to uncommitted work
+- **Go to Worktree** - Close the report and focus that worktree in the list
+- **Remove…** - For dormant worktrees; always opens the normal delete
+  confirmation first, so nothing is deleted in one click
+
+The report refreshes automatically after an action completes.
 
 ## Error Handling
 
