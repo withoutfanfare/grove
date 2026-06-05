@@ -189,13 +189,17 @@ async function runBulkPull(items: BulkPullItem[]): Promise<void> {
   bulkProgress.value = progress
   showProgressPanel.value = true
 
+  // Mutate through the ref's reactive proxy — writing to the captured plain
+  // object would bypass change tracking and freeze the progress panel.
+  const live = bulkProgress.value as OperationProgress
+
   const affectedRepos = new Set<string>()
   try {
     for (const [index, entry] of items.entries()) {
-      const progressItem = progress.items[index]
+      const progressItem = live.items[index]
       if (bulkCancelled.value) {
         progressItem.status = 'skipped'
-        progress.current = index + 1
+        live.current = index + 1
         continue
       }
       progressItem.status = 'in_progress'
@@ -224,9 +228,9 @@ async function runBulkPull(items: BulkPullItem[]): Promise<void> {
         progressItem.details = message
         itemErrors.value[key] = message
       }
-      progress.current = index + 1
+      live.current = index + 1
     }
-    progress.isComplete = true
+    live.isComplete = true
   } finally {
     isBulkPulling.value = false
     if (affectedRepos.size > 0) {

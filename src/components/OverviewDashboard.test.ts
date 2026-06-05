@@ -63,6 +63,21 @@ function mountOverview() {
   })
 }
 
+/** Mount variant that renders OperationProgressPanel for real (not stubbed). */
+function mountOverviewWithProgress() {
+  return mount(OverviewDashboard, {
+    global: {
+      stubs: {
+        HealthPanel: true,
+        DeleteWorktreeDialog: true,
+        PruneConfirmDialog: true,
+        SIconButton: true,
+        SSkeleton: true,
+      },
+    },
+  })
+}
+
 describe('OverviewDashboard', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -153,6 +168,63 @@ describe('OverviewDashboard', () => {
     await nextTick()
 
     expect(wrapper.text()).toContain('Refreshing')
+    wrapper.unmount()
+  })
+
+  it('bulk pull progress panel updates reactively and shows completion', async () => {
+    // Arrange: one repo with one worktree that is 2 commits behind
+    const store = useWorktreeStore()
+    store.setRepositories([{ name: 'api', worktrees: 1 }])
+    mockWtCommands(
+      {
+        api: [makeWorktree({ path: '/repos/api/main', branch: 'main', behind: 2 })],
+      },
+      []
+    )
+
+    // Extend the invoke mock to handle pull_worktree
+    mockTauriInvoke.mockImplementation((command: string, args?: Record<string, unknown>) => {
+      if (command === 'list_worktrees') {
+        const repo = (args?.repoName as string) ?? ''
+        if (repo === 'api') {
+          return Promise.resolve([
+            makeWorktree({ path: '/repos/api/main', branch: 'main', behind: 2 }),
+          ])
+        }
+        return Promise.resolve([])
+      }
+      if (command === 'get_recent_worktrees') return Promise.resolve([])
+      if (command === 'get_repo_health') return Promise.reject({ code: 'COMMAND_FAILED', message: 'unavailable in test' })
+      if (command === 'get_repo_disk_usage') return Promise.reject({ code: 'COMMAND_FAILED', message: 'unavailable in test' })
+      if (command === 'pull_worktree') {
+        return Promise.resolve({
+          success: true,
+          already_up_to_date: false,
+          conflicts: false,
+          commits_pulled: 2,
+          message: 'Updated 2 commits',
+        })
+      }
+      return Promise.resolve(undefined)
+    })
+
+    const wrapper = mountOverviewWithProgress()
+    await flushPromises()
+
+    // The Behind group should be present with its Pull all button
+    const bulkBtn = wrapper.find('.attention-bulk-action')
+    expect(bulkBtn.exists()).toBe(true)
+
+    // Act: click Pull all and wait for all async work (pull + refreshRepos) to settle
+    await bulkBtn.trigger('click')
+    await flushPromises()
+
+    // Assert: the progress panel completed — "1 succeeded" appears in the summary
+    // This assertion FAILS against the buggy code (which freezes at 0% / pending)
+    // and PASSES after the reactive-ref fix.
+    const text = wrapper.text()
+    expect(text).toContain('1 succeeded')
+
     wrapper.unmount()
   })
 })
