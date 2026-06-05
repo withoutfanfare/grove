@@ -503,6 +503,19 @@ export function useWt() {
     await invoke<void>('register_repository', { path });
   }
 
+  // ============================================================================
+  // System Tray
+  // ============================================================================
+
+  /**
+   * Rebuild the system tray menu so its quick-switch list and status
+   * indicators reflect the current worktree state. Takes no arguments;
+   * the backend injects the AppHandle.
+   */
+  async function refreshTrayMenu(): Promise<void> {
+    await invoke('refresh_tray_menu');
+  }
+
   /**
    * Convert an unknown error to a WtError
    */
@@ -578,6 +591,8 @@ export function useWt() {
     fetchPrBranch,
     // Repository registration
     registerRepository,
+    // System tray
+    refreshTrayMenu,
     toWtError,
   };
 }

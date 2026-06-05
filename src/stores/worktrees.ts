@@ -19,6 +19,8 @@ export const useWorktreeStore = defineStore('worktrees', () => {
   const focusedBranch = ref<string | null>(null);
   // Flag to expand details when focusing a worktree (e.g., from Recent list)
   const expandOnFocus = ref(false);
+  // Flag indicating the current focus should auto-clear (transient pulse from tray/Recent)
+  const focusTransient = ref(false);
   // Lazy loading: track which repos have had worktrees fetched this session
   const loadedRepos = ref<Set<string>>(new Set());
   // Cache of worktrees per repo for lazy loading
@@ -90,19 +92,26 @@ export const useWorktreeStore = defineStore('worktrees', () => {
   function selectRepository(name: string) {
     if (repositories.value.some((r) => r.name === name)) {
       selectedRepoName.value = name;
-      // Clear worktrees and show loading state to prevent flash of empty content
-      worktrees.value = [];
-      loadingWorktrees.value = true;
       // Clear any focused branch when switching repos
       focusedBranch.value = null;
+      // Stale-while-revalidate: paint cached worktrees instantly for previously
+      // loaded repos (no skeleton flash); blank + show loading for uncached repos.
+      if (isRepoLoaded(name)) {
+        worktrees.value = getCachedWorktrees(name);
+        loadingWorktrees.value = false;
+      } else {
+        worktrees.value = [];
+        loadingWorktrees.value = true;
+      }
       // Persist selection
       appStore.setLastSelectedRepo(name);
     }
   }
 
-  function focusWorktree(branch: string, shouldExpandDetails = false) {
+  function focusWorktree(branch: string, shouldExpandDetails = false, transient = false) {
     focusedBranch.value = branch;
     expandOnFocus.value = shouldExpandDetails;
+    focusTransient.value = transient;
   }
 
   function clearFocusedWorktree() {
@@ -157,6 +166,7 @@ export const useWorktreeStore = defineStore('worktrees', () => {
     loadingRecent.value = false;
     error.value = null;
     focusedBranch.value = null;
+    focusTransient.value = false;
   }
 
   return {
@@ -173,6 +183,7 @@ export const useWorktreeStore = defineStore('worktrees', () => {
     wtVersion,
     focusedBranch,
     expandOnFocus,
+    focusTransient,
     // Getters
     selectedRepo,
     hasRepositories,

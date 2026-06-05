@@ -46,6 +46,8 @@ const shortcuts = [
   { keys: ['↑', '↓'], action: 'Navigate repository list' },
   { keys: ['1-9'], action: 'Quick-select repository by position' },
   { keys: ['Enter'], action: 'Select focused repository' },
+  { keys: ['J'], action: 'Select next worktree' },
+  { keys: ['K'], action: 'Select previous worktree' },
 ]
 
 // Global shortcuts (work even when Grove is not focused)
@@ -210,7 +212,7 @@ grove setup</code></pre>
           <p>Press <kbd>⌘K</kbd> to open the command palette for quick access to any action. Use <kbd>⌘F</kbd> or <kbd>/</kbd> to focus the search bar. Both the sidebar and main panel have search:</p>
           <ul>
             <li><strong>Repository search</strong> — Filter the sidebar list by repository name</li>
-            <li><strong>Worktree search</strong> — Filter worktree cards by branch name, path, or status</li>
+            <li><strong>Worktree search</strong> — Filter worktree cards by branch name, path, status, or purpose note</li>
           </ul>
 
           <h3>Recent Worktrees</h3>

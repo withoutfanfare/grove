@@ -18,12 +18,14 @@ interface Props {
   placeholder?: string
   debounceMs?: number
   shortcut?: boolean
+  compact?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   placeholder: 'Search...',
   debounceMs: 300,
   shortcut: false,
+  compact: false,
 })
 
 const emit = defineEmits<{
@@ -86,6 +88,7 @@ function handleKeydown(event: KeyboardEvent) {
       ref="searchInputRef"
       :model-value="localValue"
       :placeholder="placeholder"
+      :compact="compact"
       :clearable="true"
       @update:model-value="handleUpdate"
       @keydown="handleKeydown"

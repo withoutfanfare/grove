@@ -23,6 +23,8 @@ Active roadmaps, design proposals, and code quality reviews for Grove.
 | [UI Overhaul Plan](proposals/ui-overhaul-plan.md) | Premium UI redesign proposal |
 | [Command Implementation Plan](proposals/command-implementation-plan.md) | CLI-to-GUI command mapping |
 | [CLI Dependency Evaluation](proposals/cli-dependency-evaluation.md) | Native Rust versus CLI dependency analysis |
+| [QoL Improvements — June 2026](proposals/qol-improvements-2026-06-05.md) | Top 10 quality-of-life improvements with implementation steps |
+| [QoL Ideas Backlog — June 2026](proposals/qol-ideas-backlog-2026-06-05.md) | Full unfiltered brainstorm output (48 ideas across six lenses) |
 
 ## Reviews
 

@@ -47,8 +47,8 @@ const scoreLabel = computed(() => {
     v-if="grade"
     :class="[
       gradeClass,
-      'inline-flex items-center gap-1 px-2 py-0.5',
-      'text-xs font-semibold rounded-md',
+      'inline-flex items-center gap-1 px-1.5 py-0.5',
+      'text-[11px] font-semibold rounded',
       'transition-all duration-150',
     ]"
     :title="scoreLabel ? `Health score: ${scoreLabel}/100` : `Health grade: ${gradeLabel}`"
@@ -59,7 +59,7 @@ const scoreLabel = computed(() => {
     <!-- Score (smaller, muted) -->
     <span
       v-if="scoreLabel"
-      class="text-2xs opacity-70 font-normal tabular-nums"
+      class="text-[10px] opacity-70 font-normal tabular-nums"
     >
       {{ scoreLabel }}
     </span>

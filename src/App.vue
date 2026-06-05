@@ -24,7 +24,7 @@ const pendingTrayFocus = ref<string | null>(null);
 // Watch for worktrees to finish loading, then apply pending focus
 watch(() => store.loadingWorktrees, (isLoading, wasLoading) => {
   if (wasLoading && !isLoading && pendingTrayFocus.value) {
-    store.focusWorktree(pendingTrayFocus.value);
+    store.focusWorktree(pendingTrayFocus.value, false, true);
     pendingTrayFocus.value = null;
   }
 });
@@ -52,11 +52,20 @@ onMounted(async () => {
             // Clear first so the watcher always fires (even if same branch).
             store.clearFocusedWorktree();
             requestAnimationFrame(() => {
-              store.focusWorktree(branch);
+              store.focusWorktree(branch, false, true);
+            });
+          } else if (store.isRepoLoaded(repo)) {
+            // Different repo, already cached — selectRepository paints it
+            // synchronously without entering loading, so the loading watcher's
+            // true→false edge never fires. Focus directly on the next frame.
+            store.selectRepository(repo);
+            requestAnimationFrame(() => {
+              store.focusWorktree(branch, false, true);
             });
           } else {
-            // Different repo — select it (triggers worktree fetch via Dashboard watcher)
-            // Store pending focus to apply once worktrees finish loading
+            // Different uncached repo — select it (triggers worktree fetch via
+            // Dashboard watcher). Store pending focus to apply once worktrees
+            // finish loading.
             pendingTrayFocus.value = branch;
             store.selectRepository(repo);
           }

@@ -22,13 +22,14 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   delete: [worktree: Worktree]
+  select: [branch: string]
 }>()
 
 // Scroll container reference
 const scrollContainerRef = ref<HTMLDivElement | null>(null)
 
-// Estimated item height based on WorktreeCard size (~90px content + 12px gap)
-const ESTIMATED_ITEM_HEIGHT = 102
+// Estimated item height based on the compact WorktreeCard size plus gap.
+const ESTIMATED_ITEM_HEIGHT = 78
 const OVERSCAN_COUNT = 5
 
 // Worktree count as a computed for reactivity
@@ -114,6 +115,7 @@ function handleDelete(worktree: Worktree) {
           :focused="focusedBranch === worktrees[virtualRow.index].branch"
           :initially-expanded="expandOnFocus && focusedBranch === worktrees[virtualRow.index].branch"
           @delete="handleDelete"
+          @select="(b) => emit('select', b)"
         />
       </div>
     </div>
@@ -150,6 +152,6 @@ function handleDelete(worktree: Worktree) {
   left: 0;
   width: 100%;
   /* Add gap between items */
-  padding-bottom: 12px;
+  padding-bottom: 10px;
 }
 </style>

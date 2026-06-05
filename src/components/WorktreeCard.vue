@@ -30,6 +30,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   delete: [worktree: Worktree]
+  select: [branch: string]
 }>()
 
 const { openInEditor, openInGitClient, openInTerminal, openInBrowser, openInFinder, openAll, pullWorktree, syncWorktree, getWorktreeOperation, isWorktreeBusy } = useWorktrees()
@@ -136,6 +137,11 @@ watch(
 
 function toggleDetails() {
   isDetailsExpanded.value = !isDetailsExpanded.value
+}
+
+function handleSelect() {
+  emit('select', props.worktree.branch)
+  toggleDetails()
 }
 
 // Computed properties for operation state from centralised tracking
@@ -361,18 +367,18 @@ async function handleOpenAll() {
       'card-expanded': isDetailsExpanded
     }">
     <!-- Main content row (click to toggle details) -->
-    <div class="p-4 flex items-center gap-4 cursor-pointer" role="button" tabindex="0"
-      @click="toggleDetails" @keydown.enter.prevent="toggleDetails" @keydown.space.prevent="toggleDetails">
+    <div class="px-3.5 py-3 flex items-center gap-3 cursor-pointer" role="button" tabindex="0"
+      @click="handleSelect" @keydown.enter.prevent="handleSelect" @keydown.space.prevent="handleSelect">
       <!-- Left: Branch info -->
       <div class="flex-1 min-w-0">
         <!-- Branch name and metadata -->
-        <div class="flex items-center gap-2.5">
-          <h3 class="text-text-primary text-[15px] font-semibold truncate tracking-tight" :title="branchName">
+        <div class="flex items-center gap-2">
+          <h3 class="text-text-primary text-[13px] font-semibold truncate tracking-tight" :title="branchName">
             {{ branchName }}
           </h3>
 
           <!-- SHA -->
-          <SKbd class="flex-shrink-0">{{ shortSha }}</SKbd>
+          <SKbd class="flex-shrink-0 compact-kbd">{{ shortSha }}</SKbd>
 
           <!-- Health grade -->
           <GradeBadge v-if="worktree.health_grade" :grade="worktree.health_grade" :score="worktree.health_score"
@@ -406,7 +412,7 @@ async function handleOpenAll() {
         </button>
 
         <!-- Status row -->
-        <div class="flex items-center gap-2.5 mt-1.5">
+        <div class="flex items-center gap-1.5 mt-1.5 min-w-0">
           <StatusBadge :dirty="worktree.dirty" :ahead="worktree.ahead" :behind="worktree.behind" :dirty-details="dirtyDetails" />
 
           <!-- Phase 2: Status badges (MERGED, STALE, MISMATCH) -->
@@ -415,7 +421,7 @@ async function handleOpenAll() {
           <!-- Protected branch badge -->
           <SBadge v-if="isProtectedBranch"
             variant="default"
-            class="!border-transparent gap-1"
+            class="!border-transparent gap-1 compact-badge"
             title="Branch is protected — deletion requires confirmation">
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -426,7 +432,7 @@ async function handleOpenAll() {
           <!-- Orphaned worktree badge (remote branch deleted) -->
           <SBadge v-if="isOrphanedWorktree"
             variant="warning"
-            class="!border-transparent gap-1"
+            class="!border-transparent gap-1 compact-badge"
             title="Remote branch has been deleted — this worktree may be ready for cleanup">
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878l4.242 4.242M15 12a3 3 0 00-3-3m0 0l7.5 7.5" />
@@ -437,7 +443,7 @@ async function handleOpenAll() {
           <!-- Stale worktree badge (configurable threshold) -->
           <SBadge v-if="isStaleWorktree && !worktree.stale"
             variant="warning"
-            class="!border-transparent gap-1.5"
+            class="!border-transparent gap-1 compact-badge"
             title="Worktree not accessed within stale threshold">
             Stale
           </SBadge>
@@ -445,17 +451,18 @@ async function handleOpenAll() {
           <!-- Diff stats badge -->
           <SBadge v-if="diffStats && diffStats.files_changed > 0"
             variant="default"
-            class="font-mono"
+            class="font-mono compact-badge"
             :title="diffStats.file_list.join('\n')">
-            {{ diffStats.display }}
+            <span>{{ diffStats.files_changed }} file{{ diffStats.files_changed === 1 ? '' : 's' }}</span>,&#32;
+            <span class="text-success">+{{ diffStats.lines_added }}</span><span class="text-text-muted">/</span><span class="text-danger">-{{ diffStats.lines_removed }}</span>
           </SBadge>
 
-          <span class="text-text-muted text-2xs font-mono truncate" :title="worktree.path">
+          <span class="text-text-muted text-[11px] font-mono truncate" :title="worktree.path">
             {{ shortPath }}
           </span>
 
           <!-- Phase 2: Age display -->
-          <span v-if="worktree.lastAccessed" class="text-text-muted text-2xs flex-shrink-0"
+          <span v-if="worktree.lastAccessed" class="text-text-muted text-[11px] flex-shrink-0"
             :title="`Last accessed: ${ageDisplay.full}`">
             {{ ageDisplay.short }}
           </span>
@@ -463,35 +470,35 @@ async function handleOpenAll() {
       </div>
 
       <!-- Right: Open in Editor button + Actions menu -->
-      <div class="flex items-center gap-1.5 flex-shrink-0" @click.stop>
+      <div class="flex items-center gap-1 flex-shrink-0" @click.stop>
         <!-- Open in Editor icon button -->
         <button
-          class="w-8 h-8 rounded-lg text-text-secondary hover:text-accent bg-surface-overlay hover:bg-surface-raised flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+          class="w-7 h-7 rounded-md text-text-secondary hover:text-accent bg-surface-overlay hover:bg-surface-raised flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
           aria-label="Open in editor"
           title="Open in editor (⌘O)"
           @click="handleOpenInEditor"
         >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
           </svg>
         </button>
 
         <!-- Open in Terminal icon button -->
         <button
-          class="w-8 h-8 rounded-lg text-text-secondary hover:text-accent bg-surface-overlay hover:bg-surface-raised flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+          class="w-7 h-7 rounded-md text-text-secondary hover:text-accent bg-surface-overlay hover:bg-surface-raised flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
           aria-label="Open in terminal"
           title="Open in terminal (⌘T)"
           @click="handleOpenInTerminal"
         >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
         </button>
 
         <Dropdown align="right">
           <template #trigger>
-            <button class="w-8 h-8 rounded-lg text-text-secondary bg-surface-overlay hover:bg-surface-raised flex items-center justify-center transition-colors" aria-label="Worktree actions" title="Actions">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button class="w-7 h-7 rounded-md text-text-secondary bg-surface-overlay hover:bg-surface-raised flex items-center justify-center transition-colors" aria-label="Worktree actions" title="Actions">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
               </svg>
