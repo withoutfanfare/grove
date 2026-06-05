@@ -102,7 +102,7 @@ describe('useWorktreeStore', () => {
       expect(store.selectedRepoName).toBe('existing')
     })
 
-    it('should clear worktrees when selecting', () => {
+    it('should clear worktrees when selecting an uncached repo', () => {
       const store = useWorktreeStore()
       store.setRepositories([
         { name: 'repo-a', worktrees: 2 },
@@ -110,16 +110,20 @@ describe('useWorktreeStore', () => {
       ])
       store.setWorktrees([{ path: '/test', branch: 'main', dirty: false, ahead: 0, behind: 0, sha: 'abc' }])
 
+      // repo-b has never been loaded this session
+      expect(store.isRepoLoaded('repo-b')).toBe(false)
       store.selectRepository('repo-b')
 
       expect(store.worktrees).toEqual([])
     })
 
-    it('should set loadingWorktrees when selecting', () => {
+    it('should set loadingWorktrees when selecting an uncached repo', () => {
       const store = useWorktreeStore()
       store.setRepositories([{ name: 'repo', worktrees: 2 }])
       store.setLoadingWorktrees(false)
 
+      // repo has never been loaded this session
+      expect(store.isRepoLoaded('repo')).toBe(false)
       store.selectRepository('repo')
 
       expect(store.loadingWorktrees).toBe(true)
@@ -133,6 +137,45 @@ describe('useWorktreeStore', () => {
       store.selectRepository('repo')
 
       expect(store.focusedBranch).toBeNull()
+    })
+
+    it('should paint cached worktrees and skip loading when selecting a previously-loaded repo', () => {
+      const store = useWorktreeStore()
+      store.setRepositories([
+        { name: 'repo-a', worktrees: 2 },
+        { name: 'repo-b', worktrees: 3 },
+      ])
+      // Load repo-a's worktrees (setWorktrees caches them against the selected repo)
+      store.selectRepository('repo-a')
+      const cached: Worktree[] = [
+        { path: '/a/main', branch: 'main', dirty: false, ahead: 0, behind: 0, sha: 'abc' },
+      ]
+      store.setWorktrees(cached)
+      expect(store.isRepoLoaded('repo-a')).toBe(true)
+
+      // Switch away to an uncached repo, then back to the cached one
+      store.selectRepository('repo-b')
+      store.selectRepository('repo-a')
+
+      expect(store.worktrees).toEqual(cached)
+      expect(store.loadingWorktrees).toBe(false)
+    })
+
+    it('should blank and set loading when selecting a never-loaded repo', () => {
+      const store = useWorktreeStore()
+      store.setRepositories([
+        { name: 'repo-a', worktrees: 2 },
+        { name: 'repo-b', worktrees: 3 },
+      ])
+      // Cache repo-a, then select the never-loaded repo-b
+      store.selectRepository('repo-a')
+      store.setWorktrees([{ path: '/a/main', branch: 'main', dirty: false, ahead: 0, behind: 0, sha: 'abc' }])
+
+      expect(store.isRepoLoaded('repo-b')).toBe(false)
+      store.selectRepository('repo-b')
+
+      expect(store.worktrees).toEqual([])
+      expect(store.loadingWorktrees).toBe(true)
     })
   })
 
@@ -253,6 +296,30 @@ describe('useWorktreeStore', () => {
       expect(store.expandOnFocus).toBe(true)
     })
 
+    it('focusWorktree should leave focusTransient false by default', () => {
+      const store = useWorktreeStore()
+      store.focusWorktree('my-feature-branch')
+
+      expect(store.focusTransient).toBe(false)
+    })
+
+    it('focusWorktree with transient flag should set focusTransient', () => {
+      const store = useWorktreeStore()
+      store.focusWorktree('my-feature-branch', false, true)
+
+      expect(store.focusedBranch).toBe('my-feature-branch')
+      expect(store.focusTransient).toBe(true)
+    })
+
+    it('focusWorktree should reset focusTransient to false when omitted', () => {
+      const store = useWorktreeStore()
+      store.focusWorktree('first', false, true)
+      expect(store.focusTransient).toBe(true)
+
+      store.focusWorktree('second')
+      expect(store.focusTransient).toBe(false)
+    })
+
     it('clearFocusedWorktree should clear focused branch', () => {
       const store = useWorktreeStore()
       store.focusWorktree('my-feature-branch')
@@ -337,7 +404,7 @@ describe('useWorktreeStore', () => {
       store.setWorktrees([{ path: '/test', branch: 'main', dirty: false, ahead: 0, behind: 0, sha: 'abc' }])
       store.setError({ code: 'TEST', message: 'Test' })
       store.setLoading(true)
-      store.focusWorktree('feature')
+      store.focusWorktree('feature', false, true)
 
       store.reset()
 
@@ -347,6 +414,7 @@ describe('useWorktreeStore', () => {
       expect(store.error).toBeNull()
       expect(store.loading).toBe(false)
       expect(store.focusedBranch).toBeNull()
+      expect(store.focusTransient).toBe(false)
     })
   })
 })

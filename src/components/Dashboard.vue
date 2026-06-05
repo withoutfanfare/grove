@@ -9,8 +9,9 @@ import { onMounted, onUnmounted, watch, ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useDebounceFn } from '@vueuse/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { useWorktreeStore, useSettingsStore } from '../stores'
-import { useRepos, useWorktrees, useWt, useOperationProgress, useAutoRefresh, useSearch, useKeyboardShortcuts, useShortcutTooltip, useToast, useWorktreeWatcher, useCommandRegistry, useWorktreeFilters, useBackgroundFetch, useStaleDetection, useTrayBadge, useRecentSwitches, useUpdater } from '../composables'
+import { useRepos, useWorktrees, useWt, useOperationProgress, useAutoRefresh, useSearch, useKeyboardShortcuts, useListNavigation, useShortcutTooltip, useToast, useWorktreeWatcher, useCommandRegistry, useWorktreeFilters, useBackgroundFetch, useStaleDetection, useTrayBadge, useRecentSwitches, useUpdater } from '../composables'
 import type { Worktree } from '../types'
 import type { WorktreeFilter, WorktreeSort } from '../composables'
 
@@ -29,7 +30,7 @@ import ErrorBoundary from './ErrorBoundary.vue'
 import SearchInput from './SearchInput.vue'
 import CommandPalette from './CommandPalette.vue'
 import UpdateBanner from './UpdateBanner.vue'
-import { SButton, SIconButton, SResizableSplit, SSegmentedControl, SSelect, SDivider } from '@stuntrocket/ui'
+import { SButton, SIconButton, SResizableSplit } from '@stuntrocket/ui'
 import { SkeletonCard } from './ui'
 import { copyPath, copyBranch, copyUrl, copyCdCommand } from '../utils/clipboard'
 
@@ -51,6 +52,7 @@ const {
   wtAvailable,
   focusedBranch,
   expandOnFocus,
+  focusTransient,
 } = storeToRefs(store)
 
 const { fetchRepositories } = useRepos()
@@ -87,10 +89,9 @@ const {
   activeSort,
   filterOptions,
   sortOptions,
-  hasActiveFilter,
   setFilter,
   setSort,
-  resetFilter,
+  countWorktrees,
   applyFiltersAndSort,
 } = useWorktreeFilters()
 
@@ -99,15 +100,30 @@ const searchInputRef = ref<{ focus: () => void } | null>(null)
 
 // Filtered worktrees: apply text search, then structured filters and sort
 const filteredWorktrees = computed(() => {
-  const searched = searchFilterWorktrees(worktrees.value)
+  const searched = searchFilterWorktrees(worktrees.value, (wt) =>
+    selectedRepoName.value ? settingsStore.getWorktreeNote(selectedRepoName.value, wt.branch) : ''
+  )
   return applyFiltersAndSort(searched)
 })
 
-// Count of worktrees matching the active filter (before text search)
-const filterCount = computed(() => {
-  if (!hasActiveFilter.value) return worktrees.value.length
-  return applyFiltersAndSort(worktrees.value).length
-})
+const filterOptionCounts = computed<Record<WorktreeFilter, number>>(() =>
+  countWorktrees(worktrees.value)
+)
+
+// J/K worktree list navigation — moves the persistent focus through the visible list
+const worktreeNav = useListNavigation(() => filteredWorktrees.value)
+
+function selectPrevWorktree() {
+  worktreeNav.navigateUp()
+  const wt = worktreeNav.getCurrentItem()
+  if (wt) store.focusWorktree(wt.branch)
+}
+
+function selectNextWorktree() {
+  worktreeNav.navigateDown()
+  const wt = worktreeNav.getCurrentItem()
+  if (wt) store.focusWorktree(wt.branch)
+}
 
 // Content key for crossfade transitions when switching states
 const contentKey = computed(() => {
@@ -175,6 +191,9 @@ const unregisterWatcher = onWorktreeChanged(() => {
   handleWorktreeChange()
 })
 
+// Global quick-switch shortcut listener (⌘⇧W) — opens the command palette
+let unlistenQuickSwitch: UnlistenFn | null = null
+
 // Initial load
 onMounted(async () => {
   // Repository list is already loaded by App.vue during loading screen
@@ -189,6 +208,16 @@ onMounted(async () => {
   // Start background fetch for remote tracking
   startBackgroundFetch()
 
+  // Open the command palette when the global quick-switch shortcut fires.
+  // Open (rather than toggle) so repeated presses from another app reliably show it.
+  try {
+    unlistenQuickSwitch = await listen('global_shortcut_quick_switch', () => {
+      showCommandPalette.value = true
+    })
+  } catch (e) {
+    console.error('[Dashboard] Failed to set up quick-switch listener:', e)
+  }
+
   // Check for updates on launch
   checkOnLaunch(settingsStore.settings.autoCheckUpdates)
 })
@@ -200,6 +229,10 @@ onUnmounted(() => {
   stopWatching()
   unregisterWatcher()
   cleanupWorktrees()
+  if (unlistenQuickSwitch) {
+    unlistenQuickSwitch()
+    unlistenQuickSwitch = null
+  }
   // H3: Debounced handler is 500ms; unregisterWatcher() above prevents new
   // triggers, and cleanupWorktrees() clears state, so pending calls are harmless.
 })
@@ -250,13 +283,15 @@ async function handleDrop(e: DragEvent) {
 // Watch for repo selection changes with race condition protection
 watch(selectedRepoName, async (newName, oldName) => {
   if (newName && newName !== oldName) {
-    // Clear search and filters when switching repositories
+    // Clear search when switching repositories; filter and sort persist
     clearWorktreeSearch()
-    resetFilter()
     // Stop watching the old repo
     await stopWatching()
     const currentFetch = ++fetchCounter.value
-    await fetchWorktrees()
+    // Stale-while-revalidate: cached repos were painted synchronously by
+    // selectRepository, so revalidate silently (no skeleton flash).
+    const wasCached = store.isRepoLoaded(newName)
+    await fetchWorktrees({ silent: wasCached })
     // H2: Guard against stale fetch — abort if another switch occurred during await
     if (currentFetch !== fetchCounter.value) return
     // Start auto-refresh for the new repository
@@ -275,6 +310,10 @@ function dismissError() {
   store.clearError()
 }
 
+function handleSortChange(event: Event) {
+  setSort((event.target as HTMLSelectElement).value as WorktreeSort)
+}
+
 // Helper to scroll focused worktree into view (retries until element appears in DOM)
 function scrollToFocusedWorktree() {
   const branch = focusedBranch.value
@@ -291,7 +330,10 @@ function scrollToFocusedWorktree() {
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'center' })
       setTimeout(() => store.clearExpandOnFocus(), 500)
-      setTimeout(() => store.clearFocusedWorktree(), 3000)
+      // Only auto-clear transient focus (tray/Recent pulse); click-driven focus persists
+      if (focusTransient.value) {
+        setTimeout(() => store.clearFocusedWorktree(), 3000)
+      }
     } else if (++attempts < maxAttempts) {
       // Element not in DOM yet — retry (worktrees may still be loading)
       setTimeout(tryScroll, 200)
@@ -308,6 +350,13 @@ watch(focusedBranch, (branch) => {
   }
 })
 
+// Keep J/K nav index in sync when focus changes from other sources (click/tray/Recent)
+watch(focusedBranch, (branch) => {
+  if (!branch) return
+  const index = filteredWorktrees.value.findIndex(w => w.branch === branch)
+  if (index !== -1) worktreeNav.selectIndex(index)
+})
+
 // Debounced refresh - uses auto-refresh to reset timer
 const handleRefresh = useDebounceFn(async () => {
   await fetchRepositories()
@@ -319,6 +368,7 @@ const handleRefresh = useDebounceFn(async () => {
 
 // Modal state
 const showCreateModal = ref(false)
+const pendingCreatedBranch = ref<string | null>(null)
 const showDeleteDialog = ref(false)
 const showSettingsPanel = ref(false)
 const showRepoManagementPanel = ref(false)
@@ -341,6 +391,24 @@ const progressHasConflicts = computed(() => hasConflicts())
 
 function openCreateModal() {
   showCreateModal.value = true
+}
+
+function handleWorktreeCreated(branch: string) {
+  pendingCreatedBranch.value = branch
+}
+
+function handleCreateModalClose() {
+  showCreateModal.value = false
+  const branch = pendingCreatedBranch.value
+  pendingCreatedBranch.value = null
+  if (branch) {
+    store.focusWorktree(branch, true)
+  }
+}
+
+// Persist focus on card click so keyboard/palette actions have a target (non-transient)
+function handleSelectWorktree(branch: string) {
+  store.focusWorktree(branch)
 }
 
 function closeAllPanels() {
@@ -721,6 +789,41 @@ useKeyboardShortcuts({
   onFocusSearch: () => focusSearch(),  // L12
   onCommandPalette: () => toggleCommandPalette(),
   onOpenEditor: () => { void handlePaletteOpenInEditor() },
+  onOpenTerminal: () => { void handlePaletteOpenInTerminal() },
+  onOpenBrowser: () => { void handlePaletteOpenInBrowser() },
+  onOpenAll: () => { void handlePaletteOpenAll() },
+  onCopyPath: () => {
+    void copyFocusedWorktreeValue(
+      (wt) => wt.path,
+      copyPath,
+      'Copied path to clipboard'
+    )
+  },
+  onCopyBranch: () => {
+    void copyFocusedWorktreeValue(
+      (wt) => wt.branch,
+      copyBranch,
+      'Copied branch name to clipboard'
+    )
+  },
+  onCopyUrl: () => {
+    void copyFocusedWorktreeValue(
+      (wt) => wt.url ?? null,
+      copyUrl,
+      'Copied URL to clipboard',
+      'No URL available for this worktree'
+    )
+  },
+  onCopyCdCommand: () => {
+    void copyFocusedWorktreeValue(
+      (wt) => wt.path,
+      copyCdCommand,
+      'Copied cd command to clipboard'
+    )
+  },
+  onHasFocusedWorktree: () => getFocusedWorktree() !== null,
+  onSelectPrevWorktree: () => selectPrevWorktree(),
+  onSelectNextWorktree: () => selectNextWorktree(),
 })
 
 async function handleTitlebarDrag(e: MouseEvent) {
@@ -797,98 +900,112 @@ async function handleTitlebarDrag(e: MouseEvent) {
           <!-- Header (Sticky & Glassmorphic) -->
           <header class="sticky top-0 border-b border-white/5"
             style="background-color: rgba(3, 7, 18, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); z-index: 100;">
-            <div class="px-6 py-3 pt-8 flex items-center gap-4">
+            <div class="px-5 py-2.5 pt-7 flex items-center gap-3">
               <!-- Left: repo info -->
-              <div class="flex items-center gap-3 flex-shrink-0">
-                <h1 class="text-xl font-bold text-text-primary tracking-tight truncate">
+              <div class="flex items-center gap-2.5 flex-shrink-0 min-w-0">
+                <h1 class="text-[17px] font-semibold text-text-primary tracking-tight truncate">
                   {{ selectedRepo?.name || 'Select a Repository' }}
                 </h1>
-                <span v-if="selectedRepo" class="text-sm text-text-tertiary">
+                <span v-if="selectedRepo" class="text-xs text-text-tertiary whitespace-nowrap">
                   {{ selectedRepo.worktrees }} worktree{{ selectedRepo.worktrees === 1 ? '' : 's' }}
                 </span>
-                <span v-if="selectedRepo" class="flex items-center gap-2 text-xs text-text-muted">
-                  <Transition name="fade">
-                    <span v-if="isAutoRefreshing" class="inline-flex items-center gap-1">
-                      <span class="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                      Refreshing...
-                    </span>
-                  </Transition>
-                  <span v-if="isWatching" class="inline-flex items-center gap-1" title="Watching for changes">
-                    <span class="w-1.5 h-1.5 bg-success rounded-full animate-pulse-subtle" />
+                <span v-if="selectedRepo" class="topbar-status">
+                  <span v-if="isWatching" class="topbar-live" title="Watching for changes">
+                    <span class="topbar-live-dot" />
                     <span class="text-success">Live</span>
                   </span>
-                  <span>{{ lastUpdatedText }}</span>
+                  <span class="topbar-updated" :title="lastUpdatedText">
+                    {{ isAutoRefreshing ? 'Refreshing...' : lastUpdatedText }}
+                  </span>
                 </span>
               </div>
 
-              <!-- Centre: search (fills remaining space) -->
-              <div v-if="selectedRepo && worktrees.length > 0" class="flex-1 min-w-0">
-                <SearchInput ref="searchInputRef" v-model="worktreeSearchQuery"
-                  placeholder="Search worktrees..." shortcut />
-              </div>
-              <div v-else class="flex-1" />
+              <div class="flex-1" />
 
               <!-- Right: action buttons -->
-              <div v-if="selectedRepo" class="flex items-center gap-2 flex-shrink-0">
-                <SButton variant="secondary" size="sm" :loading="isPullingAll" @click="handlePullAll">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div v-if="selectedRepo" class="topbar-actions">
+                <button
+                  class="topbar-action"
+                  :disabled="isPullingAll"
+                  title="Pull all worktrees"
+                  @click="handlePullAll"
+                >
+                  <svg class="w-3.5 h-3.5" :class="{ 'animate-pulse': isPullingAll }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
-                  <span class="hidden sm:inline">Pull All</span>
-                </SButton>
-                <SButton variant="secondary" size="sm" @click="openHealthPanel">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  Pull
+                </button>
+                <button class="topbar-action" title="Repository health" @click="openHealthPanel">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
-                  <span class="hidden sm:inline">Health</span>
-                </SButton>
-                <SButton variant="secondary" size="sm" :loading="isPruning" title="Clean up stale references and find merged branches that can be safely removed" @click="handlePrune">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  Health
+                </button>
+                <button
+                  class="topbar-action"
+                  :disabled="isPruning"
+                  title="Clean up stale references and find merged branches that can be safely removed"
+                  @click="handlePrune"
+                >
+                  <svg class="w-3.5 h-3.5" :class="{ 'animate-pulse': isPruning }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
-                  <span class="hidden sm:inline">Clean Up</span>
-                </SButton>
+                  Clean
+                </button>
 
-                <SDivider orientation="vertical" :subtle="true" class="mx-1 h-6" />
+                <span class="topbar-divider" />
 
-                <SButton variant="primary" size="sm" @click="openCreateModal">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button class="topbar-action topbar-action-primary" title="Create worktree" @click="openCreateModal">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                   </svg>
                   Create
-                </SButton>
+                </button>
 
-                <SIconButton :tooltip="tooltipWithShortcut('Refresh', 'R')" @click="handleRefresh">
-                  <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button class="topbar-icon" :title="tooltipWithShortcut('Refresh', 'R')" @click="handleRefresh">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                </SIconButton>
-                <SIconButton :tooltip="tooltipWithShortcut('Repository Management', 'M')"
-                  :active="showRepoManagementPanel"
-                  @click="() => openRepoManagementPanel()">
-                  <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                </button>
+                <button
+                  class="topbar-icon"
+                  :class="{ 'topbar-icon-active': showRepoManagementPanel }"
+                  :title="tooltipWithShortcut('Repository Management', 'M')"
+                  @click="() => openRepoManagementPanel()"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
                   </svg>
-                </SIconButton>
-                <SIconButton tooltip="Help" :active="showHelpModal" @click="openHelpModal">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                </button>
+                <button
+                  class="topbar-icon"
+                  :class="{ 'topbar-icon-active': showHelpModal }"
+                  title="Help"
+                  @click="openHelpModal"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                </SIconButton>
-                <SIconButton :tooltip="tooltipWithShortcut('Settings', ',')" :active="showSettingsPanel" @click="openSettingsPanel">
-                  <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                </button>
+                <button
+                  class="topbar-icon"
+                  :class="{ 'topbar-icon-active': showSettingsPanel }"
+                  :title="tooltipWithShortcut('Settings', ',')"
+                  @click="openSettingsPanel"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                </SIconButton>
+                </button>
               </div>
             </div>
 
@@ -920,38 +1037,44 @@ async function handleTitlebarDrag(e: MouseEvent) {
 
           <!-- Filter/sort toolbar (visible when worktrees exist) -->
           <div v-if="selectedRepo && worktrees.length > 0"
-            class="flex-shrink-0 px-6 py-2 border-b border-white/5 flex items-center gap-3"
+            class="worktree-toolbar"
             style="background-color: rgba(3, 7, 18, 0.8);">
             <!-- Filter toggles -->
-            <SSegmentedControl
-              :options="filterOptions"
-              :model-value="activeFilter"
-              @update:model-value="(v: string) => setFilter(v as WorktreeFilter)" />
-
-            <!-- Active filter pill with clear -->
-            <span v-if="hasActiveFilter"
-              class="inline-flex items-center gap-1 px-2 py-0.5 text-2xs font-medium rounded-full bg-accent/10 text-accent">
-              {{ filterCount }} of {{ worktrees.length }}
-              <button class="ml-0.5 hover:text-text-primary transition-colors" @click="resetFilter" title="Clear filter">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+            <div class="worktree-filter-group" role="tablist" aria-label="Worktree filters">
+              <button
+                v-for="option in filterOptions"
+                :key="option.value"
+                class="worktree-filter"
+                :class="{ 'worktree-filter-active': activeFilter === option.value }"
+                role="tab"
+                :aria-selected="activeFilter === option.value"
+                @click="setFilter(option.value)"
+              >
+                <span>{{ option.label }}</span>
+                <span
+                  v-if="option.value !== 'all' && filterOptionCounts[option.value] > 0"
+                  class="worktree-filter-count">{{ filterOptionCounts[option.value] }}</span>
               </button>
-            </span>
+            </div>
 
             <div class="flex-1" />
 
-            <!-- Sort selector -->
-            <div class="flex items-center gap-1.5">
-              <span class="text-2xs text-text-muted">Sort:</span>
-              <SSelect
-                :model-value="activeSort"
-                size="sm"
-                @update:model-value="(v: string) => setSort(v as WorktreeSort)">
+            <div class="worktree-search">
+              <SearchInput ref="searchInputRef" v-model="worktreeSearchQuery"
+                placeholder="Search worktrees..." shortcut compact />
+            </div>
+
+            <div class="worktree-sort">
+              <label for="worktree-sort-select" class="worktree-sort-label">Sort</label>
+              <select
+                id="worktree-sort-select"
+                class="worktree-sort-select"
+                :value="activeSort"
+                @change="handleSortChange">
                 <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">
                   {{ opt.label }}
                 </option>
-              </SSelect>
+              </select>
             </div>
           </div>
 
@@ -1005,7 +1128,7 @@ async function handleTitlebarDrag(e: MouseEvent) {
               </div>
 
               <!-- Worktree list -->
-              <div v-else :key="contentKey" class="p-6 space-y-4">
+              <div v-else :key="contentKey" class="p-5 space-y-3">
                 <!-- No search results -->
                 <div v-if="filteredWorktrees.length === 0 && worktreeSearchQuery.trim()"
                   class="py-12 text-center animate-fade-in">
@@ -1030,16 +1153,16 @@ async function handleTitlebarDrag(e: MouseEvent) {
                   <!-- Virtual scrolling for 50+ items (performance optimisation) -->
                   <VirtualWorktreeList v-if="useVirtualScroll" :worktrees="filteredWorktrees"
                     :repo-name="selectedRepoName!" :focused-branch="focusedBranch" :expand-on-focus="expandOnFocus"
-                    @delete="handleDeleteWorktree" />
+                    @delete="handleDeleteWorktree" @select="handleSelectWorktree" />
 
                   <!-- Animated list for smaller lists (better UX with transitions) -->
-                  <div v-else class="space-y-3">
+                  <div v-else class="space-y-2.5">
                     <TransitionGroup name="list" appear @before-enter="onListBeforeEnter" @after-enter="onListAfterEnter">
                       <WorktreeCard v-for="(wt, index) in filteredWorktrees" :id="`worktree-${wt.branch}`" :key="wt.path"
                         :data-index="index"
                         :worktree="wt" :repo-name="selectedRepoName!" :focused="focusedBranch === wt.branch"
                         :initially-expanded="expandOnFocus && focusedBranch === wt.branch"
-                        @delete="handleDeleteWorktree" />
+                        @delete="handleDeleteWorktree" @select="handleSelectWorktree" />
                     </TransitionGroup>
                   </div>
                 </template>
@@ -1053,7 +1176,7 @@ async function handleTitlebarDrag(e: MouseEvent) {
     </template>
 
     <!-- Modals and Panels -->
-    <CreateWorktreeModal :is-open="showCreateModal" @close="showCreateModal = false" />
+    <CreateWorktreeModal :is-open="showCreateModal" @created="handleWorktreeCreated" @close="handleCreateModalClose" />
 
     <DeleteWorktreeDialog :is-open="showDeleteDialog" :worktree="worktreeToDelete" :repo-name="selectedRepoName || ''"
       @close="showDeleteDialog = false" />
@@ -1099,6 +1222,207 @@ button, a, input, select, textarea,
 [role="button"], [role="menuitem"] {
   -webkit-app-region: no-drag;
   app-region: no-drag;
+}
+
+.topbar-status {
+  display: inline-grid;
+  grid-template-columns: 30px 92px;
+  align-items: center;
+  column-gap: 6px;
+  flex: 0 0 128px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.topbar-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.topbar-live-dot {
+  width: 4px;
+  height: 4px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--color-success);
+  animation: pulse-subtle var(--duration-pulse) infinite;
+}
+
+.topbar-updated {
+  display: inline-block;
+  width: 92px;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+  text-overflow: clip;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.topbar-action,
+.topbar-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.topbar-action {
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.topbar-action:hover,
+.topbar-icon:hover {
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.topbar-action-primary {
+  color: var(--color-text-primary);
+  border-color: color-mix(in srgb, var(--color-accent) 28%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.topbar-action-primary:hover {
+  background: color-mix(in srgb, var(--color-accent) 24%, transparent);
+}
+
+.topbar-action:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.topbar-icon {
+  width: 28px;
+  border: 1px solid transparent;
+}
+
+.topbar-icon-active {
+  color: var(--color-text-primary);
+  border-color: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.topbar-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 2px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.worktree-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 42px;
+  padding: 6px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.worktree-filter-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.045);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.worktree-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 5px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.worktree-filter:hover {
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.worktree-filter-active {
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.075);
+}
+
+.worktree-filter-count {
+  min-width: 16px;
+  padding: 1px 4px;
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  background: rgba(255, 255, 255, 0.045);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
+  text-align: center;
+}
+
+.worktree-filter-active .worktree-filter-count {
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.worktree-search {
+  flex: 1 1 320px;
+  min-width: 220px;
+  max-width: 420px;
+}
+
+.worktree-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.worktree-sort-label {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.worktree-sort-select {
+  height: 28px;
+  min-width: 132px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 7px;
+  background-color: rgba(255, 255, 255, 0.035);
+  color: var(--color-text-primary);
+  padding: 0 28px 0 9px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.worktree-sort-select:hover {
+  border-color: rgba(255, 255, 255, 0.09);
+  background-color: rgba(255, 255, 255, 0.055);
 }
 
 /* Dashboard animations using design tokens */

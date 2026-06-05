@@ -3,8 +3,8 @@ import { useWindowFocus, useTimestamp, useThrottleFn } from '@vueuse/core';
 import { useWorktreeStore } from '../stores';
 import { useWt } from './useWt';
 
-/** Auto-refresh interval when user is active (15 seconds) */
-const ACTIVE_REFRESH_INTERVAL_MS = 15000;
+/** Auto-refresh interval when user is active (10 seconds) */
+const ACTIVE_REFRESH_INTERVAL_MS = 10000;
 
 /** Auto-refresh interval when user is idle (60 seconds) */
 const IDLE_REFRESH_INTERVAL_MS = 60000;
@@ -31,7 +31,7 @@ export interface AutoRefreshState {
   lastUpdatedText: ComputedRef<string>;
   /** Whether the user is currently active (has interacted within IDLE_TIMEOUT_MS) */
   isUserActive: ComputedRef<boolean>;
-  /** Current refresh interval in milliseconds (15s active, 60s idle) */
+  /** Current refresh interval in milliseconds (10s active, 60s idle) */
   currentInterval: ComputedRef<number>;
 }
 
@@ -54,7 +54,7 @@ export type UseAutoRefreshReturn = AutoRefreshState & AutoRefreshControls;
  * Composable for automatic worktree status refresh with adaptive intervals.
  *
  * Uses adaptive refresh intervals based on user activity:
- * - Active (15s): User has interacted within the last 30 seconds
+ * - Active (10s): User has interacted within the last 30 seconds
  * - Idle (60s): No user interaction for 30+ seconds
  *
  * Pauses when the window loses focus and resumes when it regains focus.
@@ -265,7 +265,7 @@ export function useAutoRefresh(): UseAutoRefreshReturn {
 
     isIntervalActive.value = true;
 
-    // Schedule with current interval (15s active, 60s idle)
+    // Schedule with current interval (10s active, 60s idle)
     // Capture current interval to avoid stale closure
     const interval = currentInterval.value;
     intervalTimeout = setTimeout(async () => {

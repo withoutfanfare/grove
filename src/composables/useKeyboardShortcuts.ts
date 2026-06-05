@@ -71,6 +71,8 @@ export interface ShortcutDefinition {
   requiresAlt?: boolean
   /** Whether this shortcut should work even when input is focused */
   allowInInput?: boolean
+  /** Optional guard: when it returns false the shortcut is skipped entirely (no preventDefault) */
+  enabled?: () => boolean
 }
 
 /**
@@ -101,6 +103,11 @@ export interface KeyboardShortcutHandlers {
   onCopyCdCommand?: () => void
   onOpenAll?: () => void
   onCommandPalette?: () => void
+  /** Focus-state probe: returns true when a worktree is focused (gates worktree-targeted shortcuts) */
+  onHasFocusedWorktree?: () => boolean
+  // J/K worktree list navigation (non-modifier)
+  onSelectPrevWorktree?: () => void
+  onSelectNextWorktree?: () => void
 }
 
 /**
@@ -146,6 +153,9 @@ export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers = {}) {
 
       // Check the key
       if (event.key.toLowerCase() !== definition.key.toLowerCase()) return
+
+      // Optional guard: skip entirely (no preventDefault) so native keystrokes pass through
+      if (definition.enabled && !definition.enabled()) return
 
       // Prevent default browser behaviour
       event.preventDefault()
@@ -214,12 +224,14 @@ export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers = {}) {
       description: 'Open in terminal',
       action: () => handlers.onOpenTerminal?.(),
       requiresModifier: true,
+      enabled: () => handlers.onHasFocusedWorktree?.() ?? false,
     },
     {
       key: 'b',
       description: 'Open in browser',
       action: () => handlers.onOpenBrowser?.(),
       requiresModifier: true,
+      enabled: () => handlers.onHasFocusedWorktree?.() ?? false,
     },
     // L12: Cmd+F to focus search
     {
@@ -256,6 +268,7 @@ export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers = {}) {
       requiresModifier: true,
       requiresShift: false,
       requiresAlt: false,
+      enabled: () => handlers.onHasFocusedWorktree?.() ?? false,
     },
     {
       key: 'c',
@@ -264,6 +277,7 @@ export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers = {}) {
       requiresModifier: true,
       requiresShift: true,
       requiresAlt: false,
+      enabled: () => handlers.onHasFocusedWorktree?.() ?? false,
     },
     {
       key: 'c',
@@ -272,6 +286,7 @@ export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers = {}) {
       requiresModifier: true,
       requiresShift: false,
       requiresAlt: true,
+      enabled: () => handlers.onHasFocusedWorktree?.() ?? false,
     },
     {
       key: 'd',
@@ -280,6 +295,7 @@ export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers = {}) {
       requiresModifier: true,
       requiresShift: true,
       requiresAlt: false,
+      enabled: () => handlers.onHasFocusedWorktree?.() ?? false,
     },
   ]
 
@@ -291,6 +307,7 @@ export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers = {}) {
     requiresModifier: true,
     requiresShift: false,
     requiresAlt: false,
+    enabled: () => handlers.onHasFocusedWorktree?.() ?? false,
   }
 
   // Navigation shortcuts without modifier
@@ -317,6 +334,18 @@ export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers = {}) {
       key: 'Enter',
       description: 'Select item',
       action: () => handlers.onSelectItem?.(),
+      requiresModifier: false,
+    },
+    {
+      key: 'k',
+      description: 'Select previous worktree',
+      action: () => handlers.onSelectPrevWorktree?.(),
+      requiresModifier: false,
+    },
+    {
+      key: 'j',
+      description: 'Select next worktree',
+      action: () => handlers.onSelectNextWorktree?.(),
       requiresModifier: false,
     },
   ]

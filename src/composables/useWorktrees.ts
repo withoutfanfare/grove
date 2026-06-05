@@ -21,6 +21,13 @@ const REFRESH_DEBOUNCE_MS = 200;
 // Track pending refresh timeouts per repository
 const pendingRefreshes = new Map<string, ReturnType<typeof setTimeout>>();
 
+// Debounce delay for tray menu rebuilds. Larger than REFRESH_DEBOUNCE_MS because
+// rebuilding the tray menu spawns the wt sidecar once per registered repo (N+1).
+const TRAY_REFRESH_DEBOUNCE_MS = 500;
+
+// Single shared timer coalescing tray refreshes across all useWorktrees() consumers
+let trayRefreshTimeout: ReturnType<typeof setTimeout> | undefined;
+
 // ============================================================================
 // Race Condition Prevention (C2 Fix)
 // ============================================================================
@@ -86,16 +93,36 @@ export function useWorktrees() {
   const wt = useWt();
 
   /**
+   * Schedule a debounced rebuild of the system tray menu so its quick-switch
+   * list and status indicators reflect the latest worktree state. Called on the
+   * success path of mutating operations only. Failures are swallowed (via void)
+   * so a tray issue never breaks the worktree mutation flow.
+   */
+  function scheduleTrayRefresh(): void {
+    if (trayRefreshTimeout) {
+      clearTimeout(trayRefreshTimeout);
+    }
+    trayRefreshTimeout = setTimeout(() => {
+      trayRefreshTimeout = undefined;
+      void wt.refreshTrayMenu();
+    }, TRAY_REFRESH_DEBOUNCE_MS);
+  }
+
+  /**
    * Internal function to fetch worktrees with proper error handling.
    * Tries getWorktreeStatus first, falls back to listWorktrees.
    * Uses fetch IDs to prevent race conditions when rapidly switching repos (C2 fix).
    */
-  async function fetchWorktreesInternal(repoName: string): Promise<void> {
+  async function fetchWorktreesInternal(repoName: string, opts?: { silent?: boolean }): Promise<void> {
     // Generate a unique fetch ID for this request
     const fetchId = ++globalFetchId;
     expectedFetchId.set(repoName, fetchId);
 
-    store.setLoadingWorktrees(true);
+    // Silent revalidation keeps the cached list painted (no skeleton); only the
+    // visible (non-silent) path toggles the loading state.
+    if (!opts?.silent) {
+      store.setLoadingWorktrees(true);
+    }
     store.clearError();
 
     try {
@@ -138,8 +165,11 @@ export function useWorktrees() {
 
           store.setWorktrees(worktrees);
         } catch (fallbackError) {
-          // C2 Fix: Only set error if this is still the active fetch
-          if (expectedFetchId.get(repoName) === fetchId && store.selectedRepoName === repoName) {
+          // C2 Fix: Only set error if this is still the active fetch.
+          // Silent revalidation must never surface an error banner over the
+          // usable cached list (plan item 4 risk note) — a transient background
+          // fetch failure leaves the cached worktrees untouched and unannounced.
+          if (!opts?.silent && expectedFetchId.get(repoName) === fetchId && store.selectedRepoName === repoName) {
             // Combine both errors for better debugging
             const primaryErr = wt.toWtError(primaryError);
             const fallbackErr = wt.toWtError(fallbackError);
@@ -152,8 +182,9 @@ export function useWorktrees() {
         }
       }
     } finally {
-      // Only clear loading state if this is still the active fetch for this repo
-      if (expectedFetchId.get(repoName) === fetchId) {
+      // Only clear loading state if this is still the active fetch for this repo.
+      // Silent revalidation never toggled loading, so it must not clear it either.
+      if (!opts?.silent && expectedFetchId.get(repoName) === fetchId) {
         store.setLoadingWorktrees(false);
       }
     }
@@ -162,12 +193,12 @@ export function useWorktrees() {
   /**
    * Fetch worktrees for the currently selected repository
    */
-  async function fetchWorktrees(): Promise<void> {
+  async function fetchWorktrees(opts?: { silent?: boolean }): Promise<void> {
     const repoName = store.selectedRepoName;
     if (!repoName) {
       return;
     }
-    await fetchWorktreesInternal(repoName);
+    await fetchWorktreesInternal(repoName, opts);
   }
 
   /**
@@ -342,6 +373,7 @@ export function useWorktrees() {
       const response = await wt.createWorktree(options);
       // Refresh the worktree list after creation
       await fetchWorktrees();
+      scheduleTrayRefresh();
       return response;
     } catch (error) {
       store.setError(wt.toWtError(error));
@@ -363,6 +395,7 @@ export function useWorktrees() {
       const response = await wt.removeWorktree(options);
       // Refresh the worktree list after removal
       await fetchWorktrees();
+      scheduleTrayRefresh();
       return response;
     } catch (error) {
       store.setError(wt.toWtError(error));
@@ -382,6 +415,7 @@ export function useWorktrees() {
       const result = await wt.pullWorktree(repo, branch);
       // Refresh the worktree list to update status
       await fetchWorktrees();
+      scheduleTrayRefresh();
       return result;
     } catch (error) {
       store.setError(wt.toWtError(error));
@@ -401,6 +435,7 @@ export function useWorktrees() {
       const result = await wt.syncWorktree(repo, branch);
       // Refresh the worktree list to update status
       await fetchWorktrees();
+      scheduleTrayRefresh();
       return result;
     } catch (error) {
       store.setError(wt.toWtError(error));
@@ -449,6 +484,7 @@ export function useWorktrees() {
       const result = await wt.pruneRepo(repoName, force);
       // Refresh the worktree list after pruning
       await fetchWorktrees();
+      scheduleTrayRefresh();
       // Notify if window not focused
       if (result?.summary) {
         notifications.notifyPruneComplete(result.summary.branches_deleted, repoName);
@@ -469,6 +505,7 @@ export function useWorktrees() {
       const result = await wt.pullAllWorktrees(repoName);
       // Refresh the worktree list after pulling all (debounced to prevent flicker)
       fetchWorktreesDebounced();
+      scheduleTrayRefresh();
       // Notify if window not focused
       if (result?.summary) {
         notifications.notifyPullAllComplete(result.summary.succeeded, result.summary.failed);
@@ -489,6 +526,7 @@ export function useWorktrees() {
       const result = await wt.pullSelectedWorktrees(repoName, branches);
       // Refresh the worktree list after pulling (debounced to prevent flicker)
       fetchWorktreesDebounced();
+      scheduleTrayRefresh();
       return result;
     } catch (error) {
       store.setError(wt.toWtError(error));
@@ -528,6 +566,12 @@ export function useWorktrees() {
       clearTimeout(timeout);
     }
     pendingRefreshes.clear();
+
+    // Clear any pending tray refresh debounce
+    if (trayRefreshTimeout) {
+      clearTimeout(trayRefreshTimeout);
+      trayRefreshTimeout = undefined;
+    }
 
     // Clear expected fetch IDs
     expectedFetchId.clear();
