@@ -37,7 +37,9 @@ const filesLoading = ref(false)
 const filesError = ref<string | null>(null)
 const filesFetched = ref(false)
 
-// Fetch data when panel expands (lazy loading)
+// Fetch data when panel expands (lazy loading). Immediate so a panel
+// mounted already expanded (card focused with initiallyExpanded) still
+// fetches — a non-immediate watch never fires when the prop starts true.
 watch(() => props.isExpanded, async (expanded) => {
   if (expanded) {
     // Fetch commits if not already fetched
@@ -50,7 +52,7 @@ watch(() => props.isExpanded, async (expanded) => {
       await fetchFiles()
     }
   }
-})
+}, { immediate: true })
 
 async function fetchCommits() {
   commitsLoading.value = true
