@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Overview Dashboard** - A cross-repository home screen shown whenever no repository is selected: portfolio stat strip (repos, worktrees, dirty, behind, disk usage), a grouped "Needs Attention" panel (repository errors with Repair, health issues, dirty, behind remote, cleanup candidates) and a Recent worktrees panel. Includes bulk **Pull all** (sequential, with live progress, cancel and retry) and bulk **Prune all** behind a mandatory confirmation listing exactly what will be deleted. Snapshots cache to localStorage for instant paint, with a tiered background refresh (worktree lists ×3 concurrent; health and disk usage throttled to once per five minutes per repository). Reachable via the sidebar Overview button, Cmd+0, or the command palette
 - **Worktree Focus Persistence** - Selecting a worktree (click, Enter, or J/K navigation) keeps it focused so keyboard shortcuts and palette actions always have a target; tray and recents navigation use transient focus that auto-clears
 - **Filter Count Chips** - Live per-filter match counts on the worktree filter segmented control
 - **Broader Worktree Search** - Search now matches worktree path and purpose note as well as branch name
@@ -17,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Launch Lands on the Overview** - The app no longer auto-selects (or restores) a repository at launch; it opens onto the new Overview home screen instead
 - **Global Shortcuts Wired Up** - Cmd+T/Cmd+B/copy/Cmd+Enter shortcuts now act on the focused worktree, gated so they no longer swallow native keystrokes (notably Cmd+C) when no worktree is focused
 - **Cmd+Shift+W Quick Switch** - The global quick-switch shortcut now opens the command palette instead of doing nothing
 - **Instant Repo Switching** - Previously loaded repositories render their cached worktrees immediately on switch with a silent background revalidation, instead of a blank loading state
