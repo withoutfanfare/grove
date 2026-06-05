@@ -383,6 +383,7 @@ onMounted(() => {
           ? 'bg-accent/15 text-text-primary'
           : 'text-text-secondary hover:text-text-primary hover:bg-surface-overlay/60'"
         aria-label="Go to Overview"
+        :aria-current="selectedRepoName === null ? 'page' : undefined"
         @click="handleGoToOverview"
       >
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
