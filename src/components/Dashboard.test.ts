@@ -13,6 +13,7 @@ function mountDashboard() {
     global: {
       stubs: {
         RepoList: true,
+        OverviewDashboard: true,
         WorktreeCard: true,
         VirtualWorktreeList: true,
         CreateWorktreeModal: true,

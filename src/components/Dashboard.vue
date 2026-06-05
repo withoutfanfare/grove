@@ -11,12 +11,13 @@ import { useDebounceFn } from '@vueuse/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { useWorktreeStore, useSettingsStore } from '../stores'
-import { useRepos, useWorktrees, useWt, useOperationProgress, useAutoRefresh, useSearch, useKeyboardShortcuts, useListNavigation, useShortcutTooltip, useToast, useWorktreeWatcher, useCommandRegistry, useWorktreeFilters, useBackgroundFetch, useStaleDetection, useTrayBadge, useRecentSwitches, useUpdater } from '../composables'
+import { useRepos, useWorktrees, useWt, useOperationProgress, useAutoRefresh, useSearch, useKeyboardShortcuts, useListNavigation, useShortcutTooltip, useToast, useWorktreeWatcher, useCommandRegistry, useWorktreeFilters, useBackgroundFetch, useStaleDetection, useTrayBadge, useRecentSwitches, useUpdater, useOverview } from '../composables'
 import type { Worktree } from '../types'
 import type { WorktreeFilter, WorktreeSort } from '../composables'
 
 // Components
 import RepoList from './RepoList.vue'
+import OverviewDashboard from './OverviewDashboard.vue'
 import WorktreeCard from './WorktreeCard.vue'
 import VirtualWorktreeList from './VirtualWorktreeList.vue'
 import CreateWorktreeModal from './CreateWorktreeModal.vue'
@@ -79,6 +80,9 @@ const {
   pause: pauseAutoRefresh,
   resume: resumeAutoRefresh,
 } = useAutoRefresh()
+
+// Overview refresh (used by ⌘R when no repository is selected)
+const { refreshAll: refreshOverview } = useOverview()
 
 // Search functionality
 const { query: worktreeSearchQuery, filterWorktrees: searchFilterWorktrees, clearQuery: clearWorktreeSearch } = useSearch()
@@ -363,6 +367,9 @@ const handleRefresh = useDebounceFn(async () => {
   if (selectedRepoName.value) {
     // Use triggerAutoRefresh to fetch worktrees and reset the auto-refresh timer
     await triggerAutoRefresh()
+  } else {
+    // Overview is showing — force a full snapshot refresh (bypasses throttle)
+    await refreshOverview({ force: true })
   }
 }, 300)
 
@@ -904,7 +911,7 @@ async function handleTitlebarDrag(e: MouseEvent) {
               <!-- Left: repo info -->
               <div class="flex items-center gap-2.5 flex-shrink-0 min-w-0">
                 <h1 class="text-[17px] font-semibold text-text-primary tracking-tight truncate">
-                  {{ selectedRepo?.name || 'Select a Repository' }}
+                  {{ selectedRepo?.name || 'Overview' }}
                 </h1>
                 <span v-if="selectedRepo" class="text-xs text-text-tertiary whitespace-nowrap">
                   {{ selectedRepo.worktrees }} worktree{{ selectedRepo.worktrees === 1 ? '' : 's' }}
@@ -1083,19 +1090,8 @@ async function handleTitlebarDrag(e: MouseEvent) {
             <ErrorBoundary title="Failed to display worktrees"
               description="There was an error displaying the worktree list. Please try again." @retry="handleRefresh">
               <Transition name="crossfade" mode="out-in">
-              <!-- No repo selected -->
-              <div v-if="!selectedRepo" :key="contentKey" class="h-full flex items-center justify-center p-8">
-                <div class="text-center animate-fade-in">
-                  <div class="w-20 h-20 mx-auto mb-6 rounded-2xl bg-surface-overlay flex items-center justify-center">
-                    <svg class="w-10 h-10 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                        d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" />
-                    </svg>
-                  </div>
-                  <p class="text-lg font-medium text-text-secondary">Select a repository</p>
-                  <p class="text-sm text-text-muted mt-1">to view its worktrees</p>
-                </div>
-              </div>
+              <!-- No repo selected: cross-repository overview -->
+              <OverviewDashboard v-if="!selectedRepo" :key="contentKey" />
 
               <!-- Loading worktrees with skeleton cards -->
               <div v-else-if="loadingWorktrees" key="loading" class="p-6 space-y-3">
