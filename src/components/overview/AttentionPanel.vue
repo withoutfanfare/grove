@@ -113,7 +113,8 @@ function cleanupLabel(worktree: Worktree): string {
           <span class="attention-count">{{ healthAttention.length }}</span>
         </div>
         <ul class="attention-items">
-          <li v-for="(item, index) in healthAttention" :key="`${item.repo}-${item.issue.worktree}-${index}`"
+          <li v-for="item in healthAttention"
+            :key="`${item.repo}-${item.issue.worktree}-${item.issue.severity}-${item.issue.message}`"
             class="attention-item">
             <button class="attention-item-body" @click="emit('navigate', item.repo, item.issue.worktree)">
               <span class="attention-item-title">
