@@ -51,19 +51,6 @@ export const useWorktreeStore = defineStore('worktrees', () => {
   // Actions
   function setRepositories(repos: Repository[]) {
     repositories.value = repos;
-    // If no repo is selected and we have repos, select the first one immediately
-    // then try to restore the last selection from persistent store
-    if (!selectedRepoName.value && repos.length > 0) {
-      selectedRepoName.value = repos[0].name;
-      restoreLastSelectedRepo(repos);
-    }
-  }
-
-  async function restoreLastSelectedRepo(repos: Repository[]) {
-    const lastRepo = await appStore.getLastSelectedRepo();
-    if (lastRepo && repos.some((r) => r.name === lastRepo)) {
-      selectedRepoName.value = lastRepo;
-    }
   }
 
   function setWorktrees(wts: Worktree[]) {
@@ -106,6 +93,17 @@ export const useWorktreeStore = defineStore('worktrees', () => {
       // Persist selection
       appStore.setLastSelectedRepo(name);
     }
+  }
+
+  /**
+   * Deselect the current repository — the dashboard shows the overview.
+   */
+  function deselectRepository() {
+    selectedRepoName.value = null;
+    focusedBranch.value = null;
+    focusTransient.value = false;
+    // Persist so future launches also land on the overview
+    appStore.setLastSelectedRepo(null);
   }
 
   function focusWorktree(branch: string, shouldExpandDetails = false, transient = false) {
@@ -195,6 +193,7 @@ export const useWorktreeStore = defineStore('worktrees', () => {
     setWorktrees,
     setRecentWorktrees,
     selectRepository,
+    deselectRepository,
     setLoading,
     setLoadingWorktrees,
     setLoadingRecent,

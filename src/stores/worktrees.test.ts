@@ -49,7 +49,7 @@ describe('useWorktreeStore', () => {
       expect(store.repositories).toEqual(repos)
     })
 
-    it('should auto-select first repo when none selected', () => {
+    it('should not auto-select a repository (launch lands on the overview)', () => {
       const store = useWorktreeStore()
       const repos: Repository[] = [
         { name: 'repo-a', worktrees: 3 },
@@ -58,24 +58,22 @@ describe('useWorktreeStore', () => {
 
       store.setRepositories(repos)
 
-      expect(store.selectedRepoName).toBe('repo-a')
+      expect(store.selectedRepoName).toBeNull()
     })
 
     it('should not change selection if already selected', () => {
       const store = useWorktreeStore()
-      
-      // First set repos and auto-select the first one
+
       const repos: Repository[] = [
         { name: 'repo-a', worktrees: 3 },
         { name: 'repo-b', worktrees: 5 },
       ]
       store.setRepositories(repos)
-      expect(store.selectedRepoName).toBe('repo-a')
-      
-      // Now manually select repo-b
+
+      // Manually select repo-b
       store.selectRepository('repo-b')
       expect(store.selectedRepoName).toBe('repo-b')
-      
+
       // Setting repos again should not change the selection
       store.setRepositories(repos)
 
@@ -96,6 +94,7 @@ describe('useWorktreeStore', () => {
     it('should not select non-existent repository', () => {
       const store = useWorktreeStore()
       store.setRepositories([{ name: 'existing', worktrees: 1 }])
+      store.selectRepository('existing')
 
       store.selectRepository('non-existent')
 
@@ -176,6 +175,28 @@ describe('useWorktreeStore', () => {
 
       expect(store.worktrees).toEqual([])
       expect(store.loadingWorktrees).toBe(true)
+    })
+  })
+
+  describe('deselectRepository', () => {
+    it('clears the selection and focused worktree', () => {
+      const store = useWorktreeStore()
+      store.setRepositories([{ name: 'repo-a', worktrees: 1 }])
+      store.selectRepository('repo-a')
+      store.focusWorktree('main')
+
+      store.deselectRepository()
+
+      expect(store.selectedRepoName).toBeNull()
+      expect(store.focusedBranch).toBeNull()
+    })
+
+    it('is a no-op when nothing is selected', () => {
+      const store = useWorktreeStore()
+
+      store.deselectRepository()
+
+      expect(store.selectedRepoName).toBeNull()
     })
   })
 
