@@ -3,6 +3,7 @@ export { useWt } from './useWt';
 export { useRepos } from './useRepos';
 export { useWorktrees } from './useWorktrees';
 export { useRecent } from './useRecent';
+export { useOverview } from './useOverview';
 export { useOperationProgress } from './useOperationProgress';
 export { useAutoRefresh } from './useAutoRefresh';
 export type { AutoRefreshState, AutoRefreshControls, UseAutoRefreshReturn } from './useAutoRefresh';
