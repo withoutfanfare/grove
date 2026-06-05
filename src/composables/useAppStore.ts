@@ -64,10 +64,6 @@ export function useAppStore() {
     }
   }
 
-  async function getLastSelectedRepo(): Promise<string | null> {
-    return get('lastSelectedRepo');
-  }
-
   async function setLastSelectedRepo(repoName: string | null): Promise<void> {
     return set('lastSelectedRepo', repoName);
   }
@@ -108,7 +104,6 @@ export function useAppStore() {
     isReady,
     get,
     set,
-    getLastSelectedRepo,
     setLastSelectedRepo,
     getSidebarWidth,
     setSidebarWidth,
