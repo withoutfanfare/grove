@@ -69,3 +69,7 @@ CLAUDE.md
 .vscode
 prompts
 docs/developers
+code-review/
+
+# Brainstorming companion sessions
+.superpowers/

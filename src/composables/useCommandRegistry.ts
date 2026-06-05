@@ -34,6 +34,8 @@ export interface CommandHandlers {
   onSyncWorktree: () => void
   onDeleteWorktree: () => void
   onSelectRepo: (index: number) => void
+  /** Go to the cross-repo overview */
+  onGoToOverview: () => void
   /** Navigate to a worktree across any repo */
   onNavigateToWorktree?: (repo: string, branch: string) => void
   onReviewStaleWorktrees?: () => void
@@ -57,6 +59,13 @@ export function useCommandRegistry(handlers: CommandHandlers) {
       category: 'Navigation',
       shortcut: formatShortcut('F'),
       action: handlers.onFocusSearch,
+    })
+    cmds.push({
+      id: 'go-to-overview',
+      title: 'Go to Overview',
+      category: 'Navigation',
+      shortcut: formatShortcut('0'),
+      action: handlers.onGoToOverview,
     })
     cmds.push({
       id: 'open-help',

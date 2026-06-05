@@ -371,8 +371,8 @@ button:disabled {
 .card {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.04);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-md);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
   position: relative;
   overflow: hidden;
   transition: all var(--duration-slow) var(--ease-spring);
@@ -394,15 +394,30 @@ button:disabled {
 .card-interactive:hover {
   background: rgba(255, 255, 255, 0.05);
   border-color: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3),
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.24),
     0 0 0 1px rgba(99, 102, 241, 0.06);
-  transform: translateY(-1px);
 }
 
 .card-interactive.card-expanded {
   background: rgba(255, 255, 255, 0.05);
   border-color: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.24);
+}
+
+.compact-badge {
+  min-height: 18px !important;
+  padding: 1px 6px !important;
+  border-radius: 5px !important;
+  font-size: 11px !important;
+  line-height: 16px !important;
+}
+
+.compact-kbd {
+  min-height: 18px !important;
+  padding: 1px 6px !important;
+  border-radius: 5px !important;
+  font-size: 11px !important;
+  line-height: 16px !important;
 }
 
 /* Panel pattern (sidebars, slide-outs) */

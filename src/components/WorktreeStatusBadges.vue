@@ -40,7 +40,7 @@ const hasAnyBadge = computed(() => showMerged.value || showUnmerged.value || sho
     <SBadge
       v-if="showMerged"
       variant="success"
-      class="!border-transparent gap-1.5"
+      class="!border-transparent gap-1 compact-badge"
       title="This branch has been merged into the base branch and can be safely removed"
       role="status"
       aria-label="Branch merged into base"
@@ -67,7 +67,7 @@ const hasAnyBadge = computed(() => showMerged.value || showUnmerged.value || sho
     <SBadge
       v-if="showUnmerged"
       variant="warning"
-      class="!border-transparent gap-1.5"
+      class="!border-transparent gap-1 compact-badge"
       title="This branch has not been merged into the base branch"
       role="status"
       aria-label="Branch not merged"
@@ -94,7 +94,7 @@ const hasAnyBadge = computed(() => showMerged.value || showUnmerged.value || sho
     <SBadge
       v-if="showStale"
       variant="warning"
-      class="!border-transparent gap-1.5"
+      class="!border-transparent gap-1 compact-badge"
       title="This worktree is significantly behind the base branch (>50 commits). Consider syncing or removing it."
       role="status"
       aria-label="Worktree is stale"
@@ -121,7 +121,7 @@ const hasAnyBadge = computed(() => showMerged.value || showUnmerged.value || sho
     <SBadge
       v-if="showMismatch"
       variant="error"
-      class="!border-transparent gap-1.5"
+      class="!border-transparent gap-1 compact-badge"
       title="The directory name does not match the branch name. This may cause confusion when navigating between worktrees."
       role="status"
       aria-label="Directory name mismatch"

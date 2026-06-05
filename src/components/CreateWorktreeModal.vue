@@ -28,7 +28,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
-  created: []
+  created: [branch: string]
 }>()
 
 const store = useWorktreeStore()
@@ -313,7 +313,7 @@ async function handleSubmit() {
     if (response) {
       creationResult.value = response
       phase.value = 'results'
-      emit('created')
+      emit('created', response.result.branch)
     } else {
       error.value = store.error?.message ?? 'Failed to create worktree'
       phase.value = 'form'

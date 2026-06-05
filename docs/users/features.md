@@ -19,7 +19,59 @@ The dashboard is divided into two main areas:
 └─────────────────────────────────────────────────────────┘
 ```
 
+## Overview Home Screen
+
+When no repository is selected — including every launch — Grove shows the
+cross-repository Overview. It answers two questions at a glance: **what needs
+my attention?** and **where was I?**
+
+### Stat Strip
+
+A row of chips across the top totals your portfolio: repositories, worktrees,
+dirty count, behind count, and total disk usage (disk appears once the
+background scan completes).
+
+### Needs Attention Panel
+
+Grouped sections, each with a count badge:
+
+- **Repository errors** — repositories Grove couldn't read, with a **Repair**
+  action; last-known data is still shown
+- **Health issues** — critical issues first; **View** opens the full health
+  report for that repository
+- **Dirty** — worktrees with uncommitted changes; open them straight in your
+  editor
+- **Behind remote** — worktrees with commits to pull; pull individually or use
+  **Pull all** to pull every behind worktree across all repositories (one at a
+  time, with live progress)
+- **Cleanup candidates** — merged or stale worktrees; **Remove** uses the
+  normal delete flow, or **Prune all** removes merged branches across
+  repositories after a confirmation listing exactly what will be pruned
+
+Clicking an item's body jumps to that repository with the worktree focused.
+When nothing needs attention, the panel shows a calm all-clear state.
+
+### Recent Panel
+
+Your recently accessed worktrees with relative timestamps and quick-open
+editor/terminal buttons. Click one to jump straight back to it.
+
+### Getting to the Overview
+
+- Click the **Overview** button at the top of the sidebar
+- Press **Cmd+0**
+- Run **"Go to Overview"** from the command palette (Cmd+K)
+
+The Overview paints instantly from its cached snapshot, then refreshes in the
+background (on launch, on window focus, and with **Cmd+R**).
+
 ## Sidebar
+
+### Overview Button
+
+- Sits above the Repositories/Recent tabs
+- Returns to the cross-repository Overview
+- Highlighted when the Overview is showing
 
 ### Repository List
 

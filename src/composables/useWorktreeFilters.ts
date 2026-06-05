@@ -1,4 +1,5 @@
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
+import { usePersistedRef } from '@stuntrocket/ui'
 import type { Worktree } from '../types'
 
 /**
@@ -18,8 +19,8 @@ export type WorktreeSort = 'name' | 'last-accessed' | 'branch-age'
  * Works alongside the existing text search in useSearch.
  */
 export function useWorktreeFilters() {
-  const activeFilter = ref<WorktreeFilter>('all')
-  const activeSort = ref<WorktreeSort>('name')
+  const activeFilter = usePersistedRef<WorktreeFilter>('wt-worktree-filter', 'all')
+  const activeSort = usePersistedRef<WorktreeSort>('wt-worktree-sort', 'last-accessed')
 
   /**
    * Available filter options with labels
@@ -52,6 +53,20 @@ export function useWorktreeFilters() {
 
   function resetFilter() {
     activeFilter.value = 'all'
+  }
+
+  /**
+   * Count how many worktrees match each filter, computed over the full
+   * (unfiltered) list. Reuses the same predicates as filterWorktrees so the
+   * tallies always agree with the filtered result. Independent of activeFilter.
+   */
+  function countWorktrees(worktrees: Worktree[]): Record<WorktreeFilter, number> {
+    return {
+      all: worktrees.length,
+      dirty: worktrees.filter(wt => wt.dirty).length,
+      stale: worktrees.filter(wt => wt.stale === true).length,
+      unmerged: worktrees.filter(wt => wt.merged === false).length,
+    }
   }
 
   /**
@@ -116,6 +131,7 @@ export function useWorktreeFilters() {
     setFilter,
     setSort,
     resetFilter,
+    countWorktrees,
     filterWorktrees,
     sortWorktrees,
     applyFiltersAndSort,

@@ -50,9 +50,11 @@ When you first launch the app:
 
 1. **Repository Detection** - The app automatically detects repositories registered with `grove`
 
-2. **Select a Repository** - Click a repository in the sidebar to view its worktrees. Grove will remember your last selected repository for next time.
+2. **The Overview** - Grove launches onto the cross-repository Overview: portfolio stats, a "Needs Attention" panel (dirty, behind, cleanup candidates, health issues), and your recent worktrees. Press **Cmd+0** or click **Overview** in the sidebar to return to it at any time.
 
-3. **Explore Worktrees** - Each worktree card shows:
+3. **Select a Repository** - Click a repository in the sidebar to view its worktrees
+
+4. **Explore Worktrees** - Each worktree card shows:
    - Branch name and short SHA
    - Health grade (A-F)
    - Dirty/clean status

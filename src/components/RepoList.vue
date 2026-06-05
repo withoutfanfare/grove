@@ -184,6 +184,9 @@ async function handleSelectRepo(name: string) {
   if (loadingRepoName.value === name) return
 
   loadingRepoName.value = name
+  // Stale-while-revalidate: capture cache state before selecting, then
+  // revalidate silently for cached repos (no skeleton flash).
+  const wasCached = store.isRepoLoaded(name)
   selectRepository(name)
 
   // Create a timeout promise that rejects after LOADING_TIMEOUT_MS
@@ -194,7 +197,7 @@ async function handleSelectRepo(name: string) {
 
   try {
     // Race between fetch and timeout
-    await Promise.race([fetchWorktrees(), timeoutPromise])
+    await Promise.race([fetchWorktrees({ silent: wasCached }), timeoutPromise])
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : 'Failed to load worktrees'
     // Show error toast on timeout or fetch failure
@@ -239,14 +242,17 @@ async function handleNavigateToRecent(repoName: string, branch: string) {
   const needsRepoSwitch = selectedRepoName.value !== repoName
 
   if (needsRepoSwitch) {
+    // Stale-while-revalidate: capture cache state before selecting, then
+    // revalidate silently for cached repos (no skeleton flash).
+    const wasCached = store.isRepoLoaded(repoName)
     // Select the repository and fetch worktrees
     selectRepository(repoName)
     // Wait for worktrees to load before focusing
-    await fetchWorktrees()
+    await fetchWorktrees({ silent: wasCached })
   }
 
-  // Focus the worktree with details expansion flag
-  store.focusWorktree(branch, true)
+  // Focus the worktree with details expansion flag (transient — pulses then clears)
+  store.focusWorktree(branch, true, true)
 }
 
 // Phase 4: Repository management actions
@@ -350,6 +356,13 @@ function handleManageHooks() {
   emit('openRepoManagement', 'hooks')
 }
 
+/**
+ * Show the cross-repo overview by deselecting the current repository.
+ */
+function handleGoToOverview() {
+  store.deselectRepository()
+}
+
 
 
 onMounted(() => {
@@ -362,18 +375,34 @@ onMounted(() => {
 <template>
   <aside class="bg-surface-raised border-r border-white/[0.04] flex flex-col h-full">
     <!-- Tab header (pt-8 clears the native traffic light buttons in overlay mode) -->
-    <div class="flex-shrink-0 border-b border-white/[0.04] p-3 pt-8">
-      <div class="flex p-1 bg-surface-overlay/40 rounded-lg relative isolate">
+    <div class="flex-shrink-0 border-b border-white/[0.04] p-2.5 pt-7">
+      <!-- Overview button: tab-style, distinct from repo rows -->
+      <button
+        class="w-full flex items-center gap-2 px-2.5 py-1.5 mb-2 rounded-md text-[13px] font-medium transition-colors"
+        :class="selectedRepoName === null
+          ? 'bg-accent/15 text-text-primary'
+          : 'text-text-secondary hover:text-text-primary hover:bg-surface-overlay/60'"
+        aria-label="Go to Overview"
+        :aria-current="selectedRepoName === null ? 'page' : undefined"
+        @click="handleGoToOverview"
+      >
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+        </svg>
+        Overview
+      </button>
+      <div class="flex p-0.5 bg-surface-overlay/40 rounded-md relative isolate">
         <!-- Sliding background pill -->
-        <div class="absolute inset-y-1 transition-all duration-200 ease-out gradient-tab rounded-md" :class="[
-          activeTab === 'repos' ? 'left-1 right-1/2' : 'left-1/2 right-1'
+        <div class="absolute inset-y-0.5 transition-all duration-200 ease-out gradient-tab rounded" :class="[
+          activeTab === 'repos' ? 'left-0.5 right-1/2' : 'left-1/2 right-0.5'
         ]" />
 
         <button v-for="tab in [
           { id: 'repos' as TabType, label: 'Repositories' },
           { id: 'recent' as TabType, label: 'Recent' },
         ]" :key="tab.id" @click="switchTab(tab.id)" :class="[
-          'flex-1 px-3 py-1.5 text-xs font-medium tracking-wide transition-colors duration-200 relative z-10 rounded-md',
+          'flex-1 px-2.5 py-1.5 text-2xs font-medium transition-colors duration-200 relative z-10 rounded',
           activeTab === tab.id
             ? 'text-text-primary'
             : 'text-text-tertiary hover:text-text-secondary'
@@ -383,8 +412,8 @@ onMounted(() => {
       </div>
 
       <!-- Summary with action buttons -->
-      <div class="flex items-center justify-between px-4 py-2">
-        <span class="text-2xs text-text-muted">
+      <div class="flex items-center justify-between px-2.5 py-2">
+        <span class="text-[10px] leading-4 text-text-muted">
           <template v-if="activeTab === 'repos'">
             {{ repositories.length }} repos &middot; {{ totalWorktrees }} worktrees
           </template>
@@ -417,7 +446,7 @@ onMounted(() => {
 
       <!-- Repository search input -->
       <!-- M10: Debounce set to 150ms for responsive filtering -->
-      <div v-if="activeTab === 'repos' && repositories.length > 0" class="px-2 pb-2">
+      <div v-if="activeTab === 'repos' && repositories.length > 0" class="px-1.5 pb-1.5">
         <SearchInput v-model="repoSearchQuery" placeholder="Search repositories..." :debounce-ms="150" />
       </div>
     </div>
@@ -482,7 +511,7 @@ onMounted(() => {
 
       <!-- Repository list -->
       <nav v-if="!loading && repositories.length > 0 && (filteredRepositories.length > 0 || !repoSearchQuery.trim())"
-        class="flex-1 overflow-y-auto py-2 px-2"
+        class="flex-1 overflow-y-auto py-1.5 px-1.5"
         aria-label="Repository list">
 
         <!-- Grouped view (when groups exist) -->
@@ -549,11 +578,11 @@ onMounted(() => {
                   :selected="repo.name === selectedRepoName"
                   :disabled="loadingRepoName === repo.name"
                   :aria-label="`${repo.name}, ${repo.worktrees} worktree${repo.worktrees === 1 ? '' : 's'}`"
-                  class="group py-1.5"
+                  class="group py-1"
                   @click="handleSelectRepo(repo.name)">
-                  <div class="flex items-center gap-3 flex-1 min-w-0">
+                  <div class="flex items-center gap-2.5 flex-1 min-w-0">
                     <div :class="[
-                      'w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 transition-colors',
+                      'w-[26px] h-[26px] rounded flex items-center justify-center flex-shrink-0 transition-colors',
                       repo.name === selectedRepoName
                         ? 'bg-accent text-white'
                         : 'bg-surface-overlay text-text-tertiary group-hover:text-text-secondary'
@@ -575,7 +604,7 @@ onMounted(() => {
                         {{ repo.name }}
                       </span>
                       <span :class="[
-                        'block text-[11px] transition-colors',
+                        'block text-[10px] transition-colors',
                         repo.name === selectedRepoName ? 'text-accent' : 'text-text-muted'
                       ]">
                         {{ repo.worktrees }} worktree{{ repo.worktrees === 1 ? '' : 's' }}
@@ -715,12 +744,12 @@ onMounted(() => {
                 :selected="repo.name === selectedRepoName"
                 :disabled="loadingRepoName === repo.name"
                 :aria-label="`${repo.name}, ${repo.worktrees} worktree${repo.worktrees === 1 ? '' : 's'}`"
-                class="group py-1.5"
+                class="group py-1"
                 @click="handleSelectRepo(repo.name)">
                 <!-- Icon/Avatar with loading spinner -->
-                <div class="flex items-center gap-3 flex-1 min-w-0">
+                <div class="flex items-center gap-2.5 flex-1 min-w-0">
                   <div :class="[
-                    'w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 transition-colors',
+                    'w-[26px] h-[26px] rounded flex items-center justify-center flex-shrink-0 transition-colors',
                     repo.name === selectedRepoName
                       ? 'bg-accent text-white'
                       : 'bg-surface-overlay text-text-tertiary group-hover:text-text-secondary'
@@ -743,7 +772,7 @@ onMounted(() => {
                       {{ repo.name }}
                     </span>
                     <span :class="[
-                      'block text-[11px] transition-colors',
+                      'block text-[10px] transition-colors',
                       repo.name === selectedRepoName ? 'text-accent' : 'text-text-muted'
                     ]">
                       {{ repo.worktrees }} worktree{{ repo.worktrees === 1 ? '' : 's' }}
@@ -912,10 +941,10 @@ onMounted(() => {
                   <span class="block text-sm font-medium text-text-primary truncate">
                     {{ recent.branch }}
                   </span>
-                  <span class="block text-2xs text-text-muted truncate">
+                  <span class="block text-[10px] leading-4 text-text-muted truncate mt-0.5">
                     {{ recent.repo }}
                   </span>
-                  <span class="block text-2xs text-text-muted mt-0.5">
+                  <span class="block text-[10px] leading-4 text-text-muted">
                     {{ recent.accessed_ago }}
                   </span>
                 </div>
@@ -954,7 +983,7 @@ onMounted(() => {
 
     <!-- Footer with grove version -->
     <div class="flex-shrink-0 px-4 py-3 border-t border-white/[0.04]">
-      <div class="flex items-center justify-between text-2xs text-text-muted">
+      <div class="flex items-center justify-between text-[10px] leading-4 text-text-muted">
         <span>grove CLI</span>
         <span v-if="store.wtVersion" class="font-mono">v{{ store.wtVersion }}</span>
         <span v-else class="animate-pulse-subtle">...</span>

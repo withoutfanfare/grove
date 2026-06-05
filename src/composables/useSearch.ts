@@ -28,8 +28,8 @@ export interface UseSearchReturn {
   query: Ref<string>
   /** Clear the search query */
   clearQuery: () => void
-  /** Filter worktrees by branch name */
-  filterWorktrees: (worktrees: Worktree[]) => Worktree[]
+  /** Filter worktrees by branch name, path, or note */
+  filterWorktrees: (worktrees: Worktree[], getNote?: (wt: Worktree) => string) => Worktree[]
   /** Filter repositories by name */
   filterRepositories: (repositories: Repository[]) => Repository[]
   /** Check if a string matches the current query */
@@ -58,12 +58,14 @@ export function useSearch(): UseSearchReturn {
   }
 
   /**
-   * Filter worktrees by branch name
+   * Filter worktrees by branch name, path, or note
    * Preserves original order
    */
-  function filterWorktrees(worktrees: Worktree[]): Worktree[] {
+  function filterWorktrees(worktrees: Worktree[], getNote?: (wt: Worktree) => string): Worktree[] {
     if (!query.value.trim()) return worktrees
-    return worktrees.filter((wt) => matches(wt.branch))
+    return worktrees.filter(
+      (wt) => matches(wt.branch) || matches(wt.path) || (getNote ? matches(getNote(wt)) : false)
+    )
   }
 
   /**

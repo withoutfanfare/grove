@@ -54,10 +54,10 @@ describe('useSearch', () => {
 
   describe('filterWorktrees', () => {
     const worktrees: Worktree[] = [
-      { path: '/a', branch: 'main', dirty: false, ahead: 0, behind: 0, sha: 'abc' },
-      { path: '/b', branch: 'feature/login', dirty: false, ahead: 0, behind: 0, sha: 'def' },
-      { path: '/c', branch: 'feature/checkout', dirty: false, ahead: 0, behind: 0, sha: 'ghi' },
-      { path: '/d', branch: 'bugfix/auth', dirty: false, ahead: 0, behind: 0, sha: 'jkl' },
+      { path: '/Users/dev/project-worktrees/main', branch: 'main', dirty: false, ahead: 0, behind: 0, sha: 'abc' },
+      { path: '/Users/dev/project-worktrees/feature-login', branch: 'feature/login', dirty: false, ahead: 0, behind: 0, sha: 'def' },
+      { path: '/Users/dev/project-worktrees/feature-checkout', branch: 'feature/checkout', dirty: false, ahead: 0, behind: 0, sha: 'ghi' },
+      { path: '/Users/dev/sandbox/bugfix-auth', branch: 'bugfix/auth', dirty: false, ahead: 0, behind: 0, sha: 'jkl' },
     ]
 
     it('should return all worktrees when query is empty', () => {
@@ -70,6 +70,46 @@ describe('useSearch', () => {
       expect(filtered).toHaveLength(2)
       expect(filtered.map(w => w.branch)).toContain('feature/login')
       expect(filtered.map(w => w.branch)).toContain('feature/checkout')
+    })
+
+    it('should filter worktrees by path fragment', () => {
+      search.query.value = 'project-worktrees'
+      const filtered = search.filterWorktrees(worktrees)
+      expect(filtered).toHaveLength(3)
+      expect(filtered.map(w => w.branch)).toContain('main')
+      expect(filtered.map(w => w.branch)).toContain('feature/login')
+      expect(filtered.map(w => w.branch)).toContain('feature/checkout')
+      expect(filtered.map(w => w.branch)).not.toContain('bugfix/auth')
+    })
+
+    it('should match a path fragment that is not in the branch name', () => {
+      search.query.value = 'sandbox'
+      const filtered = search.filterWorktrees(worktrees)
+      expect(filtered).toHaveLength(1)
+      expect(filtered[0].branch).toBe('bugfix/auth')
+    })
+
+    it('should match a note word via the getNote resolver', () => {
+      search.query.value = 'refactor'
+      const getNote = (wt: Worktree) =>
+        wt.branch === 'bugfix/auth' ? 'payment refactor' : ''
+      const filtered = search.filterWorktrees(worktrees, getNote)
+      expect(filtered).toHaveLength(1)
+      expect(filtered[0].branch).toBe('bugfix/auth')
+    })
+
+    it('should not match notes when no resolver is passed (branch/path only)', () => {
+      search.query.value = 'refactor'
+      const filtered = search.filterWorktrees(worktrees)
+      expect(filtered).toEqual([])
+    })
+
+    it('should still match branch when a resolver is passed', () => {
+      search.query.value = 'login'
+      const getNote = () => ''
+      const filtered = search.filterWorktrees(worktrees, getNote)
+      expect(filtered).toHaveLength(1)
+      expect(filtered[0].branch).toBe('feature/login')
     })
 
     it('should return empty array when no matches', () => {

@@ -111,11 +111,11 @@ const dirtyShortLabel = computed(() => {
 </script>
 
 <template>
-  <div class="flex items-center gap-2">
+  <div class="flex items-center gap-1.5">
     <!-- Clean/Dirty badge -->
     <SBadge
       variant="default"
-      class="gap-1.5"
+      class="gap-1 compact-badge"
       role="status"
       :title="dirtyTooltip"
       :aria-label="dirty ? 'Worktree has uncommitted changes' : 'Worktree is clean'"
@@ -128,7 +128,7 @@ const dirtyShortLabel = computed(() => {
     <SBadge
       v-if="hasCommitStatus"
       variant="count"
-      :class="syncBadgeClasses"
+      :class="[syncBadgeClasses, 'compact-badge']"
       :title="commitStatusTooltip"
       role="status"
       :aria-label="commitStatusTooltip"
@@ -152,7 +152,7 @@ const dirtyShortLabel = computed(() => {
     <SBadge
       v-else-if="isUpToDate"
       variant="success"
-      class="!border-transparent gap-1.5"
+      class="!border-transparent gap-1 compact-badge"
       :title="commitStatusTooltip"
       role="status"
       aria-label="Up to date with remote"

@@ -299,6 +299,17 @@ describe('useWt', () => {
     })
   })
 
+  describe('refreshTrayMenu', () => {
+    it('should call refresh_tray_menu with no arguments', async () => {
+      mockTauriInvoke.mockResolvedValue(undefined)
+
+      const wt = useWt()
+      await wt.refreshTrayMenu()
+
+      expect(mockTauriInvoke).toHaveBeenCalledWith('refresh_tray_menu')
+    })
+  })
+
   describe('toWtError', () => {
     it('should return WtError as-is', () => {
       const wt = useWt()
