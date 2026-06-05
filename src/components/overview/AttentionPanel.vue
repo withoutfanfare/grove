@@ -14,6 +14,7 @@
 import { storeToRefs } from 'pinia'
 import { useOverviewStore } from '../../stores'
 import type { Worktree } from '../../types'
+import { parseHealthIssueMessage, severityExplanation } from '../../utils/healthIssues'
 
 const props = withDefaults(
   defineProps<{
@@ -68,6 +69,12 @@ function cleanupLabel(worktree: Worktree): string {
   if (worktree.merged) return 'merged'
   return 'stale'
 }
+
+/** Translate a raw CLI issue message into joined human titles */
+function healthSummary(message: string): string {
+  const titles = parseHealthIssueMessage(message).map((finding) => finding.title)
+  return titles.length > 0 ? titles.join(' · ') : message
+}
 </script>
 
 <template>
@@ -118,12 +125,13 @@ function cleanupLabel(worktree: Worktree): string {
             class="attention-item">
             <button class="attention-item-body" @click="emit('navigate', item.repo, item.issue.worktree)">
               <span class="attention-item-title">
-                <span class="severity-dot" :class="item.issue.severity === 'critical' ? 'bg-danger' : 'bg-warning'" />
+                <span class="severity-dot" :class="item.issue.severity === 'critical' ? 'bg-danger' : 'bg-warning'"
+                  :title="severityExplanation(item.issue.severity)" />
                 <span class="font-mono">{{ item.repo }}</span>
                 <span class="text-text-muted">·</span>
                 <span class="truncate">{{ item.issue.worktree }}</span>
               </span>
-              <span class="attention-item-sub">{{ item.issue.message }}</span>
+              <span class="attention-item-sub">{{ healthSummary(item.issue.message) }}</span>
             </button>
             <button class="attention-action" @click="emit('openHealth', item.repo)">View</button>
           </li>
