@@ -77,6 +77,9 @@ export function useOverview() {
    * Pass force to bypass the expensive-tier throttle (manual ⌘R).
    */
   async function refreshAll(opts?: { force?: boolean }): Promise<void> {
+    // The refreshing guard intentionally scopes only the cheap tier: a second
+    // refreshAll during the expensive tail is benign (idempotent store writes,
+    // per-repo throttle) and must not block cheap-only refreshes.
     if (overviewStore.refreshing) return;
     const repoNames = worktreeStore.repositories.map((r) => r.name);
     // A transient empty repo list must not wipe the snapshot cache
