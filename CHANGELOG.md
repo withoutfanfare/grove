@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Tidier Sidebar Header** - The sidebar's top section is now three rows instead of four: clone and global-config buttons sit beside the Overview button as a header toolbar, both tabs show live count chips (repositories and recent), and the floating "n repos · n worktrees" line is gone (portfolio totals live on the Overview page)
 - **Launch Lands on the Overview** - The app no longer auto-selects (or restores) a repository at launch; it opens onto the new Overview home screen instead
 - **Global Shortcuts Wired Up** - Cmd+T/Cmd+B/copy/Cmd+Enter shortcuts now act on the focused worktree, gated so they no longer swallow native keystrokes (notably Cmd+C) when no worktree is focused
 - **Cmd+Shift+W Quick Switch** - The global quick-switch shortcut now opens the command palette instead of doing nothing
