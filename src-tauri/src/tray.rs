@@ -190,9 +190,9 @@ fn build_worktree_item(
         display_name = format!("● {}", display_name);
     }
 
-    // Add sync status if behind
-    if worktree.behind > 0 {
-        display_name = format!("{} ↓{}", display_name, worktree.behind);
+    // Add sync status if behind (None means the base ref was unresolvable)
+    if let Some(behind) = worktree.behind.filter(|&b| b > 0) {
+        display_name = format!("{} ↓{}", display_name, behind);
     }
 
     // Menu item ID encodes repo:branch for the event handler

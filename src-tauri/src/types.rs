@@ -92,9 +92,13 @@ pub struct Worktree {
     /// Whether the worktree has uncommitted changes
     pub dirty: bool,
     /// Number of commits ahead of the tracking branch
-    pub ahead: u32,
+    /// (`None` when the CLI cannot resolve the base ref and emits `null`)
+    #[serde(default)]
+    pub ahead: Option<u32>,
     /// Number of commits behind the tracking branch
-    pub behind: u32,
+    /// (`None` when the CLI cannot resolve the base ref and emits `null`)
+    #[serde(default)]
+    pub behind: Option<u32>,
     /// Whether there's a branch mismatch
     #[serde(default)]
     pub mismatch: bool,
@@ -1115,6 +1119,24 @@ mod tests {
         assert_eq!(wt.branch, "feature/test");
         assert!(wt.dirty);
         assert_eq!(wt.health_grade, Some(HealthGrade::B));
+    }
+
+    // The CLI emits `"ahead": null` / `"behind": null` when the base ref
+    // cannot be resolved (e.g. detached HEAD before a fetch) — this is the
+    // documented JSON contract and must not fail deserialisation.
+    #[test]
+    fn test_worktree_with_null_ahead_behind() {
+        let json = r#"{
+            "path": "/Users/test/.codex/worktrees/c370/feature",
+            "branch": "",
+            "sha": "abc1234",
+            "dirty": false,
+            "ahead": null,
+            "behind": null
+        }"#;
+        let wt: Worktree = serde_json::from_str(json).unwrap();
+        assert_eq!(wt.ahead, None);
+        assert_eq!(wt.behind, None);
     }
 
     #[test]

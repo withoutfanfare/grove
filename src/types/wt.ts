@@ -64,10 +64,10 @@ export interface Worktree {
   url?: string;
   /** Whether the worktree has uncommitted changes */
   dirty: boolean;
-  /** Number of commits ahead of the tracking branch */
-  ahead: number;
-  /** Number of commits behind the tracking branch */
-  behind: number;
+  /** Number of commits ahead of the tracking branch (null when the base ref is unresolvable) */
+  ahead: number | null;
+  /** Number of commits behind the tracking branch (null when the base ref is unresolvable) */
+  behind: number | null;
   /** Whether there's a branch mismatch */
   mismatch?: boolean;
   /** Health grade (A, B, C, D, F) */

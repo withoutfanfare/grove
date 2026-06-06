@@ -27,7 +27,7 @@ export function useTrayBadge() {
   function needsAttention(wt: Worktree): boolean {
     const states = settings.value.trayBadgeStates;
     if (states.includes('dirty') && wt.dirty) return true;
-    if (states.includes('behind') && wt.behind > 0) return true;
+    if (states.includes('behind') && (wt.behind ?? 0) > 0) return true;
     if (states.includes('stale') && isStale(wt)) return true;
     return false;
   }
@@ -53,7 +53,7 @@ export function useTrayBadge() {
       .map((wt) => {
         const reasons: string[] = [];
         if (states.includes('dirty') && wt.dirty) reasons.push('uncommitted changes');
-        if (states.includes('behind') && wt.behind > 0) reasons.push(`${wt.behind} behind`);
+        if (states.includes('behind') && (wt.behind ?? 0) > 0) reasons.push(`${wt.behind} behind`);
         if (states.includes('stale') && isStale(wt)) reasons.push('stale');
         return { worktree: wt, reasons };
       });

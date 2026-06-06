@@ -28,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Nullable Sync Counts** - Worktree ahead/behind counts may legitimately arrive as null from the CLI when the base ref cannot be resolved (e.g. a detached-HEAD worktree before a fetch); Grove now accepts this instead of failing the whole repository snapshot with "invalid type: null, expected u32"
 - **Silent Revalidation Errors** - Background refresh failures on cached repositories no longer raise the error banner over a perfectly usable cached list
 - **Accurate Health Issue Counts** - Health findings are counted individually (one per finding) even with older `grove` CLI builds that joined a worktree's findings into a single comma-separated message, and summary tiles now reflect worktree score brackets rather than issue rows
 - **Stale Toast Tests** - Rewrote useToast tests against the current @stuntrocket/ui wrapper API, eliminating 24 pre-existing failures left over from the component library migration

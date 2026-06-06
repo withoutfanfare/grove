@@ -25,8 +25,9 @@ export interface DirtyDetails {
 
 const props = defineProps<{
   dirty: boolean
-  ahead?: number
-  behind?: number
+  /** null when the CLI cannot resolve the base ref */
+  ahead?: number | null
+  behind?: number | null
   /** Base branch name for tooltip context (e.g., "origin/main") */
   baseBranch?: string
   /** Optional detailed file counts for dirty state tooltip */

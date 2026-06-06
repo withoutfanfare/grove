@@ -142,7 +142,10 @@ const healthExplanation = computed(() => {
 
 // Sync status explanation
 const syncExplanation = computed(() => {
-  const { ahead = 0, behind = 0, dirty } = props.worktree
+  // ?? handles null (base ref unresolvable) as well as undefined
+  const { dirty } = props.worktree
+  const ahead = props.worktree.ahead ?? 0
+  const behind = props.worktree.behind ?? 0
   const parts: string[] = []
 
   if (dirty) {
