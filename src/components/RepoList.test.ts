@@ -40,6 +40,9 @@ describe('RepoList keyboard navigation (filtered/sorted)', () => {
       if (command === 'get_worktree_status' || command === 'list_worktrees') {
         return Promise.resolve([])
       }
+      if (command === 'get_recent_worktrees') {
+        return Promise.resolve([])
+      }
       return Promise.resolve(undefined)
     })
   })
