@@ -191,6 +191,44 @@ pub struct RemoveWorktreeResponse {
     pub hooks: Vec<HookExecution>,
 }
 
+/// One worktree's outcome within a batch remove operation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RemoveSelectedItem {
+    /// Branch name
+    pub branch: String,
+    /// Whether the removal succeeded
+    pub success: bool,
+    /// Whether the git branch was deleted
+    pub branch_deleted: bool,
+    /// Outcome message (or error/cancellation reason)
+    pub message: String,
+}
+
+/// Summary of a batch remove operation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RemoveSelectedSummary {
+    /// Total worktrees attempted
+    pub total: u32,
+    /// Number removed successfully
+    pub succeeded: u32,
+    /// Number that failed (excludes cancelled)
+    pub failed: u32,
+    /// Number cancelled by the user
+    #[serde(default)]
+    pub cancelled: u32,
+}
+
+/// Aggregated result of removing several worktrees
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RemoveSelectedResult {
+    /// Repository name
+    pub repo: String,
+    /// Per-worktree outcomes
+    pub worktrees: Vec<RemoveSelectedItem>,
+    /// Summary of the operation
+    pub summary: RemoveSelectedSummary,
+}
+
 /// Result from `wt pull <repo> <branch> --json`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PullResult {

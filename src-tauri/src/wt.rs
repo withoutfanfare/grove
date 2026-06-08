@@ -22,8 +22,8 @@ use crate::types::{
     BranchesResult, CloneResult, CreateWorktreeResult, HealthResult, OperationProgressEvent,
     OperationState, OperationStatus, PersistentOperationType, PruneResult, PruneSummary,
     PrunedBranch, PullAllResult, PullAllSummary, PullAllWorktree, PullResult, RecentWorktree,
-    RemoveWorktreeResult, RepairResult, Repository, SyncResult, UnlockResult, Worktree, WtError,
-    WtResult,
+    RemoveSelectedItem, RemoveSelectedResult, RemoveSelectedSummary, RemoveWorktreeResult,
+    RepairResult, Repository, SyncResult, UnlockResult, Worktree, WtError, WtResult,
 };
 
 // ============================================================================
@@ -1343,6 +1343,114 @@ pub fn pull_selected_with_progress(
             cancelled,
         },
     })
+}
+
+/// Build a `RemoveSelectedResult` from per-item outcomes.
+///
+/// Pure (no I/O) so it can be unit-tested without an `AppHandle`.
+fn summarise_removals(repo_name: &str, items: Vec<RemoveSelectedItem>) -> RemoveSelectedResult {
+    let total = items.len() as u32;
+    let succeeded = items.iter().filter(|i| i.success).count() as u32;
+    let cancelled = items
+        .iter()
+        .filter(|i| i.message == "Operation cancelled")
+        .count() as u32;
+    let failed = items
+        .iter()
+        .filter(|i| !i.success && i.message != "Operation cancelled")
+        .count() as u32;
+
+    RemoveSelectedResult {
+        repo: repo_name.to_string(),
+        worktrees: items,
+        summary: RemoveSelectedSummary { total, succeeded, failed, cancelled },
+    }
+}
+
+/// Remove several worktrees sequentially, emitting progress events.
+///
+/// Mirrors `pull_selected_with_progress` but runs sequentially (worktree
+/// removal mutates the repo's worktree list and runs hooks, so parallelism is
+/// unsafe). Per-item failures are recorded and do not abort the batch.
+/// Cancellation is honoured between items via the global cancellation token.
+/// `force` is always true, matching the single-delete GUI behaviour.
+pub fn remove_selected_with_progress(
+    app: &tauri::AppHandle,
+    repo_name: &str,
+    branches: Vec<String>,
+    delete_branch: bool,
+    drop_db: bool,
+    skip_backup: bool,
+) -> WtResult<RemoveSelectedResult> {
+    validate_repo_name(repo_name)?;
+    for branch in &branches {
+        validate_branch_name(branch)?;
+    }
+
+    let total = branches.len() as u32;
+    if total == 0 {
+        return Ok(summarise_removals(repo_name, vec![]));
+    }
+
+    // Registers globally and becomes the active operation; request_cancel() flips it.
+    let cancel_token = CancellationToken::new();
+
+    // Emit initial "pending" for all items so the panel shows the full list.
+    for (i, branch) in branches.iter().enumerate() {
+        emit_progress(app, "remove_all", (i + 1) as u32, total, branch, "pending", None);
+    }
+
+    let mut items: Vec<RemoveSelectedItem> = Vec::with_capacity(branches.len());
+    for (i, branch) in branches.iter().enumerate() {
+        let current = (i + 1) as u32;
+
+        if cancel_token.is_cancelled() {
+            emit_progress(app, "remove_all", current, total, branch, "skipped", Some("cancelled".to_string()));
+            items.push(RemoveSelectedItem {
+                branch: branch.clone(),
+                success: false,
+                branch_deleted: false,
+                message: "Operation cancelled".to_string(),
+            });
+            continue;
+        }
+
+        emit_progress(app, "remove_all", current, total, branch, "in_progress", None);
+
+        match remove_worktree(app, repo_name, branch, delete_branch, drop_db, skip_backup, true) {
+            Ok(resp) if resp.result.success => {
+                let deleted = resp.result.branch_deleted;
+                let details = if deleted { "branch deleted" } else { "worktree removed" };
+                emit_progress(app, "remove_all", current, total, branch, "success", Some(details.to_string()));
+                items.push(RemoveSelectedItem {
+                    branch: branch.clone(),
+                    success: true,
+                    branch_deleted: deleted,
+                    message: "removed".to_string(),
+                });
+            }
+            Ok(_) => {
+                emit_progress(app, "remove_all", current, total, branch, "failed", Some("removal reported failure".to_string()));
+                items.push(RemoveSelectedItem {
+                    branch: branch.clone(),
+                    success: false,
+                    branch_deleted: false,
+                    message: "removal reported failure".to_string(),
+                });
+            }
+            Err(e) => {
+                emit_progress(app, "remove_all", current, total, branch, "failed", Some(e.message.clone()));
+                items.push(RemoveSelectedItem {
+                    branch: branch.clone(),
+                    success: false,
+                    branch_deleted: false,
+                    message: e.message,
+                });
+            }
+        }
+    }
+
+    Ok(summarise_removals(repo_name, items))
 }
 
 /// Pull all worktrees with progress events (parallel execution)
@@ -2682,5 +2790,33 @@ Some trailing text that isn't JSON"#;
             derive_repo_name_from_url("https://github.com/user/repo.git/"),
             Some("repo".to_string())
         );
+    }
+
+    #[test]
+    fn test_summarise_removals_counts() {
+        let items = vec![
+            RemoveSelectedItem { branch: "a".into(), success: true, branch_deleted: true, message: "removed".into() },
+            RemoveSelectedItem { branch: "b".into(), success: false, branch_deleted: false, message: "boom".into() },
+            RemoveSelectedItem { branch: "c".into(), success: false, branch_deleted: false, message: "Operation cancelled".into() },
+        ];
+        let result = summarise_removals("myrepo", items);
+        assert_eq!(result.repo, "myrepo");
+        assert_eq!(result.summary.total, 3);
+        assert_eq!(result.summary.succeeded, 1);
+        assert_eq!(result.summary.failed, 1);
+        assert_eq!(result.summary.cancelled, 1);
+    }
+
+    #[test]
+    fn test_remove_selected_result_serde_roundtrip() {
+        let result = summarise_removals(
+            "r",
+            vec![RemoveSelectedItem { branch: "x".into(), success: true, branch_deleted: false, message: "removed".into() }],
+        );
+        let json = serde_json::to_string(&result).unwrap();
+        let parsed: RemoveSelectedResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.worktrees.len(), 1);
+        assert_eq!(parsed.worktrees[0].branch, "x");
+        assert_eq!(parsed.summary.succeeded, 1);
     }
 }
