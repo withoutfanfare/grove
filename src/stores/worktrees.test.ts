@@ -438,4 +438,74 @@ describe('useWorktreeStore', () => {
       expect(store.focusTransient).toBe(false)
     })
   })
+
+  describe('multi-selection', () => {
+    const wts: Worktree[] = [
+      { path: '/r/a', branch: 'a', sha: 's', dirty: false, ahead: 0, behind: 0 },
+      { path: '/r/b', branch: 'b', sha: 's', dirty: false, ahead: 0, behind: 0 },
+      { path: '/r/c', branch: 'c', sha: 's', dirty: false, ahead: 0, behind: 0 },
+    ]
+
+    it('starts with an empty selection', () => {
+      const store = useWorktreeStore()
+      expect(store.selectedPaths.size).toBe(0)
+      expect(store.selectionCount).toBe(0)
+    })
+
+    it('toggles a path on and off and tracks the anchor', () => {
+      const store = useWorktreeStore()
+      store.toggleSelection('/r/a')
+      expect(store.selectedPaths.has('/r/a')).toBe(true)
+      expect(store.lastSelectedPath).toBe('/r/a')
+      store.toggleSelection('/r/a')
+      expect(store.selectedPaths.has('/r/a')).toBe(false)
+    })
+
+    it('selects an inclusive range between the anchor and target', () => {
+      const store = useWorktreeStore()
+      store.toggleSelection('/r/a')
+      store.selectRange('/r/c', ['/r/a', '/r/b', '/r/c'])
+      expect([...store.selectedPaths].sort()).toEqual(['/r/a', '/r/b', '/r/c'])
+    })
+
+    it('replaces the selection with setSelection', () => {
+      const store = useWorktreeStore()
+      store.toggleSelection('/r/a')
+      store.setSelection(['/r/b', '/r/c'])
+      expect([...store.selectedPaths].sort()).toEqual(['/r/b', '/r/c'])
+    })
+
+    it('clears selection when switching repository', () => {
+      const store = useWorktreeStore()
+      store.setRepositories([{ name: 'r1', worktrees: 1 }, { name: 'r2', worktrees: 1 }])
+      store.selectRepository('r1')
+      store.toggleSelection('/r/a')
+      store.selectRepository('r2')
+      expect(store.selectedPaths.size).toBe(0)
+      expect(store.lastSelectedPath).toBeNull()
+    })
+
+    it('prunes selected paths that disappear after a refresh', () => {
+      const store = useWorktreeStore()
+      store.setRepositories([{ name: 'r1', worktrees: 3 }])
+      store.selectRepository('r1')
+      store.setWorktrees(wts)
+      store.setSelection(['/r/a', '/r/b'])
+      store.setWorktrees([wts[0]]) // /r/b removed
+      expect([...store.selectedPaths]).toEqual(['/r/a'])
+    })
+
+    it('selects a range in reverse (anchor after target)', () => {
+      const store = useWorktreeStore()
+      store.toggleSelection('/r/c')
+      store.selectRange('/r/a', ['/r/a', '/r/b', '/r/c'])
+      expect([...store.selectedPaths].sort()).toEqual(['/r/a', '/r/b', '/r/c'])
+    })
+
+    it('adds only the target when there is no valid anchor', () => {
+      const store = useWorktreeStore()
+      store.selectRange('/r/b', ['/r/a', '/r/b', '/r/c'])
+      expect([...store.selectedPaths]).toEqual(['/r/b'])
+    })
+  })
 })

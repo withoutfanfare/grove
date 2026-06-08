@@ -25,6 +25,10 @@ export const useWorktreeStore = defineStore('worktrees', () => {
   const loadedRepos = ref<Set<string>>(new Set());
   // Cache of worktrees per repo for lazy loading
   const worktreeCache = ref<Record<string, Worktree[]>>({});
+  // Multi-selection: set of selected worktree paths (per-repo, cleared on switch)
+  const selectedPaths = ref<Set<string>>(new Set());
+  // Anchor for shift-click range selection
+  const lastSelectedPath = ref<string | null>(null);
 
   // Getters
   const selectedRepo = computed(() => {
@@ -45,6 +49,8 @@ export const useWorktreeStore = defineStore('worktrees', () => {
     return worktrees.value.filter((wt) => !wt.dirty);
   });
 
+  const selectionCount = computed(() => selectedPaths.value.size);
+
   // Persistent store for remembering selection across restarts
   const appStore = useAppStore();
 
@@ -55,6 +61,14 @@ export const useWorktreeStore = defineStore('worktrees', () => {
 
   function setWorktrees(wts: Worktree[]) {
     worktrees.value = wts;
+    // Drop any selected paths that no longer exist (e.g. after a batch delete)
+    if (selectedPaths.value.size > 0) {
+      const valid = new Set(wts.map((w) => w.path));
+      const pruned = new Set([...selectedPaths.value].filter((p) => valid.has(p)));
+      if (pruned.size !== selectedPaths.value.size) {
+        selectedPaths.value = pruned;
+      }
+    }
     // Cache for lazy loading
     if (selectedRepoName.value) {
       loadedRepos.value.add(selectedRepoName.value);
@@ -76,11 +90,53 @@ export const useWorktreeStore = defineStore('worktrees', () => {
     return worktreeCache.value[repoName] ?? [];
   }
 
+  function toggleSelection(path: string) {
+    const next = new Set(selectedPaths.value);
+    if (next.has(path)) {
+      next.delete(path);
+    } else {
+      next.add(path);
+    }
+    selectedPaths.value = next;
+    // Anchor tracks the last item that was selected, not deselected
+    if (next.has(path)) {
+      lastSelectedPath.value = path;
+    }
+  }
+
+  function setSelection(paths: string[]) {
+    selectedPaths.value = new Set(paths);
+    lastSelectedPath.value = null;
+  }
+
+  function clearSelection() {
+    selectedPaths.value = new Set();
+    lastSelectedPath.value = null;
+  }
+
+  function selectRange(toPath: string, orderedPaths: string[]) {
+    const anchor = lastSelectedPath.value;
+    const next = new Set(selectedPaths.value);
+    if (anchor && orderedPaths.includes(anchor) && orderedPaths.includes(toPath)) {
+      const a = orderedPaths.indexOf(anchor);
+      const b = orderedPaths.indexOf(toPath);
+      const [start, end] = a < b ? [a, b] : [b, a];
+      for (let i = start; i <= end; i++) {
+        next.add(orderedPaths[i]);
+      }
+    } else {
+      next.add(toPath);
+    }
+    selectedPaths.value = next;
+    lastSelectedPath.value = toPath;
+  }
+
   function selectRepository(name: string) {
     if (repositories.value.some((r) => r.name === name)) {
       selectedRepoName.value = name;
       // Clear any focused branch when switching repos
       focusedBranch.value = null;
+      clearSelection();
       // Stale-while-revalidate: paint cached worktrees instantly for previously
       // loaded repos (no skeleton flash); blank + show loading for uncached repos.
       if (isRepoLoaded(name)) {
@@ -102,6 +158,7 @@ export const useWorktreeStore = defineStore('worktrees', () => {
     selectedRepoName.value = null;
     focusedBranch.value = null;
     focusTransient.value = false;
+    clearSelection();
     // Persist so future launches also land on the overview
     appStore.setLastSelectedRepo(null);
   }
@@ -165,6 +222,7 @@ export const useWorktreeStore = defineStore('worktrees', () => {
     error.value = null;
     focusedBranch.value = null;
     focusTransient.value = false;
+    clearSelection();
   }
 
   return {
@@ -182,12 +240,15 @@ export const useWorktreeStore = defineStore('worktrees', () => {
     focusedBranch,
     expandOnFocus,
     focusTransient,
+    selectedPaths,
+    lastSelectedPath,
     // Getters
     selectedRepo,
     hasRepositories,
     totalWorktrees,
     dirtyWorktrees,
     cleanWorktrees,
+    selectionCount,
     // Actions
     setRepositories,
     setWorktrees,
@@ -205,6 +266,10 @@ export const useWorktreeStore = defineStore('worktrees', () => {
     focusWorktree,
     clearFocusedWorktree,
     clearExpandOnFocus,
+    toggleSelection,
+    setSelection,
+    clearSelection,
+    selectRange,
     // Lazy loading
     loadedRepos,
     isRepoLoaded,
