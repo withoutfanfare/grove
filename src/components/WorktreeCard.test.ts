@@ -4,6 +4,8 @@ import { createPinia, setActivePinia } from 'pinia'
 import WorktreeCard from './WorktreeCard.vue'
 import type { Worktree, DiffStats } from '../types'
 import { mockTauriInvoke, resetTauriMocks } from '@/test/setup'
+import { useRepoConfigStore } from '@/stores/repoConfig'
+import { useWorktreeStore } from '@/stores'
 
 const worktree: Worktree = {
   path: '/repos/grove/feature-login',
@@ -101,5 +103,66 @@ describe('WorktreeCard selection', () => {
 
     // Selection is additive — the click still expands the details panel
     expect(wrapper.find('[role="article"]').classes()).toContain('card-expanded')
+  })
+})
+
+describe('WorktreeCard selection checkbox', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    resetTauriMocks()
+    mockTauriInvoke.mockResolvedValue(undefined)
+  })
+
+  const selectableWt: Worktree = {
+    path: '/repos/grove/feature-x', branch: 'feature/x', sha: 'abc', dirty: false, ahead: 0, behind: 0,
+  }
+
+  function mountSelectable(wt: Worktree = selectableWt) {
+    return mount(WorktreeCard, {
+      props: { worktree: wt, repoName: 'grove' },
+      global: { stubs: { Dropdown: true, DropdownItem: true, WorktreeDetailsPanel: true } },
+    })
+  }
+
+  it('renders a selection checkbox', () => {
+    const wrapper = mountSelectable()
+    expect(wrapper.find('[data-testid="wt-select"]').exists()).toBe(true)
+  })
+
+  it('emits toggle-select with the path and shift flag on click', async () => {
+    const wrapper = mountSelectable()
+    await wrapper.find('[data-testid="wt-select"]').trigger('click', { shiftKey: true })
+    const events = wrapper.emitted('toggle-select')
+    expect(events).toBeTruthy()
+    expect(events![0][0]).toEqual({ path: '/repos/grove/feature-x', shift: true })
+  })
+
+  it('disables the checkbox for protected branches and does not emit', async () => {
+    const repoConfig = useRepoConfigStore()
+    repoConfig.effectiveConfig = { protected_branches: ['main'] } as any
+    const wrapper = mountSelectable({ ...selectableWt, branch: 'main' })
+    const box = wrapper.find('[data-testid="wt-select"]')
+    expect(box.attributes('disabled')).toBeDefined()
+    await box.trigger('click')
+    expect(wrapper.emitted('toggle-select')).toBeFalsy()
+  })
+
+  it('shows the checked state when the path is selected', () => {
+    const store = useWorktreeStore()
+    store.setSelection(['/repos/grove/feature-x'])
+    const wrapper = mountSelectable()
+    expect(wrapper.find('[data-testid="wt-select"]').classes()).toContain('wt-select-checkbox--checked')
+  })
+
+  it('does not show the checkbox persistently when nothing is selected', () => {
+    const wrapper = mountSelectable()
+    expect(wrapper.find('[data-testid="wt-select"]').classes()).not.toContain('wt-select-checkbox--visible')
+  })
+
+  it('shows the checkbox persistently once any worktree is selected', () => {
+    const store = useWorktreeStore()
+    store.setSelection(['/some/other/path'])
+    const wrapper = mountSelectable()
+    expect(wrapper.find('[data-testid="wt-select"]').classes()).toContain('wt-select-checkbox--visible')
   })
 })

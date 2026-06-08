@@ -13,7 +13,8 @@ use crate::operation_state;
 use crate::types::{
     BranchesResult, ChangesResult, CloneResult, Config, CreateWorktreeResponse, HealthResult,
     LogResult, PrBranchInfo, PruneResult, PullAllResult, PullResult, RecentWorktree,
-    RemoveWorktreeResponse, RepairResult, Repository, ResumableOperationSummary, SyncResult,
+    RemoveSelectedResult, RemoveWorktreeResponse, RepairResult, Repository,
+    ResumableOperationSummary, SyncResult,
     UnlockResult, Worktree, WtError,
 };
 use crate::wt;
@@ -976,6 +977,30 @@ pub async fn pull_selected_worktrees(
             code: "SPAWN_ERROR".to_string(),
             message: format!("Failed to spawn background task: {}", e),
         })?
+}
+
+/// Remove several worktrees in one batch operation.
+///
+/// Emits `operation_progress` events (operation `"remove_all"`) per worktree.
+/// Options apply uniformly to every selected worktree; force is always on.
+/// Callable from frontend as: invoke('remove_selected_worktrees', { repoName, branches, deleteBranch, dropDb, skipBackup })
+#[command(rename_all = "camelCase")]
+pub async fn remove_selected_worktrees(
+    repo_name: String,
+    branches: Vec<String>,
+    delete_branch: bool,
+    drop_db: bool,
+    skip_backup: bool,
+    app: tauri::AppHandle,
+) -> Result<RemoveSelectedResult, WtError> {
+    spawn_blocking(move || {
+        wt::remove_selected_with_progress(&app, &repo_name, branches, delete_branch, drop_db, skip_backup)
+    })
+    .await
+    .map_err(|e| WtError {
+        code: "SPAWN_ERROR".to_string(),
+        message: format!("Failed to spawn background task: {}", e),
+    })?
 }
 
 /// Cancel the current long-running operation

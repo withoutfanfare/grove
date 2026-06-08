@@ -40,3 +40,4 @@ export { useRecentSwitches } from './useRecentSwitches';
 export type { RecentSwitchEntry } from './useRecentSwitches';
 export { useUpdater } from './useUpdater';
 export type { UpdateInfo, UpdateStatus } from './useUpdater';
+export { useWorktreeSelection } from './useWorktreeSelection';
