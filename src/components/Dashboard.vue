@@ -11,7 +11,7 @@ import { useDebounceFn } from '@vueuse/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { useWorktreeStore, useSettingsStore } from '../stores'
-import { useRepos, useWorktrees, useWt, useOperationProgress, useAutoRefresh, useSearch, useKeyboardShortcuts, useListNavigation, useShortcutTooltip, useToast, useWorktreeWatcher, useCommandRegistry, useWorktreeFilters, useBackgroundFetch, useStaleDetection, useTrayBadge, useRecentSwitches, useUpdater, useOverview } from '../composables'
+import { useRepos, useWorktrees, useWt, useOperationProgress, useAutoRefresh, useSearch, useKeyboardShortcuts, useListNavigation, useShortcutTooltip, useToast, useWorktreeWatcher, useCommandRegistry, useWorktreeFilters, useWorktreeSelection, useBackgroundFetch, useStaleDetection, useTrayBadge, useRecentSwitches, useUpdater, useOverview } from '../composables'
 import type { Worktree } from '../types'
 import type { WorktreeFilter, WorktreeSort } from '../composables'
 
@@ -31,6 +31,8 @@ import ErrorBoundary from './ErrorBoundary.vue'
 import SearchInput from './SearchInput.vue'
 import CommandPalette from './CommandPalette.vue'
 import UpdateBanner from './UpdateBanner.vue'
+import SelectionActionBar from './SelectionActionBar.vue'
+import BatchDeleteDialog from './BatchDeleteDialog.vue'
 import { SButton, SIconButton, SResizableSplit } from '@stuntrocket/ui'
 import { SkeletonCard } from './ui'
 import { copyPath, copyBranch, copyUrl, copyCdCommand } from '../utils/clipboard'
@@ -62,6 +64,7 @@ const {
   pruneRepo,
   pullAllWorktrees,
   pullSelectedWorktrees,
+  removeSelectedWorktrees,
   cancelOperation,
   openInEditor,
   openInTerminal,
@@ -113,6 +116,20 @@ const filteredWorktrees = computed(() => {
 const filterOptionCounts = computed<Record<WorktreeFilter, number>>(() =>
   countWorktrees(worktrees.value)
 )
+
+// Multi-selection
+const selection = useWorktreeSelection()
+const selectionCount = selection.selectionCount
+const selectAllState = computed(() => selection.selectAllState(filteredWorktrees.value))
+
+function handleToggleSelect(payload: { path: string; shift: boolean }) {
+  const wt = filteredWorktrees.value.find((w) => w.path === payload.path)
+  if (wt) selection.toggle(wt, { shift: payload.shift }, filteredWorktrees.value)
+}
+
+function handleSelectAll() {
+  selection.toggleSelectAll(filteredWorktrees.value)
+}
 
 // J/K worktree list navigation — moves the persistent focus through the visible list
 const worktreeNav = useListNavigation(() => filteredWorktrees.value)
@@ -384,6 +401,18 @@ const showHelpModal = ref(false)
 const showHealthPanel = ref(false)
 const worktreeToDelete = ref<Worktree | null>(null)
 
+// Batch operations
+const showBatchDeleteDialog = ref(false)
+const activeBatchOp = ref<'pull_all' | 'remove_all' | null>(null)
+const lastBatchDeleteOptions = ref<{ deleteBranch: boolean; dropDb: boolean; skipBackup: boolean }>({
+  deleteBranch: true,
+  dropDb: false,
+  skipBackup: false,
+})
+
+// Worktrees backing the open batch-delete dialog (snapshot of the selection)
+const batchDeleteWorktrees = computed(() => selection.selectedWorktrees(worktrees.value))
+
 // Operation state
 const isPruning = ref(false)
 const isPullingAll = ref(false)
@@ -499,6 +528,8 @@ async function handlePrune() {
 async function handlePullAll() {
   if (!selectedRepoName.value || isPullingAll.value) return
 
+  activeBatchOp.value = 'pull_all'
+
   // Phase 5: Build a map of branch names to worktree paths for conflict resolution actions
   const worktreePathMap = new Map<string, string>()
   for (const wt of worktrees.value) {
@@ -528,9 +559,82 @@ async function handlePullAll() {
   }
 }
 
+async function handleBatchPull() {
+  if (!selectedRepoName.value) return
+  const branches = selection.selectedBranches(worktrees.value)
+  if (branches.length === 0) return
+
+  const worktreePathMap = new Map<string, string>()
+  for (const wt of worktrees.value) {
+    if (wt.branch) worktreePathMap.set(wt.branch, wt.path)
+  }
+
+  closeAllPanels()
+  activeBatchOp.value = 'pull_all'
+  progressTitle.value = `Pulling ${branches.length} Worktree${branches.length === 1 ? '' : 's'}`
+  await startListening('pull_all', branches, worktreePathMap)
+  showProgressPanel.value = true
+
+  pauseAutoRefresh()
+  try {
+    await pullSelectedWorktrees(selectedRepoName.value, branches)
+    selection.clear()
+  } catch {
+    toast.error('Failed to pull selected worktrees')
+  } finally {
+    resumeAutoRefresh()
+  }
+}
+
+function openBatchDeleteDialog() {
+  if (selectionCount.value === 0) return
+  showBatchDeleteDialog.value = true
+}
+
+async function handleBatchDeleteConfirm(options: { deleteBranch: boolean; dropDb: boolean; skipBackup: boolean }) {
+  showBatchDeleteDialog.value = false
+  if (!selectedRepoName.value) return
+  const branches = selection.selectedBranches(worktrees.value)
+  if (branches.length === 0) return
+
+  lastBatchDeleteOptions.value = options
+
+  const worktreePathMap = new Map<string, string>()
+  for (const wt of worktrees.value) {
+    if (wt.branch) worktreePathMap.set(wt.branch, wt.path)
+  }
+
+  closeAllPanels()
+  activeBatchOp.value = 'remove_all'
+  progressTitle.value = `Deleting ${branches.length} Worktree${branches.length === 1 ? '' : 's'}`
+  await startListening('remove_all', branches, worktreePathMap)
+  showProgressPanel.value = true
+
+  pauseAutoRefresh()
+  try {
+    const result = await removeSelectedWorktrees(selectedRepoName.value, branches, options)
+    if (result) {
+      const { succeeded, failed } = result.summary
+      if (failed > 0) {
+        toast.warning(`Deleted ${succeeded}, ${failed} failed`)
+        // Keep the selection: the progress panel shows the failures for retry,
+        // and the store prunes the successfully-deleted paths on the next refresh.
+      } else {
+        toast.success(`Deleted ${succeeded} worktree${succeeded === 1 ? '' : 's'}`)
+        selection.clear()
+      }
+    }
+  } catch {
+    toast.error('Failed to delete selected worktrees')
+  } finally {
+    resumeAutoRefresh()
+  }
+}
+
 function handleProgressPanelClose() {
   showProgressPanel.value = false
   resetProgress()
+  activeBatchOp.value = null
 }
 
 // M16: Auto-close progress panel after successful completion (no failures/conflicts)
@@ -567,14 +671,24 @@ async function handleRetryFailed() {
     }
   }
 
-  // Reset progress and start new operation for failed items only
   await resetProgress()
+
+  if (activeBatchOp.value === 'remove_all') {
+    progressTitle.value = `Retrying ${failedBranches.length} Failed`
+    await startListening('remove_all', failedBranches, worktreePathMap)
+    pauseAutoRefresh()
+    try {
+      await removeSelectedWorktrees(selectedRepoName.value, failedBranches, lastBatchDeleteOptions.value)
+    } finally {
+      resumeAutoRefresh()
+    }
+    return
+  }
+
+  // Default: pull retry
   progressTitle.value = `Retrying ${failedBranches.length} Failed`
   await startListening('pull_all', failedBranches, worktreePathMap)
-
-  // Pause auto-refresh during retry
   pauseAutoRefresh()
-
   try {
     await pullSelectedWorktrees(selectedRepoName.value, failedBranches)
   } finally {
@@ -616,6 +730,8 @@ function closeAllModals() {
     showDeleteDialog.value = false
   } else if (showCreateModal.value) {
     showCreateModal.value = false
+  } else if (selectionCount.value > 0) {
+    selection.clear()
   }
 }
 
@@ -1048,6 +1164,25 @@ async function handleTitlebarDrag(e: MouseEvent) {
           <div v-if="selectedRepo && worktrees.length > 0"
             class="worktree-toolbar"
             style="background-color: rgba(3, 7, 18, 0.8);">
+            <!-- Select all (filtered, selectable) -->
+            <button
+              type="button"
+              role="checkbox"
+              data-testid="select-all"
+              :aria-checked="selectAllState === 'all'"
+              :title="selectAllState === 'all' ? 'Deselect all' : 'Select all'"
+              class="wt-select-all"
+              :class="{
+                'wt-select-all--checked': selectAllState === 'all',
+                'wt-select-all--indeterminate': selectAllState === 'some',
+              }"
+              @click="handleSelectAll"
+            >
+              <svg v-if="selectAllState === 'all'" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+              </svg>
+              <span v-else-if="selectAllState === 'some'" class="wt-select-all-dash" />
+            </button>
             <!-- Filter toggles -->
             <div class="worktree-filter-group" role="tablist" aria-label="Worktree filters">
               <button
@@ -1151,7 +1286,7 @@ async function handleTitlebarDrag(e: MouseEvent) {
                   <!-- Virtual scrolling for 50+ items (performance optimisation) -->
                   <VirtualWorktreeList v-if="useVirtualScroll" :worktrees="filteredWorktrees"
                     :repo-name="selectedRepoName!" :focused-branch="focusedBranch" :expand-on-focus="expandOnFocus"
-                    @delete="handleDeleteWorktree" @select="handleSelectWorktree" />
+                    @delete="handleDeleteWorktree" @select="handleSelectWorktree" @toggle-select="handleToggleSelect" />
 
                   <!-- Animated list for smaller lists (better UX with transitions) -->
                   <div v-else class="space-y-2.5">
@@ -1160,7 +1295,7 @@ async function handleTitlebarDrag(e: MouseEvent) {
                         :data-index="index"
                         :worktree="wt" :repo-name="selectedRepoName!" :focused="focusedBranch === wt.branch"
                         :initially-expanded="expandOnFocus && focusedBranch === wt.branch"
-                        @delete="handleDeleteWorktree" @select="handleSelectWorktree" />
+                        @delete="handleDeleteWorktree" @select="handleSelectWorktree" @toggle-select="handleToggleSelect" />
                     </TransitionGroup>
                   </div>
                 </template>
@@ -1168,6 +1303,13 @@ async function handleTitlebarDrag(e: MouseEvent) {
               </Transition>
             </ErrorBoundary>
           </div>
+
+          <SelectionActionBar
+            :count="selectionCount"
+            @pull="handleBatchPull"
+            @delete="openBatchDeleteDialog"
+            @clear="selection.clear()"
+          />
         </main>
         </template>
       </SResizableSplit>
@@ -1178,6 +1320,13 @@ async function handleTitlebarDrag(e: MouseEvent) {
 
     <DeleteWorktreeDialog :is-open="showDeleteDialog" :worktree="worktreeToDelete" :repo-name="selectedRepoName || ''"
       @close="showDeleteDialog = false" />
+
+    <BatchDeleteDialog
+      :is-open="showBatchDeleteDialog"
+      :worktrees="batchDeleteWorktrees"
+      @close="showBatchDeleteDialog = false"
+      @confirm="handleBatchDeleteConfirm"
+    />
 
     <SettingsPanel :is-open="showSettingsPanel" @close="showSettingsPanel = false" />
 
@@ -1344,6 +1493,39 @@ button, a, input, select, textarea,
   border: 1px solid rgba(255, 255, 255, 0.045);
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.025);
+}
+
+.wt-select-all {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 5px;
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+  transition: background-color var(--duration-fast, 120ms) ease, border-color var(--duration-fast, 120ms) ease;
+}
+
+.wt-select-all:hover {
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.wt-select-all--checked {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.wt-select-all--indeterminate {
+  border-color: var(--color-accent);
+}
+
+.wt-select-all-dash {
+  width: 9px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--color-accent);
 }
 
 .worktree-filter {
