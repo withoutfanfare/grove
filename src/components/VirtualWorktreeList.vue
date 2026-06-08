@@ -23,6 +23,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   delete: [worktree: Worktree]
   select: [branch: string]
+  'toggle-select': [payload: { path: string; shift: boolean }]
 }>()
 
 // Scroll container reference
@@ -116,6 +117,7 @@ function handleDelete(worktree: Worktree) {
           :initially-expanded="expandOnFocus && focusedBranch === worktrees[virtualRow.index].branch"
           @delete="handleDelete"
           @select="(b) => emit('select', b)"
+          @toggle-select="(payload) => emit('toggle-select', payload)"
         />
       </div>
     </div>
