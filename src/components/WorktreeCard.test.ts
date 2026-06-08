@@ -153,4 +153,16 @@ describe('WorktreeCard selection checkbox', () => {
     const wrapper = mountSelectable()
     expect(wrapper.find('[data-testid="wt-select"]').classes()).toContain('wt-select-checkbox--checked')
   })
+
+  it('does not show the checkbox persistently when nothing is selected', () => {
+    const wrapper = mountSelectable()
+    expect(wrapper.find('[data-testid="wt-select"]').classes()).not.toContain('wt-select-checkbox--visible')
+  })
+
+  it('shows the checkbox persistently once any worktree is selected', () => {
+    const store = useWorktreeStore()
+    store.setSelection(['/some/other/path'])
+    const wrapper = mountSelectable()
+    expect(wrapper.find('[data-testid="wt-select"]').classes()).toContain('wt-select-checkbox--visible')
+  })
 })

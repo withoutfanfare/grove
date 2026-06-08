@@ -42,7 +42,7 @@ const repoConfigStore = useRepoConfigStore()
 const { isOrphaned } = useOrphanedDetection()
 const selection = useWorktreeSelection()
 const isSelected = computed(() => selection.isSelected(props.worktree.path))
-const selectionActive = computed(() => selection.hasSelection)
+const selectionActive = computed(() => selection.hasSelection.value)
 const isSelectable = computed(() => selection.isSelectable(props.worktree))
 const unselectableReason = computed(() => selection.unselectableReason(props.worktree))
 
