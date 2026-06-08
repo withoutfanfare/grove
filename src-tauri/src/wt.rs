@@ -2438,6 +2438,20 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_remove_worktree_result_cli_contract() {
+        // Mirrors the exact JSON emitted by `grove rm --json` (see
+        // grove-cli lib/commands/lifecycle.sh). The CLI reports
+        // `db_drop_requested` (the request), not `db_dropped`, because the
+        // database drop is delegated to hooks and cannot be confirmed.
+        let json = r#"{"success": true, "repo": "myrepo", "branch": "2fa-enforce", "path": "/Users/me/code/myrepo-worktrees/2fa-enforce", "branch_deleted": true, "db_drop_requested": false}"#;
+        let result: RemoveWorktreeResult = extract_json_object(json).unwrap();
+        assert!(result.success);
+        assert_eq!(result.branch, "2fa-enforce");
+        assert!(result.branch_deleted);
+        assert!(!result.db_drop_requested);
+    }
+
+    #[test]
     fn test_validate_repo_name_valid() {
         assert!(validate_repo_name("my-repo").is_ok());
         assert!(validate_repo_name("my_repo").is_ok());

@@ -410,14 +410,14 @@ function handleClose() {
             </SBadge>
           </div>
 
-          <!-- Database dropped (only show if drop was requested) -->
+          <!-- Database drop (only show if drop was requested) -->
           <div
             v-if="requestedDropDb"
             class="px-3 py-2.5 flex items-center gap-3"
           >
-            <span class="text-text-muted text-xs flex-shrink-0 w-20">Database dropped</span>
-            <SBadge :variant="deletionResult.result.db_dropped ? 'success' : 'default'">
-              {{ deletionResult.result.db_dropped ? 'yes' : 'no' }}
+            <span class="text-text-muted text-xs flex-shrink-0 w-20">Database drop</span>
+            <SBadge :variant="deletionResult.result.db_drop_requested ? 'success' : 'default'">
+              {{ deletionResult.result.db_drop_requested ? 'requested' : 'no' }}
             </SBadge>
           </div>
         </div>

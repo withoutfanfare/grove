@@ -175,10 +175,11 @@ pub struct RemoveWorktreeResult {
     pub branch: String,
     /// Path that was removed
     pub path: String,
-    /// Whether the git branch was deleted
+    /// Whether the git branch was deleted (the real outcome)
     pub branch_deleted: bool,
-    /// Whether the database was dropped
-    pub db_dropped: bool,
+    /// Whether a database drop was requested. The drop itself is delegated to
+    /// hooks, so the CLI reports the request rather than a confirmed outcome.
+    pub db_drop_requested: bool,
 }
 
 /// Response from removing a worktree, including hook execution results

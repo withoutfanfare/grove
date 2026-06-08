@@ -202,10 +202,10 @@ export interface RemoveWorktreeResult {
   branch: string;
   /** Path that was removed */
   path: string;
-  /** Whether the git branch was deleted */
+  /** Whether the git branch was deleted (the real outcome) */
   branch_deleted: boolean;
-  /** Whether the database was dropped */
-  db_dropped: boolean;
+  /** Whether a database drop was requested (the drop is delegated to hooks) */
+  db_drop_requested: boolean;
 }
 
 /**

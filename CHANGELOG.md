@@ -29,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Worktree Deletion Reported False Failures** - Deleting a worktree showed "Failed to delete worktree" (and the row lingered until a manual refresh) even though the worktree had already been removed. The bundled `grove` CLI renamed its `rm --json` field `db_dropped` to `db_drop_requested` (the database drop is hook-delegated, so the CLI reports the request rather than a confirmed outcome) and Grove's mirrored types had drifted, so strict JSON parsing failed with `missing field 'db_dropped'`. The types now match the CLI, the response parses cleanly, and the list refreshes immediately; a Rust contract test pins the CLI's JSON shape to catch future drift
 - **Nullable Sync Counts** - Worktree ahead/behind counts may legitimately arrive as null from the CLI when the base ref cannot be resolved (e.g. a detached-HEAD worktree before a fetch); Grove now accepts this instead of failing the whole repository snapshot with "invalid type: null, expected u32"
 - **Silent Revalidation Errors** - Background refresh failures on cached repositories no longer raise the error banner over a perfectly usable cached list
 - **Accurate Health Issue Counts** - Health findings are counted individually (one per finding) even with older `grove` CLI builds that joined a worktree's findings into a single comma-separated message, and summary tiles now reflect worktree score brackets rather than issue rows
