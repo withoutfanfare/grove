@@ -37,7 +37,9 @@ const filesLoading = ref(false)
 const filesError = ref<string | null>(null)
 const filesFetched = ref(false)
 
-// Fetch data when panel expands (lazy loading)
+// Fetch data when panel expands (lazy loading). Immediate so a panel
+// mounted already expanded (card focused with initiallyExpanded) still
+// fetches — a non-immediate watch never fires when the prop starts true.
 watch(() => props.isExpanded, async (expanded) => {
   if (expanded) {
     // Fetch commits if not already fetched
@@ -50,7 +52,7 @@ watch(() => props.isExpanded, async (expanded) => {
       await fetchFiles()
     }
   }
-})
+}, { immediate: true })
 
 async function fetchCommits() {
   commitsLoading.value = true
@@ -140,7 +142,10 @@ const healthExplanation = computed(() => {
 
 // Sync status explanation
 const syncExplanation = computed(() => {
-  const { ahead = 0, behind = 0, dirty } = props.worktree
+  // ?? handles null (base ref unresolvable) as well as undefined
+  const { dirty } = props.worktree
+  const ahead = props.worktree.ahead ?? 0
+  const behind = props.worktree.behind ?? 0
   const parts: string[] = []
 
   if (dirty) {

@@ -217,7 +217,7 @@ describe('useWt', () => {
         branch: 'feature/old',
         path: '/old/worktree',
         branch_deleted: true,
-        db_dropped: false,
+        db_drop_requested: false,
       }
       mockTauriInvoke.mockResolvedValue(mockResult)
       

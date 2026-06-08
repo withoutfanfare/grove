@@ -128,7 +128,7 @@ export const useOverviewStore = defineStore('overview', () => {
       worktreeCount += snap.worktrees.length;
       for (const worktree of snap.worktrees) {
         if (worktree.dirty) dirtyCount++;
-        if (worktree.behind > 0) behindCount++;
+        if ((worktree.behind ?? 0) > 0) behindCount++;
       }
       if (snap.diskUsage) {
         hasDiskUsage = true;
@@ -146,7 +146,7 @@ export const useOverviewStore = defineStore('overview', () => {
 
   const dirtyAttention = computed(() => collectWorktrees((wt) => wt.dirty));
 
-  const behindAttention = computed(() => collectWorktrees((wt) => wt.behind > 0));
+  const behindAttention = computed(() => collectWorktrees((wt) => (wt.behind ?? 0) > 0));
 
   const cleanupAttention = computed(() =>
     collectWorktrees((wt) => Boolean(wt.merged) || Boolean(wt.stale))
