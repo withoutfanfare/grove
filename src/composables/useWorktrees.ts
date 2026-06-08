@@ -13,6 +13,7 @@ import type {
   HealthResult,
   PruneResult,
   PullAllResult,
+  RemoveSelectedResult,
 } from '../types';
 
 // Debounce delay for refresh operations (prevents UI flickering, reduced from 300ms)
@@ -534,6 +535,27 @@ export function useWorktrees() {
     }
   }
 
+  /**
+   * Remove selected worktrees in a batch. Refreshes the list and tray on
+   * completion. Returns the aggregated result, or null on a hard failure.
+   */
+  async function removeSelectedWorktrees(
+    repoName: string,
+    branches: string[],
+    options: { deleteBranch: boolean; dropDb: boolean; skipBackup: boolean }
+  ): Promise<RemoveSelectedResult | null> {
+    try {
+      const result = await wt.removeSelectedWorktrees(repoName, branches, options);
+      // Refresh after batch removal (debounced to prevent flicker)
+      fetchWorktreesDebounced();
+      scheduleTrayRefresh();
+      return result;
+    } catch (error) {
+      store.setError(wt.toWtError(error));
+      return null;
+    }
+  }
+
   // ============================================================================
   // Operation Control
   // ============================================================================
@@ -598,6 +620,7 @@ export function useWorktrees() {
     pruneRepo,
     pullAllWorktrees,
     pullSelectedWorktrees,
+    removeSelectedWorktrees,
     // Operation control
     cancelOperation,
     // Per-worktree operation state (Phase 2)

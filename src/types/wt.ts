@@ -219,6 +219,29 @@ export interface RemoveWorktreeResponse {
   hooks: HookExecution[];
 }
 
+/** One worktree's outcome within a batch remove (mirrors Rust RemoveSelectedItem) */
+export interface RemoveSelectedItem {
+  branch: string;
+  success: boolean;
+  branch_deleted: boolean;
+  message: string;
+}
+
+/** Summary of a batch remove (mirrors Rust RemoveSelectedSummary) */
+export interface RemoveSelectedSummary {
+  total: number;
+  succeeded: number;
+  failed: number;
+  cancelled: number;
+}
+
+/** Aggregated result of removing several worktrees (mirrors Rust RemoveSelectedResult) */
+export interface RemoveSelectedResult {
+  repo: string;
+  worktrees: RemoveSelectedItem[];
+  summary: RemoveSelectedSummary;
+}
+
 /**
  * Result from pulling a worktree
  */

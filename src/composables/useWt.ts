@@ -27,6 +27,7 @@ import type {
   ConfigFileContents,
   ConfigKeyUpdate,
   PrBranchInfo,
+  RemoveSelectedResult,
 } from '../types';
 import { isWtError } from '../types';
 
@@ -262,6 +263,23 @@ export function useWt() {
    */
   async function pullSelectedWorktrees(repoName: string, branches: string[]): Promise<PullAllResult> {
     return await invoke<PullAllResult>('pull_selected_worktrees', { repoName, branches });
+  }
+
+  /**
+   * Remove several worktrees in one batch (emits operation_progress events).
+   */
+  async function removeSelectedWorktrees(
+    repoName: string,
+    branches: string[],
+    options: { deleteBranch: boolean; dropDb: boolean; skipBackup: boolean }
+  ): Promise<RemoveSelectedResult> {
+    return await invoke<RemoveSelectedResult>('remove_selected_worktrees', {
+      repoName,
+      branches,
+      deleteBranch: options.deleteBranch,
+      dropDb: options.dropDb,
+      skipBackup: options.skipBackup,
+    });
   }
 
   /**
@@ -556,6 +574,7 @@ export function useWt() {
     pruneRepo,
     pullAllWorktrees,
     pullSelectedWorktrees,
+    removeSelectedWorktrees,
     // Operation control
     cancelOperation,
     // Operation state persistence
