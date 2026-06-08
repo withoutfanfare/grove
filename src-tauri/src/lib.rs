@@ -28,7 +28,8 @@ use commands::{
     fetch_repo, is_watching, list_branches, list_hooks, list_repositories, list_worktrees,
     mark_interrupted_operations, open_config, open_in_browser, open_in_editor, open_in_finder, open_in_git_client,
     open_in_terminal, prune_repo, pull_all_worktrees, pull_selected_worktrees, pull_worktree,
-    read_config_file, read_hook, refresh_tray_menu, register_repository, remove_worktree, rename_hook,
+    read_config_file, read_hook, refresh_tray_menu, register_repository, remove_selected_worktrees,
+    remove_worktree, rename_hook,
     repair_repository, resume_operation, set_hook_executable,
     show_worktree_context_menu,
     start_watching, stop_watching,
@@ -114,6 +115,7 @@ pub fn run() {
             prune_repo,
             pull_all_worktrees,
             pull_selected_worktrees,
+            remove_selected_worktrees,
             // Operation control
             cancel_operation,
             // Operation state persistence
