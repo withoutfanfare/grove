@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Batch worktree operations** — select multiple worktrees with hover checkboxes (shift-click for ranges, select-all in the toolbar) and delete or pull them in one action, with live progress and cancellation. Protected branches are excluded from multi-select; dirty worktrees are flagged before a batch delete
 - **Overview Dashboard** - A cross-repository home screen shown whenever no repository is selected: portfolio stat strip (repos, worktrees, dirty, behind, disk usage), a grouped "Needs Attention" panel (repository errors with Repair, health issues, dirty, behind remote, cleanup candidates) and a Recent worktrees panel. Includes bulk **Pull all** (sequential, with live progress, cancel and retry) and bulk **Prune all** behind a mandatory confirmation listing exactly what will be deleted. Snapshots cache to localStorage for instant paint, with a tiered background refresh (worktree lists ×3 concurrent; health and disk usage throttled to once per five minutes per repository). Reachable via the sidebar Overview button, Cmd+0, or the command palette
 - **Worktree Focus Persistence** - Selecting a worktree (click, Enter, or J/K navigation) keeps it focused so keyboard shortcuts and palette actions always have a target; tray and recents navigation use transient focus that auto-clears
 - **Filter Count Chips** - Live per-filter match counts on the worktree filter segmented control
