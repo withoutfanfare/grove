@@ -13,7 +13,7 @@ import StatusBadge from './StatusBadge.vue'
 import GradeBadge from './GradeBadge.vue'
 import WorktreeStatusBadges from './WorktreeStatusBadges.vue'
 import WorktreeDetailsPanel from './WorktreeDetailsPanel.vue'
-import { useWorktrees, useToast, formatRelativeTime, useWt, useOrphanedDetection } from '../composables'
+import { useWorktrees, useToast, formatRelativeTime, useWt, useOrphanedDetection, useWorktreeSelection } from '../composables'
 import { useSettingsStore } from '../stores/settings'
 import { useRepoConfigStore } from '../stores/repoConfig'
 import { SKbd, SBadge, SDivider } from '@stuntrocket/ui'
@@ -31,6 +31,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   delete: [worktree: Worktree]
   select: [branch: string]
+  'toggle-select': [payload: { path: string; shift: boolean }]
 }>()
 
 const { openInEditor, openInGitClient, openInTerminal, openInBrowser, openInFinder, openAll, pullWorktree, syncWorktree, getWorktreeOperation, isWorktreeBusy } = useWorktrees()
@@ -39,6 +40,17 @@ const { getDirtyDetails, getDiffStats } = useWt()
 const settingsStore = useSettingsStore()
 const repoConfigStore = useRepoConfigStore()
 const { isOrphaned } = useOrphanedDetection()
+const selection = useWorktreeSelection()
+const isSelected = computed(() => selection.isSelected(props.worktree.path))
+const selectionActive = computed(() => selection.hasSelection)
+const isSelectable = computed(() => selection.isSelectable(props.worktree))
+const unselectableReason = computed(() => selection.unselectableReason(props.worktree))
+
+function handleCheckboxClick(e: MouseEvent) {
+  e.stopPropagation()
+  if (!isSelectable.value) return
+  emit('toggle-select', { path: props.worktree.path, shift: e.shiftKey })
+}
 
 // Check if git client is configured
 const hasGitClient = computed(() => settingsStore.settings.gitClient !== 'none')
@@ -369,6 +381,26 @@ async function handleOpenAll() {
     <!-- Main content row (click to toggle details) -->
     <div class="px-3.5 py-3 flex items-center gap-3 cursor-pointer" role="button" tabindex="0"
       @click="handleSelect" @keydown.enter.prevent="handleSelect" @keydown.space.prevent="handleSelect">
+      <!-- Selection checkbox (hover-revealed, persistent once selecting) -->
+      <button
+        type="button"
+        role="checkbox"
+        data-testid="wt-select"
+        :aria-checked="isSelected"
+        :disabled="!isSelectable"
+        :title="unselectableReason || (isSelected ? 'Deselect' : 'Select')"
+        class="wt-select-checkbox flex-shrink-0"
+        :class="{
+          'wt-select-checkbox--visible': selectionActive,
+          'wt-select-checkbox--checked': isSelected,
+          'wt-select-checkbox--disabled': !isSelectable,
+        }"
+        @click="handleCheckboxClick"
+      >
+        <svg v-if="isSelected" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+        </svg>
+      </button>
       <!-- Left: Branch info -->
       <div class="flex-1 min-w-0">
         <!-- Branch name and metadata -->
@@ -633,3 +665,41 @@ async function handleOpenAll() {
     <WorktreeDetailsPanel :worktree="worktree" :repo-name="repoName" :is-expanded="isDetailsExpanded" />
   </div>
 </template>
+
+<style scoped>
+.wt-select-checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+  opacity: 0;
+  transition: opacity var(--duration-fast, 120ms) ease, background-color var(--duration-fast, 120ms) ease, border-color var(--duration-fast, 120ms) ease;
+}
+
+/* `.card` is this component's root; reveal on hover */
+.card:hover .wt-select-checkbox {
+  opacity: 1;
+}
+
+.wt-select-checkbox--visible {
+  opacity: 1;
+}
+
+.wt-select-checkbox--checked {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.wt-select-checkbox--disabled {
+  opacity: 0;
+  cursor: not-allowed;
+}
+
+.card:hover .wt-select-checkbox--disabled {
+  opacity: 0.3;
+}
+</style>
