@@ -7,7 +7,7 @@
  * worker state, scheduler LaunchAgent state, active worktree, and
  * start/stop/restart actions.
  */
-import { ref, watch } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
 import { useWt, useToast } from '../composables'
 import { useServicesStore } from '../stores'
 import type { ServiceAction, ServiceApp } from '../types'
@@ -41,12 +41,30 @@ async function fetchStatus(silent = false) {
   store.setLoading(false)
 }
 
-// Fetch when the panel opens
+// Silent auto-refresh while the panel is open, so supervisor state changes
+// (a worker settling after restart, an external stop) appear without clicks.
+const REFRESH_INTERVAL_MS = 15_000
+let refreshTimer: ReturnType<typeof setInterval> | null = null
+
+function stopAutoRefresh() {
+  if (refreshTimer) {
+    clearInterval(refreshTimer)
+    refreshTimer = null
+  }
+}
+
 watch(() => props.isOpen, async (open) => {
   if (open) {
     await fetchStatus()
+    stopAutoRefresh()
+    refreshTimer = setInterval(() => fetchStatus(true), REFRESH_INTERVAL_MS)
+  } else {
+    stopAutoRefresh()
+    closeSwitcher()
   }
 })
+
+onUnmounted(stopAutoRefresh)
 
 async function runAction(app: ServiceApp, action: ServiceAction) {
   if (store.isActionPending(app.name)) return
@@ -75,6 +93,68 @@ async function openHorizon(app: ServiceApp) {
     await wtApi.openInBrowser(`https://${app.domain}/horizon`)
   } catch {
     toast.error('Failed to open Horizon dashboard')
+  }
+}
+
+// ── Worktree switcher ────────────────────────────────────────────────
+// The -current symlink decides which worktree Horizon and the scheduler
+// serve. The switcher lists the app's worktree directory names (slugs)
+// and calls `grove services switch`, which cycles services around the
+// symlink change.
+
+const switcherFor = ref<string | null>(null)
+const switcherOptions = ref<string[]>([])
+const switcherChoice = ref<string>('')
+const switcherLoading = ref(false)
+
+function closeSwitcher() {
+  switcherFor.value = null
+  switcherOptions.value = []
+  switcherChoice.value = ''
+  switcherLoading.value = false
+}
+
+async function openSwitcher(app: ServiceApp) {
+  if (switcherFor.value === app.name) {
+    closeSwitcher()
+    return
+  }
+  switcherFor.value = app.name
+  switcherChoice.value = app.current_worktree ?? ''
+  switcherOptions.value = []
+  switcherLoading.value = true
+  try {
+    // Worktree directory names are the final path segment of each worktree
+    const worktrees = await wtApi.listWorktrees(app.system_name)
+    switcherOptions.value = worktrees
+      .map((wt) => wt.path.split('/').pop() ?? '')
+      .filter(Boolean)
+      .sort()
+  } catch (e) {
+    toast.error(`${app.name}: ${wtApi.toWtError(e).message}`)
+    closeSwitcher()
+    return
+  }
+  switcherLoading.value = false
+}
+
+async function applySwitch(app: ServiceApp) {
+  const target = switcherChoice.value
+  if (!target || target === app.current_worktree) {
+    closeSwitcher()
+    return
+  }
+  if (store.isActionPending(app.name)) return
+  store.setActionPending(app.name, true)
+  try {
+    await wtApi.switchServiceWorktree(app.name, target)
+    toast.success(`Switched ${app.name} to ${target}`)
+    closeSwitcher()
+    await fetchStatus(true)
+  } catch (e) {
+    toast.error(`${app.name}: ${wtApi.toWtError(e).message}`)
+  } finally {
+    store.setActionPending(app.name, false)
   }
 }
 
@@ -219,27 +299,38 @@ function handleClose() {
             </div>
 
             <!-- Actions -->
-            <div v-if="app.services !== 'none'" class="flex flex-wrap items-center gap-1.5">
+            <div class="flex flex-wrap items-center gap-1.5">
+              <template v-if="app.services !== 'none'">
+                <button
+                  class="service-action"
+                  :disabled="store.isActionPending(app.name)"
+                  @click="runAction(app, 'start')"
+                >
+                  Start
+                </button>
+                <button
+                  class="service-action"
+                  :disabled="store.isActionPending(app.name)"
+                  @click="runAction(app, 'stop')"
+                >
+                  Stop
+                </button>
+                <button
+                  class="service-action"
+                  :disabled="store.isActionPending(app.name)"
+                  @click="runAction(app, 'restart')"
+                >
+                  Restart
+                </button>
+              </template>
               <button
                 class="service-action"
+                :class="{ 'service-action-active': switcherFor === app.name }"
                 :disabled="store.isActionPending(app.name)"
-                @click="runAction(app, 'start')"
+                title="Point the -current symlink at a different worktree"
+                @click="openSwitcher(app)"
               >
-                Start
-              </button>
-              <button
-                class="service-action"
-                :disabled="store.isActionPending(app.name)"
-                @click="runAction(app, 'stop')"
-              >
-                Stop
-              </button>
-              <button
-                class="service-action"
-                :disabled="store.isActionPending(app.name)"
-                @click="runAction(app, 'restart')"
-              >
-                Restart
+                Switch worktree…
               </button>
               <button
                 v-if="usesHorizon(app)"
@@ -248,6 +339,36 @@ function handleClose() {
               >
                 Horizon ↗
               </button>
+            </div>
+
+            <!-- Worktree switcher -->
+            <div v-if="switcherFor === app.name" class="flex items-center gap-1.5">
+              <SSkeleton v-if="switcherLoading" width="100%" height="1.75rem" />
+              <template v-else>
+                <select
+                  v-model="switcherChoice"
+                  class="switcher-select flex-1 min-w-0"
+                  :disabled="store.isActionPending(app.name)"
+                >
+                  <option v-for="wt in switcherOptions" :key="wt" :value="wt">
+                    {{ wt }}{{ wt === app.current_worktree ? ' (current)' : '' }}
+                  </option>
+                </select>
+                <button
+                  class="service-action"
+                  :disabled="store.isActionPending(app.name) || !switcherChoice || switcherChoice === app.current_worktree"
+                  @click="applySwitch(app)"
+                >
+                  {{ store.isActionPending(app.name) ? 'Switching…' : 'Switch' }}
+                </button>
+                <button
+                  class="service-action"
+                  :disabled="store.isActionPending(app.name)"
+                  @click="closeSwitcher"
+                >
+                  Cancel
+                </button>
+              </template>
             </div>
           </div>
         </div>
@@ -298,6 +419,26 @@ function handleClose() {
 }
 
 .service-action:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.service-action-active {
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.switcher-select {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text-primary);
+  font-size: 12px;
+}
+
+.switcher-select:disabled {
   cursor: wait;
   opacity: 0.55;
 }

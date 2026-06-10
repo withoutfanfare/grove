@@ -915,6 +915,25 @@ pub async fn run_service_action(
         })?
 }
 
+/// Switch the worktree an app's -current symlink points at
+///
+/// Stops services, repoints the symlink, clears config cache, restarts.
+/// Runs on a background thread to keep the UI responsive.
+/// Callable from frontend as: invoke('switch_service_worktree', { appName, worktree })
+#[command(rename_all = "camelCase")]
+pub async fn switch_service_worktree(
+    app_name: String,
+    worktree: String,
+    app: tauri::AppHandle,
+) -> Result<(), WtError> {
+    spawn_blocking(move || wt::switch_service_worktree(&app, &app_name, &worktree))
+        .await
+        .map_err(|e| WtError {
+            code: "SPAWN_ERROR".to_string(),
+            message: format!("Failed to spawn background task: {}", e),
+        })?
+}
+
 /// Get recent commits for a worktree
 ///
 /// Returns the most recent commits for the specified worktree.

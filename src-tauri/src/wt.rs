@@ -1130,6 +1130,23 @@ pub fn run_service_action(app: &tauri::AppHandle, app_name: &str, action: &str) 
     Ok(())
 }
 
+/// Switch the worktree an app's -current symlink points at
+///
+/// Executes `grove services switch <app> <worktree>`, which stops the app's
+/// services, repoints the symlink, clears the Laravel config cache, and
+/// starts services again. Both names are validated before reaching the CLI;
+/// worktree directory names share the repo-name character whitelist.
+pub fn switch_service_worktree(
+    app: &tauri::AppHandle,
+    app_name: &str,
+    worktree: &str,
+) -> WtResult<()> {
+    validate_repo_name(app_name)?;
+    validate_repo_name(worktree)?;
+    execute_wt(app, &["services", "switch", app_name, worktree])?;
+    Ok(())
+}
+
 /// Prune stale worktrees and merged branches
 ///
 /// Executes `wt prune <repo> --json` and parses the output.

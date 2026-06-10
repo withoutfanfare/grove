@@ -34,7 +34,8 @@ use commands::{
     repair_repository, resume_operation, run_service_action, set_hook_executable,
     show_worktree_context_menu,
     start_watching, stop_watching,
-    sync_worktree, unlock_repository, update_config_keys, write_config_file, write_hook,
+    switch_service_worktree, sync_worktree, unlock_repository, update_config_keys,
+    write_config_file, write_hook,
 };
 
 use tauri::{Emitter, Manager};
@@ -114,6 +115,7 @@ pub fn run() {
             // Services (Supervisor/Horizon/scheduler)
             list_services_status,
             run_service_action,
+            switch_service_worktree,
             get_recent_commits,
             get_uncommitted_files,
             prune_repo,

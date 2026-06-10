@@ -230,6 +230,14 @@ export function useWt() {
   }
 
   /**
+   * Switch the worktree an app's -current symlink points at
+   * (stop services, repoint, clear config cache, restart)
+   */
+  async function switchServiceWorktree(appName: string, worktree: string): Promise<void> {
+    return await invoke<void>('switch_service_worktree', { appName, worktree });
+  }
+
+  /**
    * Get recent commits for a worktree
    */
   async function getRecentCommits(
@@ -587,6 +595,7 @@ export function useWt() {
     getRepoHealth,
     listServicesStatus,
     runServiceAction,
+    switchServiceWorktree,
     getRecentCommits,
     getUncommittedFiles,
     pruneRepo,

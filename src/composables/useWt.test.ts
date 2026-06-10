@@ -408,4 +408,18 @@ describe('useWt', () => {
       })
     })
   })
+
+  describe('switchServiceWorktree', () => {
+    it('should invoke switch_service_worktree with app name and worktree', async () => {
+      mockTauriInvoke.mockResolvedValue(undefined)
+
+      const wt = useWt()
+      await wt.switchServiceWorktree('myapp', 'feature-login')
+
+      expect(mockTauriInvoke).toHaveBeenCalledWith('switch_service_worktree', {
+        appName: 'myapp',
+        worktree: 'feature-login',
+      })
+    })
+  })
 })
