@@ -1144,6 +1144,50 @@ export function getConfigLayerLabel(layer: ConfigLayer): string {
 }
 
 // ============================================================================
+// Services (grove services status --json)
+// ============================================================================
+
+/** Service action accepted by `run_service_action` */
+export type ServiceAction = 'start' | 'stop' | 'restart';
+
+/**
+ * Per-app service status from `grove services status --json`
+ */
+export interface ServiceApp {
+  /** Registered app name */
+  name: string;
+  /** Directory name in the Herd root (bare repo prefix) */
+  system_name: string;
+  /** Service profile: "horizon", "horizon:reverb", or "none" */
+  services: string;
+  /** Supervisor process name/pattern (empty for services=none) */
+  supervisor_process: string;
+  /** Local .test domain */
+  domain: string;
+  /** Worktree the -current symlink points at (null when the symlink is missing) */
+  current_worktree?: string | null;
+  /**
+   * Raw supervisorctl state word (RUNNING, STOPPED, FATAL, ...),
+   * "NOT_CONFIGURED" when no matching process exists, or null for services=none
+   */
+  supervisor_status?: string | null;
+  /** Whether the scheduler LaunchAgent is loaded in launchctl */
+  scheduler_loaded: boolean;
+}
+
+/**
+ * Result from `grove services status --json`
+ */
+export interface ServicesStatusResult {
+  /** Supervisor daemon started (via brew services) */
+  supervisor_running: boolean;
+  /** Redis reachable (redis-cli ping) */
+  redis_running: boolean;
+  /** Per-app status, sorted by app name */
+  apps: ServiceApp[];
+}
+
+// ============================================================================
 // GitHub PR Integration
 // ============================================================================
 
