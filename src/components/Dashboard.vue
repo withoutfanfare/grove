@@ -26,6 +26,7 @@ import SettingsPanel from './SettingsPanel.vue'
 import HelpModal from './HelpModal.vue'
 import RepoManagementPanel from './RepoManagementPanel.vue'
 import HealthPanel from './HealthPanel.vue'
+import ServicesPanel from './ServicesPanel.vue'
 import OperationProgressPanel from './OperationProgressPanel.vue'
 import ErrorBoundary from './ErrorBoundary.vue'
 import SearchInput from './SearchInput.vue'
@@ -399,6 +400,7 @@ const showRepoManagementPanel = ref(false)
 const repoManagementInitialTab = ref<'config' | 'hooks'>('config')
 const showHelpModal = ref(false)
 const showHealthPanel = ref(false)
+const showServicesPanel = ref(false)
 const worktreeToDelete = ref<Worktree | null>(null)
 
 // Batch operations
@@ -451,6 +453,7 @@ function closeAllPanels() {
   showSettingsPanel.value = false
   showRepoManagementPanel.value = false
   showHealthPanel.value = false
+  showServicesPanel.value = false
   if (showProgressPanel.value) {
     handleProgressPanelClose()
   }
@@ -487,6 +490,15 @@ function handleDeleteWorktree(worktree: Worktree) {
 function openHealthPanel() {
   closeAllPanels()
   showHealthPanel.value = true
+}
+
+function openServicesPanel() {
+  if (showServicesPanel.value) {
+    showServicesPanel.value = false
+    return
+  }
+  closeAllPanels()
+  showServicesPanel.value = true
 }
 
 async function handlePrune() {
@@ -720,6 +732,8 @@ function closeAllModals() {
     handleProgressPanelClose()
   } else if (showHealthPanel.value) {
     showHealthPanel.value = false
+  } else if (showServicesPanel.value) {
+    showServicesPanel.value = false
   } else if (showRepoManagementPanel.value) {
     showRepoManagementPanel.value = false
   } else if (showSettingsPanel.value) {
@@ -1109,6 +1123,17 @@ async function handleTitlebarDrag(e: MouseEvent) {
                 </button>
                 <button
                   class="topbar-icon"
+                  :class="{ 'topbar-icon-active': showServicesPanel }"
+                  title="Services"
+                  @click="openServicesPanel"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+                  </svg>
+                </button>
+                <button
+                  class="topbar-icon"
                   :class="{ 'topbar-icon-active': showHelpModal }"
                   title="Help"
                   @click="openHelpModal"
@@ -1339,6 +1364,8 @@ async function handleTitlebarDrag(e: MouseEvent) {
       @close="showCommandPalette = false" />
 
     <HealthPanel :is-open="showHealthPanel" :repo-name="selectedRepoName || ''" @close="showHealthPanel = false" />
+
+    <ServicesPanel :is-open="showServicesPanel" @close="showServicesPanel = false" />
 
     <!-- M6: ErrorBoundary around progress panel to prevent malformed data crashing app -->
     <ErrorBoundary>

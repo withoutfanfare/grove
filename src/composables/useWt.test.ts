@@ -350,11 +350,76 @@ describe('useWt', () => {
 
     it('should handle objects without code/message', () => {
       const wt = useWt()
-      
+
       const result = wt.toWtError({ foo: 'bar' })
-      
+
       expect(result.code).toBe('UNKNOWN_ERROR')
       expect(result.message).toBe('An unexpected error occurred')
+    })
+  })
+
+  describe('listServicesStatus', () => {
+    it('should return services status', async () => {
+      const mockStatus = {
+        supervisor_running: true,
+        redis_running: true,
+        apps: [
+          {
+            name: 'myapp',
+            system_name: 'myapp',
+            services: 'horizon',
+            supervisor_process: 'myapp-horizon',
+            domain: 'myapp.test',
+            current_worktree: 'main',
+            supervisor_status: 'RUNNING',
+            scheduler_loaded: true,
+          },
+        ],
+      }
+      mockTauriInvoke.mockResolvedValue(mockStatus)
+
+      const wt = useWt()
+      const result = await wt.listServicesStatus()
+
+      expect(result).toEqual(mockStatus)
+      expect(mockTauriInvoke).toHaveBeenCalledWith('list_services_status')
+    })
+  })
+
+  describe('runServiceAction', () => {
+    it('should invoke run_service_action with app name and action', async () => {
+      mockTauriInvoke.mockResolvedValue(undefined)
+
+      const wt = useWt()
+      await wt.runServiceAction('myapp', 'restart')
+
+      expect(mockTauriInvoke).toHaveBeenCalledWith('run_service_action', {
+        appName: 'myapp',
+        action: 'restart',
+      })
+    })
+
+    it('should propagate backend errors', async () => {
+      mockTauriInvoke.mockRejectedValue({ code: 'COMMAND_FAILED', message: 'boom' })
+
+      const wt = useWt()
+      await expect(wt.runServiceAction('myapp', 'start')).rejects.toMatchObject({
+        code: 'COMMAND_FAILED',
+      })
+    })
+  })
+
+  describe('switchServiceWorktree', () => {
+    it('should invoke switch_service_worktree with app name and worktree', async () => {
+      mockTauriInvoke.mockResolvedValue(undefined)
+
+      const wt = useWt()
+      await wt.switchServiceWorktree('myapp', 'feature-login')
+
+      expect(mockTauriInvoke).toHaveBeenCalledWith('switch_service_worktree', {
+        appName: 'myapp',
+        worktree: 'feature-login',
+      })
     })
   })
 })

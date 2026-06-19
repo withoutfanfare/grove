@@ -13,7 +13,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "icons:generate": "node scripts/generate-icons.mjs generate",
+    "icons:verify": "node scripts/generate-icons.mjs verify"
   },
   "dependencies": {
     "@stuntrocket/ui": "^0.8.2",

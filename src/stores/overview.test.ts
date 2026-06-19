@@ -101,6 +101,28 @@ describe('useOverviewStore', () => {
       expect(store.healthAttention[1].issue.severity).toBe('warning')
     })
 
+    it('combines multiple health issues for the same worktree into one attention item', () => {
+      const store = useOverviewStore()
+      store.setWorktreeSnapshot('demo', [makeWorktree({ branch: 'feature' })], 1000)
+      store.setHealth('demo', makeHealth({
+        issues: [
+          { severity: 'warning', worktree: 'feature', message: 'behind:22' },
+          { severity: 'critical', worktree: 'feature', message: 'changes:1' },
+          { severity: 'warning', worktree: 'feature', message: 'unmerged,behind:22' },
+        ],
+      }))
+
+      expect(store.healthAttention).toHaveLength(1)
+      expect(store.healthAttention[0]).toEqual({
+        repo: 'demo',
+        issue: {
+          severity: 'critical',
+          worktree: 'feature',
+          message: 'behind:22,changes:1,unmerged',
+        },
+      })
+    })
+
     it('sorts worktree attention items by repo then branch', () => {
       const store = useOverviewStore()
       store.setWorktreeSnapshot('zeta', [

@@ -14,8 +14,7 @@ use crate::types::{
     BranchesResult, ChangesResult, CloneResult, Config, CreateWorktreeResponse, HealthResult,
     LogResult, PrBranchInfo, PruneResult, PullAllResult, PullResult, RecentWorktree,
     RemoveSelectedResult, RemoveWorktreeResponse, RepairResult, Repository,
-    ResumableOperationSummary, SyncResult,
-    UnlockResult, Worktree, WtError,
+    ResumableOperationSummary, ServicesStatusResult, SyncResult, UnlockResult, Worktree, WtError,
 };
 use crate::wt;
 
@@ -874,6 +873,60 @@ pub async fn get_repo_health(
     app: tauri::AppHandle,
 ) -> Result<HealthResult, WtError> {
     spawn_blocking(move || wt::get_health(&app, &repo_name))
+        .await
+        .map_err(|e| WtError {
+            code: "SPAWN_ERROR".to_string(),
+            message: format!("Failed to spawn background task: {}", e),
+        })?
+}
+
+/// Get service status for all registered apps
+///
+/// Returns daemon health plus per-app Supervisor and scheduler state.
+/// Runs on a background thread to keep the UI responsive.
+/// Callable from frontend as: invoke('list_services_status')
+#[command]
+pub async fn list_services_status(
+    app: tauri::AppHandle,
+) -> Result<ServicesStatusResult, WtError> {
+    spawn_blocking(move || wt::get_services_status(&app))
+        .await
+        .map_err(|e| WtError {
+            code: "SPAWN_ERROR".to_string(),
+            message: format!("Failed to spawn background task: {}", e),
+        })?
+}
+
+/// Run a service action (start/stop/restart) for a registered app
+///
+/// Runs on a background thread to keep the UI responsive.
+/// Callable from frontend as: invoke('run_service_action', { appName, action })
+#[command(rename_all = "camelCase")]
+pub async fn run_service_action(
+    app_name: String,
+    action: String,
+    app: tauri::AppHandle,
+) -> Result<(), WtError> {
+    spawn_blocking(move || wt::run_service_action(&app, &app_name, &action))
+        .await
+        .map_err(|e| WtError {
+            code: "SPAWN_ERROR".to_string(),
+            message: format!("Failed to spawn background task: {}", e),
+        })?
+}
+
+/// Switch the worktree an app's -current symlink points at
+///
+/// Stops services, repoints the symlink, clears config cache, restarts.
+/// Runs on a background thread to keep the UI responsive.
+/// Callable from frontend as: invoke('switch_service_worktree', { appName, worktree })
+#[command(rename_all = "camelCase")]
+pub async fn switch_service_worktree(
+    app_name: String,
+    worktree: String,
+    app: tauri::AppHandle,
+) -> Result<(), WtError> {
+    spawn_blocking(move || wt::switch_service_worktree(&app, &app_name, &worktree))
         .await
         .map_err(|e| WtError {
             code: "SPAWN_ERROR".to_string(),

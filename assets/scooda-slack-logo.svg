@@ -1,0 +1,28 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="72" y1="32" x2="440" y2="480" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7C3CFF"/>
+      <stop offset="0.58" stop-color="#5B2CF6"/>
+      <stop offset="1" stop-color="#3A168C"/>
+    </linearGradient>
+    <filter id="softDepth" x="90" y="139" width="332" height="234" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="12" stdDeviation="10" flood-color="#21085F" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <path
+    d="M118 256C118 203 164 176 211 203C241 220 267 292 301 311C349 338 394 310 394 256C394 202 349 174 301 201C267 220 241 292 211 309C164 336 118 309 118 256Z"
+    stroke="#FFFFFF"
+    stroke-width="46"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    filter="url(#softDepth)"
+  />
+  <path
+    d="M118 256C118 203 164 176 211 203C241 220 267 292 301 311C349 338 394 310 394 256C394 202 349 174 301 201C267 220 241 292 211 309C164 336 118 309 118 256Z"
+    stroke="#F4ECFF"
+    stroke-width="30"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>
