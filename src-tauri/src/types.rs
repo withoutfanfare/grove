@@ -468,6 +468,45 @@ pub struct OperationProgressEvent {
 }
 
 // ============================================================================
+// Services (grove services status --json)
+// ============================================================================
+
+/// Per-app service status from `grove services status --json`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServiceApp {
+    /// Registered app name
+    pub name: String,
+    /// Directory name in the Herd root (bare repo prefix)
+    pub system_name: String,
+    /// Service profile: "horizon", "horizon:reverb", or "none"
+    pub services: String,
+    /// Supervisor process name/pattern (empty for services=none)
+    pub supervisor_process: String,
+    /// Local .test domain
+    pub domain: String,
+    /// Worktree the -current symlink points at (None when the symlink is missing)
+    #[serde(default)]
+    pub current_worktree: Option<String>,
+    /// Raw supervisorctl state word (RUNNING, STOPPED, FATAL, ...),
+    /// "NOT_CONFIGURED" when no matching process exists, or None for services=none
+    #[serde(default)]
+    pub supervisor_status: Option<String>,
+    /// Whether the scheduler LaunchAgent is loaded in launchctl
+    pub scheduler_loaded: bool,
+}
+
+/// Result from `grove services status --json`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServicesStatusResult {
+    /// Supervisor daemon started (via brew services)
+    pub supervisor_running: bool,
+    /// Redis reachable (redis-cli ping)
+    pub redis_running: bool,
+    /// Per-app status, sorted by app name
+    pub apps: Vec<ServiceApp>,
+}
+
+// ============================================================================
 // Error Codes Convention (H3)
 // ============================================================================
 //
@@ -1138,6 +1177,46 @@ mod tests {
         let repo: Repository = serde_json::from_str(json).unwrap();
         assert_eq!(repo.name, "my-project");
         assert_eq!(repo.worktrees, 6);
+    }
+
+    // Mirrors the documented `grove services status --json` contract:
+    // current_worktree/supervisor_status are null for missing symlinks and
+    // services=none apps, and must not fail deserialisation.
+    #[test]
+    fn test_services_status_deserialize() {
+        let json = r#"{
+            "supervisor_running": true,
+            "redis_running": false,
+            "apps": [
+                {
+                    "name": "myapp",
+                    "system_name": "myapp",
+                    "services": "horizon",
+                    "supervisor_process": "myapp-horizon",
+                    "domain": "myapp.test",
+                    "current_worktree": "feature-login",
+                    "supervisor_status": "RUNNING",
+                    "scheduler_loaded": true
+                },
+                {
+                    "name": "static",
+                    "system_name": "static",
+                    "services": "none",
+                    "supervisor_process": "",
+                    "domain": "static.test",
+                    "current_worktree": null,
+                    "supervisor_status": null,
+                    "scheduler_loaded": false
+                }
+            ]
+        }"#;
+        let status: ServicesStatusResult = serde_json::from_str(json).unwrap();
+        assert!(status.supervisor_running);
+        assert!(!status.redis_running);
+        assert_eq!(status.apps.len(), 2);
+        assert_eq!(status.apps[0].supervisor_status.as_deref(), Some("RUNNING"));
+        assert_eq!(status.apps[1].current_worktree, None);
+        assert_eq!(status.apps[1].supervisor_status, None);
     }
 
     #[test]

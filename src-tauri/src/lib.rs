@@ -25,15 +25,17 @@ use commands::{
     get_config_files, get_diff_stats, get_dirty_details, get_recent_commits, get_recent_worktrees,
     get_remote_branches, get_repo_disk_usage, get_repo_health,
     get_resumable_operations, get_uncommitted_files, get_worktree_status, get_wt_version,
-    fetch_repo, is_watching, list_branches, list_hooks, list_repositories, list_worktrees,
+    fetch_repo, is_watching, list_branches, list_hooks, list_repositories, list_services_status,
+    list_worktrees,
     mark_interrupted_operations, open_config, open_in_browser, open_in_editor, open_in_finder, open_in_git_client,
     open_in_terminal, prune_repo, pull_all_worktrees, pull_selected_worktrees, pull_worktree,
     read_config_file, read_hook, refresh_tray_menu, register_repository, remove_selected_worktrees,
     remove_worktree, rename_hook,
-    repair_repository, resume_operation, set_hook_executable,
+    repair_repository, resume_operation, run_service_action, set_hook_executable,
     show_worktree_context_menu,
     start_watching, stop_watching,
-    sync_worktree, unlock_repository, update_config_keys, write_config_file, write_hook,
+    switch_service_worktree, sync_worktree, unlock_repository, update_config_keys,
+    write_config_file, write_hook,
 };
 
 use tauri::{Emitter, Manager};
@@ -110,6 +112,10 @@ pub fn run() {
             // Phase 3: Branches, health, prune, pull-all
             list_branches,
             get_repo_health,
+            // Services (Supervisor/Horizon/scheduler)
+            list_services_status,
+            run_service_action,
+            switch_service_worktree,
             get_recent_commits,
             get_uncommitted_files,
             prune_repo,

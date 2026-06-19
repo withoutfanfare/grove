@@ -1,0 +1,36 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="tile" x1="160" y1="80" x2="860" y2="940" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#263842"/>
+      <stop offset="0.56" stop-color="#18262E"/>
+      <stop offset="1" stop-color="#10191E"/>
+    </linearGradient>
+    <linearGradient id="pine" x1="370" y1="164" x2="660" y2="856" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D9E2DC"/>
+      <stop offset="0.5" stop-color="#9FB9B5"/>
+      <stop offset="1" stop-color="#6D91A3"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="48" y="48" width="928" height="928" rx="208" fill="url(#tile)"/>
+  <rect x="50" y="50" width="924" height="924" rx="206" stroke="white" stroke-opacity="0.12" stroke-width="2"/>
+
+  <path
+    fill="#071014"
+    fill-opacity="0.38"
+    d="M512 190C568 298 624 386 684 458H606C664 542 724 614 786 670H672C718 732 764 780 812 816H556V882H468V816H212C260 780 306 732 352 670H238C300 614 360 542 418 458H340C400 386 456 298 512 190Z"
+  />
+
+  <path
+    fill="url(#pine)"
+    d="M512 164C568 272 624 360 684 432H606C664 516 724 588 786 644H672C718 706 764 754 812 790H556V856H468V790H212C260 754 306 706 352 644H238C300 588 360 516 418 432H340C400 360 456 272 512 164Z"
+  />
+
+  <path
+    d="M512 280V778M428 474C468 518 496 564 512 616M596 474C556 518 528 564 512 616"
+    stroke="#203842"
+    stroke-opacity="0.42"
+    stroke-width="26"
+    stroke-linecap="round"
+  />
+</svg>

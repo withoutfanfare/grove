@@ -153,19 +153,35 @@ export const useOverviewStore = defineStore('overview', () => {
   );
 
   const healthAttention = computed<AttentionHealthItem[]>(() => {
-    const items: AttentionHealthItem[] = [];
+    const items = new Map<string, AttentionHealthItem>();
     for (const snap of Object.values(snapshots.value)) {
       if (!snap.health) continue;
       for (const issue of snap.health.issues) {
-        items.push({ repo: snap.repo, issue });
+        const key = `${snap.repo}\0${issue.worktree}`;
+        const existing = items.get(key);
+        if (!existing) {
+          items.set(key, { repo: snap.repo, issue: { ...issue } });
+          continue;
+        }
+
+        const messages = new Set(
+          `${existing.issue.message},${issue.message}`
+            .split(',')
+            .map((message) => message.trim())
+            .filter(Boolean)
+        );
+        existing.issue.message = [...messages].join(',');
+        if (issue.severity === 'critical') {
+          existing.issue.severity = 'critical';
+        }
       }
     }
     // Critical first, then by repo name for stable display
-    return items.sort((a, b) => {
+    return [...items.values()].sort((a, b) => {
       if (a.issue.severity !== b.issue.severity) {
         return a.issue.severity === 'critical' ? -1 : 1;
       }
-      return a.repo.localeCompare(b.repo);
+      return a.repo.localeCompare(b.repo) || a.issue.worktree.localeCompare(b.issue.worktree);
     });
   });
 

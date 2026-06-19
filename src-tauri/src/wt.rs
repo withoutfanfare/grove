@@ -23,7 +23,8 @@ use crate::types::{
     OperationState, OperationStatus, PersistentOperationType, PruneResult, PruneSummary,
     PrunedBranch, PullAllResult, PullAllSummary, PullAllWorktree, PullResult, RecentWorktree,
     RemoveSelectedItem, RemoveSelectedResult, RemoveSelectedSummary, RemoveWorktreeResult,
-    RepairResult, Repository, SyncResult, UnlockResult, Worktree, WtError, WtResult,
+    RepairResult, Repository, ServicesStatusResult, SyncResult, UnlockResult, Worktree, WtError,
+    WtResult,
 };
 
 // ============================================================================
@@ -1097,6 +1098,53 @@ pub fn get_health(app: &tauri::AppHandle, repo_name: &str) -> WtResult<HealthRes
 
     // H1: Use robust JSON extraction to handle debug output mixed with JSON
     extract_json_object(&output)
+}
+
+/// Get service status for all registered apps
+///
+/// Executes `grove services status --json` and parses the output.
+pub fn get_services_status(app: &tauri::AppHandle) -> WtResult<ServicesStatusResult> {
+    let output = execute_wt(app, &["services", "status", "--json"])?;
+
+    // H1: Use robust JSON extraction to handle debug output mixed with JSON
+    extract_json_object(&output)
+}
+
+/// Run a service lifecycle action (start/stop/restart) for a registered app
+///
+/// Executes `grove services <action> <app>`. The action is whitelisted here
+/// and the app name validated, so nothing user-controlled reaches the CLI
+/// as a flag or extra argument.
+pub fn run_service_action(app: &tauri::AppHandle, app_name: &str, action: &str) -> WtResult<()> {
+    validate_repo_name(app_name)?;
+    match action {
+        "start" | "stop" | "restart" => {}
+        _ => {
+            return Err(WtError::new(
+                "INVALID_INPUT",
+                "Service action must be start, stop, or restart",
+            ))
+        }
+    }
+    execute_wt(app, &["services", action, app_name])?;
+    Ok(())
+}
+
+/// Switch the worktree an app's -current symlink points at
+///
+/// Executes `grove services switch <app> <worktree>`, which stops the app's
+/// services, repoints the symlink, clears the Laravel config cache, and
+/// starts services again. Both names are validated before reaching the CLI;
+/// worktree directory names share the repo-name character whitelist.
+pub fn switch_service_worktree(
+    app: &tauri::AppHandle,
+    app_name: &str,
+    worktree: &str,
+) -> WtResult<()> {
+    validate_repo_name(app_name)?;
+    validate_repo_name(worktree)?;
+    execute_wt(app, &["services", "switch", app_name, worktree])?;
+    Ok(())
 }
 
 /// Prune stale worktrees and merged branches

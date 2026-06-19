@@ -46,47 +46,21 @@ onUnmounted(() => {
       <div class="logo-container">
         <div class="logo-glow" />
         <div class="logo">
-          <!-- Tree/Branch icon representing git worktrees -->
+          <!-- Columnar Pine: several work paths converging into one trunk -->
           <svg class="logo-icon" viewBox="0 0 48 48" fill="none">
-            <!-- Trunk -->
-            <path 
-              d="M24 42V22" 
-              stroke="currentColor" 
-              stroke-width="3" 
-              stroke-linecap="round"
-              class="trunk"
+            <path
+              class="pine"
+              fill="currentColor"
+              d="M24 3.8C26.6 8.9 29.3 13 32.1 16.4H28.5C31.2 20.3 34 23.7 36.9 26.3H31.5C33.7 29.2 35.8 31.5 38.1 33.1H26.1V38.2H21.9V33.1H9.9C12.2 31.5 14.3 29.2 16.5 26.3H11.1C14 23.7 16.8 20.3 19.5 16.4H15.9C18.7 13 21.4 8.9 24 3.8Z"
             />
-            <!-- Main branch left -->
-            <path 
-              d="M24 30C20 30 14 26 10 20" 
-              stroke="currentColor" 
-              stroke-width="2.5" 
+            <path
+              class="pine-paths"
+              d="M24 9.3V32.6M20.1 18.4C22 20.5 23.3 22.6 24 25.1M27.9 18.4C26 20.5 24.7 22.6 24 25.1"
+              stroke="var(--color-surface-raised)"
+              stroke-opacity="0.45"
+              stroke-width="1.8"
               stroke-linecap="round"
-              class="branch branch-1"
             />
-            <!-- Main branch right -->
-            <path 
-              d="M24 26C28 26 34 22 38 16" 
-              stroke="currentColor" 
-              stroke-width="2.5" 
-              stroke-linecap="round"
-              class="branch branch-2"
-            />
-            <!-- Top branch -->
-            <path 
-              d="M24 22C24 18 24 12 24 6" 
-              stroke="currentColor" 
-              stroke-width="2.5" 
-              stroke-linecap="round"
-              class="branch branch-3"
-            />
-            <!-- Leaf nodes -->
-            <circle cx="10" cy="18" r="4" class="leaf leaf-1" fill="currentColor" />
-            <circle cx="38" cy="14" r="4" class="leaf leaf-2" fill="currentColor" />
-            <circle cx="24" cy="6" r="4" class="leaf leaf-3" fill="currentColor" />
-            <!-- Small accent nodes -->
-            <circle cx="16" cy="24" r="2.5" class="node node-1" fill="currentColor" />
-            <circle cx="32" cy="20" r="2.5" class="node node-2" fill="currentColor" />
           </svg>
         </div>
       </div>
@@ -266,85 +240,24 @@ onUnmounted(() => {
   color: var(--color-accent);
 }
 
-/* Branch drawing animations */
-.trunk {
-  stroke-dasharray: 20;
-  stroke-dashoffset: 20;
-  animation: draw-trunk 0.8s ease-out forwards;
-}
-
-@keyframes draw-trunk {
-  to { stroke-dashoffset: 0; }
-}
-
-.branch {
-  stroke-dasharray: 30;
-  stroke-dashoffset: 30;
-}
-
-.branch-1 {
-  animation: draw-branch 0.6s ease-out 0.4s forwards;
-}
-
-.branch-2 {
-  animation: draw-branch 0.6s ease-out 0.6s forwards;
-}
-
-.branch-3 {
-  animation: draw-branch 0.6s ease-out 0.8s forwards;
-}
-
-@keyframes draw-branch {
-  to { stroke-dashoffset: 0; }
-}
-
-/* Leaf animations */
-.leaf {
-  opacity: 0;
+.pine {
   transform-origin: center;
+  animation: reveal-pine 0.8s var(--ease-spring) both;
 }
 
-.leaf-1 {
-  animation: pop-leaf 0.4s ease-out 1s forwards;
+.pine-paths {
+  stroke-dasharray: 36;
+  stroke-dashoffset: 36;
+  animation: draw-pine-paths 0.8s ease-out 0.35s forwards;
 }
 
-.leaf-2 {
-  animation: pop-leaf 0.4s ease-out 1.1s forwards;
+@keyframes reveal-pine {
+  from { opacity: 0; transform: translateY(4px) scale(0.92); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-.leaf-3 {
-  animation: pop-leaf 0.4s ease-out 1.2s forwards;
-}
-
-@keyframes pop-leaf {
-  0% {
-    opacity: 0;
-    transform: scale(0);
-  }
-  60% {
-    transform: scale(1.2);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-/* Node animations */
-.node {
-  opacity: 0;
-}
-
-.node-1 {
-  animation: fade-node 0.3s ease-out 1.3s forwards;
-}
-
-.node-2 {
-  animation: fade-node 0.3s ease-out 1.4s forwards;
-}
-
-@keyframes fade-node {
-  to { opacity: 0.6; }
+@keyframes draw-pine-paths {
+  to { stroke-dashoffset: 0; }
 }
 
 /* App name */
@@ -450,24 +363,16 @@ onUnmounted(() => {
   .orb,
   .logo-glow,
   .logo,
-  .trunk,
-  .branch,
-  .leaf,
-  .node,
+  .pine,
+  .pine-paths,
   .app-name,
   .spinner-ring,
   .version-badge {
     animation: none;
   }
   
-  .trunk,
-  .branch {
+  .pine-paths {
     stroke-dashoffset: 0;
-  }
-  
-  .leaf,
-  .node {
-    opacity: 1;
   }
 }
 </style>

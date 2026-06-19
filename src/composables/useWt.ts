@@ -28,6 +28,8 @@ import type {
   ConfigKeyUpdate,
   PrBranchInfo,
   RemoveSelectedResult,
+  ServiceAction,
+  ServicesStatusResult,
 } from '../types';
 import { isWtError } from '../types';
 
@@ -211,6 +213,28 @@ export function useWt() {
    */
   async function getRepoHealth(repoName: string): Promise<HealthResult> {
     return await invoke<HealthResult>('get_repo_health', { repoName });
+  }
+
+  /**
+   * Get service status for all registered apps (Supervisor/Horizon/scheduler)
+   */
+  async function listServicesStatus(): Promise<ServicesStatusResult> {
+    return await invoke<ServicesStatusResult>('list_services_status');
+  }
+
+  /**
+   * Run a service action (start/stop/restart) for a registered app
+   */
+  async function runServiceAction(appName: string, action: ServiceAction): Promise<void> {
+    return await invoke<void>('run_service_action', { appName, action });
+  }
+
+  /**
+   * Switch the worktree an app's -current symlink points at
+   * (stop services, repoint, clear config cache, restart)
+   */
+  async function switchServiceWorktree(appName: string, worktree: string): Promise<void> {
+    return await invoke<void>('switch_service_worktree', { appName, worktree });
   }
 
   /**
@@ -569,6 +593,9 @@ export function useWt() {
     // Phase 3: Branches, Health, Prune, Pull-All
     listBranches,
     getRepoHealth,
+    listServicesStatus,
+    runServiceAction,
+    switchServiceWorktree,
     getRecentCommits,
     getUncommittedFiles,
     pruneRepo,
