@@ -6,6 +6,7 @@ import type { Worktree, DiffStats } from '../types'
 import { mockTauriInvoke, resetTauriMocks } from '@/test/setup'
 import { useRepoConfigStore } from '@/stores/repoConfig'
 import { useWorktreeStore } from '@/stores'
+import { resetWorktreeDiagnosticsForTests } from '@/composables/useWorktreeDiagnostics'
 
 const worktree: Worktree = {
   path: '/repos/grove/feature-login',
@@ -40,6 +41,7 @@ function mountCard() {
 describe('WorktreeCard diff-stats badge', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    resetWorktreeDiagnosticsForTests()
     resetTauriMocks()
     mockTauriInvoke.mockImplementation((command: string) => {
       if (command === 'get_diff_stats') {
@@ -76,9 +78,56 @@ describe('WorktreeCard diff-stats badge', () => {
   })
 })
 
+describe('WorktreeCard diagnostics queue', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    resetWorktreeDiagnosticsForTests()
+    resetTauriMocks()
+  })
+
+  it('caps concurrent diff-stat requests across mounted cards', async () => {
+    let active = 0
+    let maxActive = 0
+    const resolveDiffs: Array<() => void> = []
+    mockTauriInvoke.mockImplementation((command: string) => {
+      if (command !== 'get_diff_stats') return Promise.resolve(undefined)
+
+      active += 1
+      maxActive = Math.max(maxActive, active)
+      return new Promise((resolve) => {
+        resolveDiffs.push(() => {
+          active -= 1
+          resolve(diffStats)
+        })
+      })
+    })
+
+    const wrappers = Array.from({ length: 8 }, (_, index) => mountCardWithWorktree({
+      ...worktree,
+      dirty: false,
+      path: `/repos/grove/worktree-${index}`,
+      branch: `feature/${index}`,
+    }))
+    await flushPromises()
+
+    expect(diffStatCalls()).toBe(4)
+    expect(maxActive).toBe(4)
+
+    resolveDiffs.shift()!()
+    await flushPromises()
+
+    expect(diffStatCalls()).toBe(5)
+    expect(maxActive).toBe(4)
+
+    resolveDiffs.splice(0).forEach(resolve => resolve())
+    wrappers.forEach(wrapper => wrapper.unmount())
+  })
+})
+
 describe('WorktreeCard selection', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    resetWorktreeDiagnosticsForTests()
     resetTauriMocks()
     mockTauriInvoke.mockImplementation((command: string) => {
       if (command === 'get_diff_stats') {
@@ -109,6 +158,7 @@ describe('WorktreeCard selection', () => {
 describe('WorktreeCard selection checkbox', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    resetWorktreeDiagnosticsForTests()
     resetTauriMocks()
     mockTauriInvoke.mockResolvedValue(undefined)
   })
@@ -166,3 +216,20 @@ describe('WorktreeCard selection checkbox', () => {
     expect(wrapper.find('[data-testid="wt-select"]').classes()).toContain('wt-select-checkbox--visible')
   })
 })
+
+function mountCardWithWorktree(wt: Worktree) {
+  return mount(WorktreeCard, {
+    props: { worktree: wt, repoName: 'grove' },
+    global: {
+      stubs: {
+        Dropdown: true,
+        DropdownItem: true,
+        WorktreeDetailsPanel: true,
+      },
+    },
+  })
+}
+
+function diffStatCalls(): number {
+  return mockTauriInvoke.mock.calls.filter(([command]) => command === 'get_diff_stats').length
+}

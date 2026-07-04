@@ -8,12 +8,12 @@
  * Phase 2: Added age display and status badges (MERGED, STALE, MISMATCH).
  */
 import { computed, ref, watch, onMounted } from 'vue'
-import type { Worktree, DirtyDetails } from '../types'
+import type { Worktree } from '../types'
 import StatusBadge from './StatusBadge.vue'
 import GradeBadge from './GradeBadge.vue'
 import WorktreeStatusBadges from './WorktreeStatusBadges.vue'
 import WorktreeDetailsPanel from './WorktreeDetailsPanel.vue'
-import { useWorktrees, useToast, formatRelativeTime, useWt, useOrphanedDetection, useWorktreeSelection } from '../composables'
+import { useWorktrees, useToast, formatRelativeTime, useWorktreeDiagnostics, useOrphanedDetection, useWorktreeSelection } from '../composables'
 import { useSettingsStore } from '../stores/settings'
 import { useRepoConfigStore } from '../stores/repoConfig'
 import { SKbd, SBadge, SDivider } from '@stuntrocket/ui'
@@ -36,7 +36,7 @@ const emit = defineEmits<{
 
 const { openInEditor, openInGitClient, openInTerminal, openInBrowser, openInFinder, openAll, pullWorktree, syncWorktree, getWorktreeOperation, isWorktreeBusy } = useWorktrees()
 const { toast } = useToast()
-const { getDirtyDetails, getDiffStats } = useWt()
+const diagnostics = useWorktreeDiagnostics()
 const settingsStore = useSettingsStore()
 const repoConfigStore = useRepoConfigStore()
 const { isOrphaned } = useOrphanedDetection()
@@ -55,8 +55,8 @@ function handleCheckboxClick(e: MouseEvent) {
 // Check if git client is configured
 const hasGitClient = computed(() => settingsStore.settings.gitClient !== 'none')
 
-// Diff stats (lazy-loaded)
-const diffStats = ref<import('../types').DiffStats | undefined>(undefined)
+const baseBranch = computed(() => settingsStore.settings.defaultBaseBranch || undefined)
+const diffStats = diagnostics.getDiffStats(props.worktree.path, baseBranch.value)
 
 // Branch protection detection
 const isProtectedBranch = computed(() => {
@@ -79,16 +79,10 @@ const isStaleWorktree = computed(() => {
   return Date.now() - new Date(props.worktree.lastAccessed).getTime() > thresholdMs
 })
 
-// Load diff stats on mount (async, non-blocking)
-onMounted(async () => {
-  try {
-    const stats = await getDiffStats(
-      props.worktree.path,
-      settingsStore.settings.defaultBaseBranch || undefined
-    )
-    diffStats.value = stats
-  } catch {
-    // Silently ignore — diff stats are supplementary
+onMounted(() => {
+  diagnostics.requestDiffStats(props.worktree.path, baseBranch.value)
+  if (props.worktree.dirty) {
+    diagnostics.requestDirtyDetails(props.worktree.path)
   }
 })
 
@@ -96,30 +90,14 @@ onMounted(async () => {
 const isLocalPulling = ref(false)
 const isLocalSyncing = ref(false)
 
-// Dirty details (lazy-loaded for dirty worktrees)
-const dirtyDetails = ref<DirtyDetails | undefined>(undefined)
-
-// Lazy-load dirty details on mount for dirty worktrees
-onMounted(async () => {
-  if (props.worktree.dirty) {
-    try {
-      dirtyDetails.value = await getDirtyDetails(props.worktree.path)
-    } catch {
-      // Silently ignore — dirty boolean is sufficient fallback
-    }
-  }
-})
+const dirtyDetails = diagnostics.getDirtyDetails(props.worktree.path)
 
 // Refresh dirty details when the worktree dirty state changes
-watch(() => props.worktree.dirty, async (isDirty) => {
+watch(() => props.worktree.dirty, (isDirty) => {
   if (isDirty) {
-    try {
-      dirtyDetails.value = await getDirtyDetails(props.worktree.path)
-    } catch {
-      dirtyDetails.value = undefined
-    }
+    diagnostics.requestDirtyDetails(props.worktree.path)
   } else {
-    dirtyDetails.value = undefined
+    diagnostics.clearDirtyDetails(props.worktree.path)
   }
 })
 
