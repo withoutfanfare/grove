@@ -102,10 +102,10 @@ wt ls [repo] --json
 ```json
 [
   {
-    "path": "/Users/danny/Herd/modernprintworks--staging",
+    "path": "/Users/example/Herd/example-app--staging",
     "branch": "staging",
     "sha": "abc1234",
-    "url": "http://modernprintworks--staging.test",
+    "url": "http://example-app--staging.test",
     "dirty": false,
     "ahead": 0,
     "behind": 2,
@@ -114,10 +114,10 @@ wt ls [repo] --json
     "health_score": 95
   },
   {
-    "path": "/Users/danny/Herd/modernprintworks--feature-auth",
+    "path": "/Users/example/Herd/example-app--feature-auth",
     "branch": "feature/auth",
     "sha": "def5678",
-    "url": "http://modernprintworks--feature-auth.test",
+    "url": "http://example-app--feature-auth.test",
     "dirty": true,
     "ahead": 3,
     "behind": 0,
@@ -160,7 +160,7 @@ wt status [repo] --json
 [
   {
     "branch": "staging",
-    "path": "/Users/danny/Herd/modernprintworks--staging",
+    "path": "/Users/example/Herd/example-app--staging",
     "sha": "abc1234",
     "dirty": false,
     "changes": 0,
@@ -173,7 +173,7 @@ wt status [repo] --json
   },
   {
     "branch": "feature/old-work",
-    "path": "/Users/danny/Herd/modernprintworks--feature-old-work",
+    "path": "/Users/example/Herd/example-app--feature-old-work",
     "sha": "xyz9999",
     "dirty": false,
     "changes": 0,
@@ -219,7 +219,7 @@ wt repos --json
 ```json
 [
   {
-    "name": "modernprintworks",
+    "name": "example-app",
     "worktrees": 4
   },
   {
@@ -251,10 +251,10 @@ wt add <repo> <branch> --json
 
 ```json
 {
-  "path": "/Users/danny/Herd/modernprintworks--feature-new",
-  "url": "http://modernprintworks--feature-new.test",
+  "path": "/Users/example/Herd/example-app--feature-new",
+  "url": "http://example-app--feature-new.test",
   "branch": "feature/new",
-  "database": "modernprintworks__feature_new"
+  "database": "example_app__feature_new"
 }
 ```
 
@@ -282,9 +282,9 @@ wt summary [repo] [branch] --json
 
 ```json
 {
-  "repo": "modernprintworks",
+  "repo": "example-app",
   "branch": "feature/auth",
-  "path": "/Users/danny/Herd/modernprintworks--feature-auth",
+  "path": "/Users/example/Herd/example-app--feature-auth",
   "base": "origin/staging",
   "ahead": 3,
   "behind": 1,
@@ -355,13 +355,13 @@ wt info [repo] [branch] --json
 
 ```json
 {
-  "repo": "modernprintworks",
+  "repo": "example-app",
   "branch": "feature/auth",
-  "path": "/Users/danny/Herd/modernprintworks--feature-auth",
-  "url": "http://modernprintworks--feature-auth.test",
-  "bare_repo": "/Users/danny/Herd/.bare/modernprintworks.git",
+  "path": "/Users/example/Herd/example-app--feature-auth",
+  "url": "http://example-app--feature-auth.test",
+  "bare_repo": "/Users/example/Herd/.bare/example-app.git",
   "database": {
-    "name": "modernprintworks__feature_auth",
+    "name": "example_app__feature_auth",
     "exists": true,
     "size_bytes": 52428800,
     "size_human": "50M"
@@ -416,13 +416,13 @@ wt branches <repo> --json
 
 ```json
 {
-  "repo": "modernprintworks",
+  "repo": "example-app",
   "branches": [
     {
       "name": "main",
       "type": "local",
       "has_worktree": true,
-      "worktree_path": "/Users/danny/Herd/modernprintworks--main",
+      "worktree_path": "/Users/example/Herd/example-app--main",
       "sha": "abc1234",
       "last_commit_at": "2026-01-06T10:00:00Z"
     },
@@ -430,7 +430,7 @@ wt branches <repo> --json
       "name": "staging",
       "type": "local",
       "has_worktree": true,
-      "worktree_path": "/Users/danny/Herd/modernprintworks--staging",
+      "worktree_path": "/Users/example/Herd/example-app--staging",
       "sha": "def5678",
       "last_commit_at": "2026-01-07T09:00:00Z"
     },
@@ -473,17 +473,17 @@ wt recent [count] --json
 ```json
 [
   {
-    "repo": "modernprintworks",
+    "repo": "example-app",
     "branch": "staging",
-    "path": "/Users/danny/Herd/modernprintworks--staging",
-    "url": "http://modernprintworks--staging.test",
+    "path": "/Users/example/Herd/example-app--staging",
+    "url": "http://example-app--staging.test",
     "accessed_at": "2026-01-07T14:30:00Z",
     "dirty": false
   },
   {
     "repo": "my-project",
     "branch": "develop",
-    "path": "/Users/danny/Herd/my-project--develop",
+    "path": "/Users/example/Herd/my-project--develop",
     "url": "http://my-project--develop.test",
     "accessed_at": "2026-01-07T12:15:00Z",
     "dirty": true
@@ -506,7 +506,7 @@ wt health [repo] --json
 
 ```json
 {
-  "repo": "modernprintworks",
+  "repo": "example-app",
   "overall_grade": "B",
   "overall_score": 82,
   "worktree_count": 4,
@@ -573,7 +573,7 @@ wt doctor --json
       "status": "ok",
       "version": "1.9.0",
       "message": "Laravel Herd is running",
-      "herd_root": "/Users/danny/Herd"
+      "herd_root": "/Users/example/Herd"
     },
     {
       "name": "mysql",
@@ -595,7 +595,7 @@ wt doctor --json
     }
   ],
   "config": {
-    "herd_root": "/Users/danny/Herd",
+    "herd_root": "/Users/example/Herd",
     "bare_dir": ".bare",
     "default_base": "origin/staging",
     "protected_branches": ["main", "master", "staging"]
@@ -618,22 +618,22 @@ wt clean [repo] --json
 
 ```json
 {
-  "repo": "modernprintworks",
+  "repo": "example-app",
   "candidates": [
     {
       "branch": "feature/old-work",
-      "path": "/Users/danny/Herd/modernprintworks--feature-old-work",
+      "path": "/Users/example/Herd/example-app--feature-old-work",
       "reason": "merged",
       "merged_to": "staging",
       "age_days": 21,
       "disk_bytes": 245000000,
       "disk_human": "245M",
-      "database": "modernprintworks__feature_old_work",
+      "database": "example_app__feature_old_work",
       "safe_to_remove": true
     },
     {
       "branch": "experiment/testing",
-      "path": "/Users/danny/Herd/modernprintworks--experiment-testing",
+      "path": "/Users/example/Herd/example-app--experiment-testing",
       "reason": "stale",
       "merged_to": null,
       "age_days": 45,
@@ -664,7 +664,7 @@ When `--json` is enabled and an error occurs, output a structured error object t
   "code": "BRANCH_NOT_FOUND",
   "message": "Branch 'feature/nonexistent' does not exist",
   "details": {
-    "repo": "modernprintworks",
+    "repo": "example-app",
     "branch": "feature/nonexistent",
     "suggestion": "Did you mean 'feature/notifications'?"
   }

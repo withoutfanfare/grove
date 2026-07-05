@@ -85,9 +85,7 @@ export function useBackgroundFetch() {
   watch(
     () => settings.value.backgroundFetchInterval,
     () => {
-      if (intervalHandle) {
-        start(); // Restart with new interval
-      }
+      start(); // Restart with new interval; start() no-ops when disabled.
     }
   );
 

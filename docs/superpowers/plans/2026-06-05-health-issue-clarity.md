@@ -12,7 +12,7 @@
 
 **Working branch:** `feature/health-issue-clarity` (already created; spec committed at `2f28134`).
 
-**Git conventions:** stage exact file paths (`git add <paths>` — never `git add .`/`-A`); conventional commit messages; never mention AI/Claude in commits. The grove-cli repo (`/Users/dannyharding/Development/Code/Project/grove-cli`) is a **separate git repository** whose `main` is write-protected by a hook — Task 4 creates a branch there and merges it.
+**Git conventions:** stage exact file paths (`git add <paths>` — never `git add .`/`-A`); conventional commit messages; never mention AI/Claude in commits. The grove-cli repo (`/path/to/grove-cli`) is a **separate git repository** whose `main` is write-protected by a hook — Task 4 creates a branch there and merges it.
 
 ## File Structure
 
@@ -1368,7 +1368,7 @@ git commit -m "feat: explain health findings with score impact and fix actions"
 
 ### Task 4: grove-cli — fix the zsh issue-splitting bug (separate repository)
 
-**Files (in `/Users/dannyharding/Development/Code/Project/grove-cli`):**
+**Files (in `/path/to/grove-cli`):**
 - Modify: `lib/commands/info.sh:993-998` and `:1059-1067`
 - Modify: `CHANGELOG.md` (`[Unreleased]` section)
 
@@ -1377,7 +1377,7 @@ grove-cli's `main` is write-protected by a hook — work on a branch and merge.
 - [ ] **Step 1: Create a branch**
 
 ```bash
-git -C /Users/dannyharding/Development/Code/Project/grove-cli checkout -b fix/health-issue-splitting
+git -C /path/to/grove-cli checkout -b fix/health-issue-splitting
 ```
 
 - [ ] **Step 2: Fix the all-issues loop**
@@ -1440,7 +1440,7 @@ becomes:
 - [ ] **Step 4: Verify the fix manually**
 
 ```bash
-cd /Users/dannyharding/Development/Code/Project/grove-cli && ./build.sh
+cd /path/to/grove-cli && ./build.sh
 ./grove health <a-repo-with-issues> --json | python3 -m json.tool | head -40
 ```
 
@@ -1451,7 +1451,7 @@ issues, this check can be skipped — the unit suite in Step 5 still gates.)
 - [ ] **Step 5: Run the CLI test suite**
 
 ```bash
-cd /Users/dannyharding/Development/Code/Project/grove-cli && ./run-tests.sh
+cd /path/to/grove-cli && ./run-tests.sh
 ```
 
 Expected: all tests pass. If a pre-existing failure unrelated to `info.sh` appears,
@@ -1472,7 +1472,7 @@ In `CHANGELOG.md` under `## [Unreleased]`, add a `### Fixed` section if missing,
 - [ ] **Step 7: Commit and merge**
 
 ```bash
-cd /Users/dannyharding/Development/Code/Project/grove-cli
+cd /path/to/grove-cli
 git add lib/commands/info.sh CHANGELOG.md
 git commit -m "fix: split health issues correctly in JSON output"
 git checkout main
@@ -1483,7 +1483,7 @@ git branch -d fix/health-issue-splitting
 - [ ] **Step 8: Refresh the Grove sidecar and confirm Grove still passes**
 
 ```bash
-cd /Users/dannyharding/Development/Code/Project/grove && npm run prepare-sidecar
+cd /path/to/grove && npm run prepare-sidecar
 npx vitest run
 ```
 
