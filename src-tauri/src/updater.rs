@@ -1,8 +1,7 @@
-//! Auto-updater commands with release channel support.
+//! Auto-updater commands.
 //!
 //! Provides Tauri IPC commands for checking for updates and retrieving the
-//! current app version. Release channel (stable/beta) is handled on the
-//! frontend by selecting which endpoint URL to check against.
+//! current app version.
 
 use serde::Serialize;
 use tauri_plugin_updater::UpdaterExt;
@@ -19,9 +18,7 @@ pub struct UpdateInfo {
 /// Check for an available update using the configured updater plugin.
 ///
 /// Returns `Some(UpdateInfo)` if an update is available, or `None` if the
-/// app is already on the latest version. The release channel is determined
-/// by the endpoint URLs configured in tauri.conf.json — the frontend can
-/// override via headers or by switching endpoints at runtime.
+/// app is already on the latest version.
 #[tauri::command]
 pub async fn check_for_update(app: tauri::AppHandle) -> Result<Option<UpdateInfo>, String> {
     let updater = app.updater().map_err(|e| e.to_string())?;

@@ -2,8 +2,7 @@
  * Auto-Updater Composable
  *
  * Checks for app updates on launch and provides manual check capability.
- * Uses the Tauri updater plugin for download and installation, with
- * release channel support (stable/beta) from settings.
+ * Uses the Tauri updater plugin for download and installation.
  */
 import { ref } from 'vue'
 import { check } from '@tauri-apps/plugin-updater'

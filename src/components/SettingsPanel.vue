@@ -7,8 +7,8 @@
  */
 import { ref, watch, computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useSettingsStore, EDITOR_OPTIONS, TERMINAL_OPTIONS, GIT_CLIENT_OPTIONS, RELEASE_CHANNEL_OPTIONS } from '../stores'
-import type { EditorChoice, TerminalChoice, GitClientChoice, ReleaseChannel } from '../stores'
+import { useSettingsStore, EDITOR_OPTIONS, TERMINAL_OPTIONS, GIT_CLIENT_OPTIONS } from '../stores'
+import type { EditorChoice, TerminalChoice, GitClientChoice } from '../stores'
 import { useUpdater } from '../composables'
 import { SPanel, SButton, SInput, SSelect, SToggle, SSectionHeader, SDivider } from '@stuntrocket/ui'
 
@@ -34,14 +34,9 @@ const enableNotifications = ref(settings.value.enableNotifications)
 const backgroundFetchInterval = ref(settings.value.backgroundFetchInterval)
 const staleThresholdDays = ref(settings.value.staleThresholdDays)
 const trayBadgeEnabled = ref(settings.value.trayBadgeEnabled)
-const releaseChannel = ref<ReleaseChannel>(settings.value.releaseChannel)
 const autoCheckUpdates = ref(settings.value.autoCheckUpdates)
 
 const { status: updateStatus, currentVersion, checkForUpdate } = useUpdater()
-
-const releaseChannelDescription = computed(() => {
-  return RELEASE_CHANNEL_OPTIONS.find((o: { value: ReleaseChannel; description: string }) => o.value === releaseChannel.value)?.description || ''
-})
 
 // M6: Validation for custom editor path
 const customEditorPathError = computed(() => {
@@ -94,7 +89,6 @@ watch(() => props.isOpen, (open) => {
     backgroundFetchInterval.value = settings.value.backgroundFetchInterval
     staleThresholdDays.value = settings.value.staleThresholdDays
     trayBadgeEnabled.value = settings.value.trayBadgeEnabled
-    releaseChannel.value = settings.value.releaseChannel
     autoCheckUpdates.value = settings.value.autoCheckUpdates
   }
 })
@@ -113,7 +107,6 @@ function handleSave() {
   settings.value.backgroundFetchInterval = backgroundFetchInterval.value
   settings.value.staleThresholdDays = staleThresholdDays.value
   settings.value.trayBadgeEnabled = trayBadgeEnabled.value
-  store.setReleaseChannel(releaseChannel.value)
   store.setAutoCheckUpdates(autoCheckUpdates.value)
   emit('close')
 }
@@ -134,7 +127,6 @@ function handleReset() {
   backgroundFetchInterval.value = settings.value.backgroundFetchInterval
   staleThresholdDays.value = settings.value.staleThresholdDays
   trayBadgeEnabled.value = settings.value.trayBadgeEnabled
-  releaseChannel.value = settings.value.releaseChannel
   autoCheckUpdates.value = settings.value.autoCheckUpdates
 }
 
@@ -339,16 +331,6 @@ const gitClientDescription = computed(() => {
       <!-- Updates Section -->
       <section class="space-y-4">
         <SSectionHeader title="Updates" />
-
-        <SSelect
-          v-model="releaseChannel"
-          label="Release Channel"
-        >
-          <option v-for="opt in RELEASE_CHANNEL_OPTIONS" :key="opt.value" :value="opt.value">
-            {{ opt.label }}
-          </option>
-        </SSelect>
-        <p class="text-2xs text-text-muted -mt-2">{{ releaseChannelDescription }}</p>
 
         <SToggle
           v-model="autoCheckUpdates"
