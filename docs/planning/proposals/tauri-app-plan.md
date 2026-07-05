@@ -108,7 +108,7 @@ The minimum viable product that provides value to the team.
 │  wt Worktree Manager                              [−] [□] [×]   │
 ├────────────────┬────────────────────────────────────────────────┤
 │                │                                                 │
-│  Repositories  │  modernprintworks                              │
+│  Repositories  │  example-app                              │
 │  ─────────────│  ───────────────────────────────────────────── │
 │                │                                                 │
 │  ● modern...  │  ┌─────────────────────────────────────────┐   │
@@ -161,7 +161,7 @@ Enable creating new worktrees without touching the CLI.
 │                                                         │
 │  Repository                                             │
 │  ┌─────────────────────────────────────────────────┐   │
-│  │ modernprintworks                            ▼   │   │
+│  │ example-app                            ▼   │   │
 │  └─────────────────────────────────────────────────┘   │
 │                                                         │
 │  Branch                                                 │
@@ -232,7 +232,7 @@ Always-available quick access.
 │  wt Worktree Manager           │
 ├────────────────────────────────┤
 │  Recent                        │
-│  ├─ modernprintworks/staging   │
+│  ├─ example-app/staging   │
 │  ├─ my-project/develop         │
 │  └─ api-gateway/main           │
 ├────────────────────────────────┤

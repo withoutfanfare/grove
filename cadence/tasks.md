@@ -2,7 +2,7 @@
 
 ## TASK-1: Real-time file watcher never registers targets for linked worktrees
 status: open
-labels: agent:triaged, agent:specced
+labels: agent:revise, agent:triaged
 
 ### Problem
 
@@ -12,7 +12,7 @@ The real-time file watcher never registers any watch targets for Grove-managed w
 
 `src-tauri/src/watcher.rs:118-144` (`start_watching`), fed by the watcher command in `commands.rs` (~1384-1387).
 
-The watcher builds targets as `PathBuf::from(worktree_path).join(".git").join("HEAD")` (plus `index`, `FETCH_HEAD`, `refs/heads`) and only registers a watch when `target.exists()`. But in Grove's standard layout — a **bare** repo (`<name>.git`) with **linked** worktrees under `<name>-worktrees/` — every worktree's `.git` is a *pointer file* (`gitdir: …`), not a directory. The real HEAD/refs live under `<mainrepo>/.git/worktrees/<name>/`. Therefore `<worktree>/.git/HEAD` never exists, `target.exists()` is always false, and **no watch targets are ever registered**. `is_watching` still returns true, masking the failure.
+The watcher builds targets as `PathBuf::from(worktree_path).join(".git").join("HEAD")` (plus `index`, `FETCH_HEAD`, `refs/heads`) and only registers a watch when `target.exists()`. But in Grove's standard layout — a **bare** repo (`<name>.git`) with **linked** worktrees under `<name>-worktrees/` — every worktree's `.git` is a *pointer file* (`gitdir: …`), not a directory. The real `HEAD`/`index` live under `<mainrepo>/.git/worktrees/<name>/`, while shared refs and fetch state live under the common git dir. Therefore `<worktree>/.git/HEAD` never exists, `target.exists()` is always false, and **no watch targets are ever registered**. `is_watching` still returns true, masking the failure.
 
 ### Why it matters
 
@@ -21,7 +21,7 @@ Correctness bug: a shipped feature silently does nothing. Any commit / checkout 
 ### Acceptance Criteria
 
 - [ ] Watcher resolves the real git directory for linked worktrees (read the `gitdir:` pointer from the `.git` file) instead of assuming `<worktree>/.git` is a directory.
-- [ ] Watch targets (`HEAD`, `index`, `FETCH_HEAD`, `refs/heads`) are registered against the resolved path and `worktree_changed` fires on a real change.
+- [ ] Watch targets (`HEAD`, `index`, shared `FETCH_HEAD`, shared `refs/heads`) are registered against the correct git directories and `worktree_changed` fires on a real change.
 - [ ] Verified against a bare-repo + linked-worktree layout: editing/committing in a worktree emits the event and the UI refreshes without waiting for the poll.
 - [ ] `is_watching` reflects reality (does not report watching when zero targets were registered).
 
@@ -31,7 +31,7 @@ Correctness bug: a shipped feature silently does nothing. Any commit / checkout 
 
 ### Root cause
 
-`watcher.rs:120` hard-codes `git_dir = <worktree>/.git` as a directory. For linked worktrees `.git` is a file containing `gitdir: /abs/path/to/mainrepo/.git/worktrees/<name>`. `HEAD`/`index`/`refs/heads` live in that resolved dir; `FETCH_HEAD` lives in the shared `<mainrepo>/.git` (the `commondir`). So the current targets never exist.
+`watcher.rs:120` hard-codes `git_dir = <worktree>/.git` as a directory. For linked worktrees `.git` is a file containing `gitdir: /abs/path/to/mainrepo/.git/worktrees/<name>`. `HEAD`/`index` live in that resolved per-worktree dir; `refs/heads` and `FETCH_HEAD` live in the shared `<mainrepo>/.git` (the `commondir`). So the current targets never exist.
 
 ### Approach
 
@@ -41,7 +41,7 @@ Correctness bug: a shipped feature silently does nothing. Any commit / checkout 
    - If `dot_git.is_file()` → read it, strip the `gitdir: ` prefix, trim, resolve relative-to-worktree if not absolute, canonicalise → return the per-worktree git dir.
    - Else `None`.
 2. In `start_watching`, replace the `let git_dir = …join(".git")` line with `let Some(git_dir) = resolve_git_dir(Path::new(path_str)) else { continue; }`.
-3. `HEAD`, `index`, `refs/heads` resolve under that per-worktree dir. `FETCH_HEAD` is written to the **common** dir for linked worktrees — read the `commondir` file (sibling of the resolved gitdir, contents e.g. `../..`) and target `<commondir>/FETCH_HEAD`. If `commondir` is absent (normal repo) fall back to `git_dir` as today. Keep the existing `target.exists()` guard so still-absent files (e.g. no fetch yet) are skipped gracefully — but at least HEAD/index/refs will now exist and register.
+3. `HEAD` and `index` resolve under that per-worktree dir. `refs/heads` and `FETCH_HEAD` are written to the **common** dir for linked worktrees — read the `commondir` file (sibling of the resolved gitdir, contents e.g. `../..`) and target `<commondir>/refs/heads` plus `<commondir>/FETCH_HEAD`. If `commondir` is absent (normal repo) fall back to `git_dir` as today. Keep the existing `target.exists()` guard so still-absent files (e.g. no fetch yet) are skipped gracefully — but at least HEAD/index/refs will now exist and register.
 4. `is_watching` accuracy: track a registered-target count. Only insert the `WatcherHandle` into `WATCHERS` (i.e. only report "watching") if at least one `watch()` call succeeded; if zero targets registered, log a warning and skip the insert so `is_watching` returns false.
 
 ### Files
@@ -51,12 +51,14 @@ Correctness bug: a shipped feature silently does nothing. Any commit / checkout 
 ### Test plan
 
 - Unit: `resolve_git_dir` — temp dir with a `.git` **file** containing `gitdir: <tmp>/mainrepo/.git/worktrees/wt1` resolves to that path; a `.git` **directory** returns itself; a missing `.git` returns `None`; a relative `gitdir:` resolves against the worktree.
-- Unit: given a fabricated linked-worktree layout on disk (create `HEAD`/`index` files under the resolved gitdir and `FETCH_HEAD` under commondir), assert the computed target set contains all four existing paths.
+- Unit: given a fabricated linked-worktree layout on disk (create `HEAD`/`index` files under the resolved gitdir and `refs/heads`/`FETCH_HEAD` under commondir), assert the computed target set contains all four existing paths.
 - Manual verify (acceptance): in a real bare+linked layout, `git commit` inside a worktree emits `worktree_changed` and the Dashboard refreshes before the poll interval.
 
+PR: https://github.com/withoutfanfare/grove/pull/3
+
 ## TASK-2: Background fetch cannot be re-enabled without an app restart
-status: open
-labels: agent:triaged, agent:specced
+status: completed
+labels: 
 
 ### Problem
 
@@ -114,9 +116,11 @@ Regression test (Vitest) in `src/composables/__tests__/useBackgroundFetch.spec.t
 
 Mock `useWt().fetchRepo` and `useOrphanedDetection().detectOrphaned` as spies; assert call counts across the transitions. This test fails against the current `if (intervalHandle)` guard and passes after the fix.
 
+PR: https://github.com/withoutfanfare/grove/pull/4
+
 ## TASK-3: Every WorktreeCard spawns a git subprocess on mount (repo-switch storm)
 status: open
-labels: agent:triaged, agent:specced
+labels: agent:triaged, agent:pr-open, agent:revise
 
 ### Problem
 
@@ -143,30 +147,29 @@ Performance (slow path / process fan-out): the single largest avoidable cost on 
 
 ## Implementation Spec
 
-### Approach: lazy-on-expand (smallest correct change)
+### Approach: bounded concurrency (smallest correct change)
 
-Diff stats and dirty details are supplementary detail. Fetch them only when the card's detail view actually needs them, instead of eagerly on mount for every card.
+Diff stats and dirty details are rendered in the collapsed status row, so lazy-on-expand would remove existing summary badges. Keep the summaries visible, but stop every card from spawning its own uncoordinated subprocess on mount.
 
-1. Move both `onMounted` fetches (`WorktreeCard.vue:83-93` and `:103-111`) behind the card's expanded/details state. Identify the existing reactive flag that drives the details panel (the disclosure that renders diff stats / dirty details). Fetch on first expand and cache the result.
-2. Implement with a single `watch` on the "expanded" flag (or a `whenVisible` guard) that, on becoming true and when not already loaded, calls `getDiffStats` and — if `props.worktree.dirty` — `getDirtyDetails`. Guard with a `loaded` ref so re-expanding doesn't re-spawn subprocesses.
-3. Keep the existing `watch(() => props.worktree.dirty, …)` at `:114` for correctness (dirty→clean transitions), but make it only refetch if details were already loaded/visible, so a background dirty-state change on a collapsed card doesn't spawn a subprocess.
-
-If cards show diff/dirty summaries **while collapsed** (verify in the template), lazy-on-expand is not viable — fall back to **bounded concurrency**: replace the per-card eager calls with a shared queue in the Dashboard/worktree store that fetches diff+dirty for the visible set with a concurrency cap (e.g. 4), populating a `Map<path, stats>` the cards read reactively. Prefer lazy-on-expand if the summaries are behind the disclosure.
+1. Replace the per-card eager calls with a shared queue in the Dashboard/worktree store that fetches diff+dirty for the visible set with a small concurrency cap (e.g. 4).
+2. Store results in a reactive `Map<path, stats>` that cards read instead of owning their own fetch lifecycle.
+3. Keep the existing dirty-state correctness path, but route refreshes through the same capped queue so a dirty-state burst cannot spawn O(n) concurrent subprocesses.
 
 ### Files
 
-- `src/components/WorktreeCard.vue` — gate the two `onMounted` fetches behind expand state; add a `loaded` guard; adjust the dirty `watch`.
-- (Only if bounded-concurrency path) `src/stores/worktrees.ts` or a small `useDiffStatsQueue` composable for the shared capped fetch + cache.
+- `src/components/WorktreeCard.vue` — read cached stats/details instead of launching its own mount-time subprocesses.
+- `src/stores/worktrees.ts` or a small `useDiffStatsQueue` composable — shared capped fetch + cache.
 
 ### Verification
 
-- Confirm which path applies by reading the card template for where `diffStats`/`dirtyDetails` render (collapsed vs expanded).
-- Measure: on a repo with many worktrees, count `git` subprocesses during a repo switch before/after (e.g. `ps`/Activity Monitor, or a temporary log line in the Rust `get_diff_stats` handler). Expect O(n) → O(expanded cards) or ≤ cap.
-- Correctness: expand a card → stats appear; make a worktree dirty → dirty details refresh via the existing watch; collapse/re-expand → no duplicate subprocess.
+- Measure: on a repo with many worktrees, count `git` subprocesses during a repo switch before/after (e.g. `ps`/Activity Monitor, or a temporary log line in the Rust `get_diff_stats` handler). Expect O(n) concurrent calls → ≤ cap.
+- Correctness: collapsed cards still show stats; make a worktree dirty → dirty details refresh via the capped queue; repeated renders do not duplicate subprocesses.
+
+PR: https://github.com/withoutfanfare/grove/pull/5
 
 ## TASK-4: Command palette lacks dialog/listbox semantics and a focus trap
 status: open
-labels: agent:triaged, agent:specced
+labels: agent:triaged, agent:pr-open, agent:revise
 
 ### Problem
 
@@ -225,9 +228,11 @@ Keep the bespoke `Teleport` overlay (migrating the combobox pattern into `SModal
 - Existing behaviour unchanged: arrow navigation, Enter runs, Escape closes, mouse hover selects.
 - Add a Vitest DOM test asserting `role="dialog"`/`aria-modal` on the container, `role="listbox"` on results, `role="option"` + `aria-selected` on the active item, and `aria-activedescendant` on the input matching the selected option id.
 
+PR: https://github.com/withoutfanfare/grove/pull/6
+
 ## TASK-5: Beta release-channel setting is a no-op (never wired to updater)
-status: open
-labels: agent:triaged, agent:specced
+status: completed
+labels: 
 
 ### Problem
 
@@ -287,3 +292,5 @@ The honest gate is **does a beta update channel actually exist server-side?** (i
 ### Recommendation
 
 Default to **Path A** (remove the toggle) unless the maintainer confirms a beta update feed exists — it is the lazier, more honest fix and removes the misleading UI immediately. Escalate the "does a beta feed exist?" question at review if unknown.
+
+PR: https://github.com/withoutfanfare/grove/pull/7
