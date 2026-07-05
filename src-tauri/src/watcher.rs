@@ -3,7 +3,7 @@
 // Uses the `notify` crate to monitor git directories for changes and emit
 // events to the frontend for real-time UI updates.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -121,6 +121,7 @@ pub fn start_watching(
     .map_err(|e| WtError::new("WATCHER_ERROR", format!("Failed to create watcher: {}", e)))?;
 
     let mut registered_targets = 0;
+    let mut seen_targets = HashSet::new();
 
     // Watch each worktree's resolved git directory
     for path_str in &worktree_paths {
@@ -130,6 +131,10 @@ pub fn start_watching(
         };
 
         for target in targets {
+            if !seen_targets.insert(target.clone()) {
+                continue;
+            }
+
             let mode = if target.is_dir() {
                 RecursiveMode::Recursive
             } else {
@@ -145,8 +150,10 @@ pub fn start_watching(
     }
 
     if registered_targets == 0 {
-        log::warn!("No watch targets registered for '{}'", repo_name);
-        return Ok(());
+        return Err(WtError::new(
+            "WATCHER_ERROR",
+            format!("No watch targets registered for '{}'", repo_name),
+        ));
     }
 
     // Store the watcher handle
