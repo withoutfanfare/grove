@@ -120,6 +120,7 @@ describe('WorktreeCard diagnostics queue', () => {
     expect(maxActive).toBe(4)
 
     resolveDiffs.splice(0).forEach(resolve => resolve())
+    await flushPromises()
     wrappers.forEach(wrapper => wrapper.unmount())
   })
 })

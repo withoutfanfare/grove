@@ -31,10 +31,14 @@ function drainQueue() {
   while (active < MAX_CONCURRENT && queue.length > 0) {
     const job = queue.shift()!
     active += 1
-    void job().finally(() => {
-      active -= 1
-      drainQueue()
-    })
+    void job()
+      .catch(() => {
+        // Individual diagnostics are supplementary UI only.
+      })
+      .finally(() => {
+        active -= 1
+        drainQueue()
+      })
   }
 }
 
