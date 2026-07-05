@@ -31,6 +31,7 @@ export type { WorktreeFilter, WorktreeSort } from './useWorktreeFilters';
 export { useAppStore } from './useAppStore';
 export { useNotifications } from './useNotifications';
 export { useBackgroundFetch } from './useBackgroundFetch';
+export { useWorktreeDiagnostics } from './useWorktreeDiagnostics';
 export { useStaleDetection } from './useStaleDetection';
 export type { StaleWorktreeInfo } from './useStaleDetection';
 export { useOrphanedDetection } from './useOrphanedDetection';
