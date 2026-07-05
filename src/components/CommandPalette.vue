@@ -189,6 +189,7 @@ function getFlatIndex(groupIndex: number, itemIndex: number): number {
                 :key="cmd.id"
                 :id="`palette-opt-${getFlatIndex(gi, ci)}`"
                 type="button"
+                tabindex="-1"
                 role="option"
                 :aria-selected="getFlatIndex(gi, ci) === selectedIndex"
                 :data-palette-selected="getFlatIndex(gi, ci) === selectedIndex"
@@ -196,6 +197,7 @@ function getFlatIndex(groupIndex: number, itemIndex: number): number {
                   'palette-item',
                   getFlatIndex(gi, ci) === selectedIndex && 'palette-item--selected'
                 ]"
+                @mousedown.prevent
                 @click="executeCommand(cmd)"
                 @mouseenter="selectedIndex = getFlatIndex(gi, ci)"
               >
