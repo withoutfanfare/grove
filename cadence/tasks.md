@@ -2,7 +2,7 @@
 
 ## TASK-1: Real-time file watcher never registers targets for linked worktrees
 status: open
-labels: agent:revise, agent:triaged
+labels: agent:triaged, agent:auto, agent:revise
 
 ### Problem
 
@@ -119,8 +119,8 @@ Mock `useWt().fetchRepo` and `useOrphanedDetection().detectOrphaned` as spies; a
 PR: https://github.com/withoutfanfare/grove/pull/4
 
 ## TASK-3: Every WorktreeCard spawns a git subprocess on mount (repo-switch storm)
-status: open
-labels: agent:triaged, agent:pr-open, agent:revise
+status: completed
+labels: 
 
 ### Problem
 
@@ -168,8 +168,8 @@ Diff stats and dirty details are rendered in the collapsed status row, so lazy-o
 PR: https://github.com/withoutfanfare/grove/pull/5
 
 ## TASK-4: Command palette lacks dialog/listbox semantics and a focus trap
-status: open
-labels: agent:triaged, agent:pr-open, agent:revise
+status: completed
+labels: 
 
 ### Problem
 

@@ -20,6 +20,7 @@ const emit = defineEmits<{
 const query = ref('')
 const selectedIndex = ref(0)
 const inputRef = ref<HTMLInputElement | null>(null)
+const previouslyFocused = ref<HTMLElement | null>(null)
 
 // Fuzzy match: check if all query chars appear in order in the target
 function fuzzyMatch(target: string, q: string): { match: boolean; score: number } {
@@ -79,15 +80,19 @@ const grouped = computed(() => {
 
 // Flat list for keyboard navigation
 const flatList = computed(() => filtered.value)
+const activeOptionId = computed(() => flatList.value.length > 0 ? `palette-opt-${selectedIndex.value}` : undefined)
 
 // Reset state when opened
 watch(() => props.isOpen, (open) => {
   if (open) {
+    previouslyFocused.value = document.activeElement instanceof HTMLElement ? document.activeElement : null
     query.value = ''
     selectedIndex.value = 0
     nextTick(() => inputRef.value?.focus())
+  } else if (previouslyFocused.value) {
+    nextTick(() => previouslyFocused.value?.focus())
   }
-})
+}, { immediate: true })
 
 // Reset selection when filter changes
 watch(filtered, () => {
@@ -100,7 +105,10 @@ function executeCommand(cmd: Command) {
 }
 
 function handleKeydown(e: KeyboardEvent) {
-  if (e.key === 'ArrowDown') {
+  if (e.key === 'Tab') {
+    e.preventDefault()
+    inputRef.value?.focus()
+  } else if (e.key === 'ArrowDown') {
     e.preventDefault()
     selectedIndex.value = (selectedIndex.value + 1) % Math.max(1, flatList.value.length)
     scrollToSelected()
@@ -139,7 +147,13 @@ function getFlatIndex(groupIndex: number, itemIndex: number): number {
   <Teleport to="body">
     <Transition name="palette">
       <div v-if="isOpen" class="palette-overlay" @mousedown.self="emit('close')">
-        <div class="palette-container" @keydown="handleKeydown">
+        <div
+          class="palette-container"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Command palette"
+          @keydown="handleKeydown"
+        >
           <!-- Search input -->
           <div class="palette-input-wrapper">
             <svg class="palette-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -151,6 +165,10 @@ function getFlatIndex(groupIndex: number, itemIndex: number): number {
               v-model="query"
               type="text"
               class="palette-input"
+              role="combobox"
+              aria-expanded="true"
+              aria-controls="palette-listbox"
+              :aria-activedescendant="activeOptionId"
               placeholder="Type a command…"
               autocomplete="off"
               spellcheck="false"
@@ -159,21 +177,27 @@ function getFlatIndex(groupIndex: number, itemIndex: number): number {
           </div>
 
           <!-- Results -->
-          <div class="palette-results">
+          <div id="palette-listbox" class="palette-results" role="listbox">
             <div v-if="flatList.length === 0" class="palette-empty">
               No matching commands
             </div>
 
             <template v-for="(group, gi) in grouped" :key="group.category">
-              <div class="palette-group-header">{{ group.category }}</div>
+              <div class="palette-group-header" role="presentation">{{ group.category }}</div>
               <button
                 v-for="(cmd, ci) in group.items"
                 :key="cmd.id"
+                :id="`palette-opt-${getFlatIndex(gi, ci)}`"
+                type="button"
+                tabindex="-1"
+                role="option"
+                :aria-selected="getFlatIndex(gi, ci) === selectedIndex"
                 :data-palette-selected="getFlatIndex(gi, ci) === selectedIndex"
                 :class="[
                   'palette-item',
                   getFlatIndex(gi, ci) === selectedIndex && 'palette-item--selected'
                 ]"
+                @mousedown.prevent
                 @click="executeCommand(cmd)"
                 @mouseenter="selectedIndex = getFlatIndex(gi, ci)"
               >
