@@ -1,8 +1,8 @@
 # Cadence Tasks
 
 ## TASK-1: Real-time file watcher never registers targets for linked worktrees
-status: open
-labels: agent:triaged, agent:auto, agent:revise
+status: completed
+labels: agent:triaged
 
 ### Problem
 
@@ -58,7 +58,7 @@ PR: https://github.com/withoutfanfare/grove/pull/3
 
 ## TASK-2: Background fetch cannot be re-enabled without an app restart
 status: completed
-labels: 
+labels: agent:triaged
 
 ### Problem
 
@@ -120,7 +120,7 @@ PR: https://github.com/withoutfanfare/grove/pull/4
 
 ## TASK-3: Every WorktreeCard spawns a git subprocess on mount (repo-switch storm)
 status: completed
-labels: 
+labels: agent:triaged
 
 ### Problem
 
@@ -169,7 +169,7 @@ PR: https://github.com/withoutfanfare/grove/pull/5
 
 ## TASK-4: Command palette lacks dialog/listbox semantics and a focus trap
 status: completed
-labels: 
+labels: agent:triaged
 
 ### Problem
 
@@ -232,7 +232,7 @@ PR: https://github.com/withoutfanfare/grove/pull/6
 
 ## TASK-5: Beta release-channel setting is a no-op (never wired to updater)
 status: completed
-labels: 
+labels: agent:triaged
 
 ### Problem
 
