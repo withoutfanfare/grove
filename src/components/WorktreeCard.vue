@@ -426,7 +426,7 @@ async function handleOpenAll() {
           <StatusBadge :dirty="worktree.dirty" :ahead="worktree.ahead" :behind="worktree.behind" :dirty-details="dirtyDetails" />
 
           <!-- Phase 2: Status badges (MERGED, STALE, MISMATCH) -->
-          <WorktreeStatusBadges :merged="worktree.merged" :stale="worktree.stale" :mismatch="hasMismatch" />
+          <WorktreeStatusBadges :merged="worktree.merged" :stale="worktree.stale" :mismatch="hasMismatch" :ledger="worktree.ledger" />
 
           <!-- Protected branch badge -->
           <SBadge v-if="isProtectedBranch"
