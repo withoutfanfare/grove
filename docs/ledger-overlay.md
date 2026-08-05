@@ -39,7 +39,19 @@ The badges depend on two things being current at once:
 
 If either is stale or missing, the overlay degrades honestly rather than failing loudly: because the `ledger` field is optional, an old sidecar or a missing `way` simply omits the key, which Grove renders as the **absent** state (no ledger UI at all). A sidecar that is current but hits a `way` error at runtime instead gets the **unavailable** state ("Ledger unknown"). Either way, nothing is ever shown as safe when the gate did not actually run — see [the three render states](#the-three-render-states) above.
 
-This is also why keeping the sidecar current matters beyond a build failure: a stale sidecar does not error, it just silently stops showing the overlay. See [Sidecar Bundling](sidecar.md) for the `GROVE_CLI_SOURCE` override that makes rebuilding it work from a git worktree.
+This is also why keeping the sidecar current matters beyond a build failure: a stale sidecar does not error, it just silently stops showing the overlay. See the next section for how to refresh it.
+
+## Refreshing the bundled sidecar
+
+`scripts/prepare-sidecar.sh` copies the `grove` CLI binary from `../grove-cli/grove` by default — a sibling checkout next to this repository. That default does not resolve when building from a git worktree (e.g. `.claude/worktrees/<name>/`), where the sibling path is relative to the worktree, not the main checkout — the script would report the CLI as not found even though it exists elsewhere on disk.
+
+Set `GROVE_CLI_SOURCE` to the built `grove` binary's actual path to override it:
+
+```bash
+GROVE_CLI_SOURCE=/path/to/grove-cli/grove ./scripts/prepare-sidecar.sh
+```
+
+The script's own comment documents this at the point of use (`scripts/prepare-sidecar.sh`, above the `GROVE_SOURCE=` assignment). Refresh the sidecar — and re-run it — any time the ledger overlay unexpectedly stops appearing; see the previous section for why a stale sidecar fails silently rather than erroring.
 
 ## Test seam
 
