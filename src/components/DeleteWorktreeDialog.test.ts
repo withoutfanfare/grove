@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import DeleteWorktreeDialog from './DeleteWorktreeDialog.vue'
 import { mockTauriInvoke, resetTauriMocks } from '@/test/setup'
+import { useWorktreeStore } from '@/stores'
 import type { Worktree } from '@/types'
 
 const mockRemoveWorktree = vi.fn()
@@ -22,6 +23,18 @@ const baseWorktree: Worktree = {
   dirty: false,
   ahead: 0,
   behind: 0,
+}
+
+// The real CLI's LEDGER_BLOCKED message (see src-tauri/src/wt.rs's
+// `ledger_blocked_error_carries_stderr_remedies_first` test): way's verbatim
+// risks/remedies, a blank line, then the CLI's instruction line — which
+// itself names the CLI-only bypass flags (`--acknowledge`, `--ledger-ack`).
+// The dialogue must render this verbatim without offering an in-GUI control
+// that performs the bypass for the user.
+const LEDGER_BLOCKED_ERROR = {
+  code: 'LEDGER_BLOCKED',
+  message:
+    "critical: uncommitted changes (3 files)\n  remedy: commit or stash them\nwarning: 2 unpushed commits\n  remedy: git push\n\nremoval blocked by the worktree ledger (see above). To proceed, run 'way worktree removal-check --acknowledge' in the worktree and pass the token with --ledger-ack",
 }
 
 function mockCommands() {
@@ -47,6 +60,20 @@ function mountDialog(worktree: Worktree | null) {
   })
 }
 
+/**
+ * Accessible-name approximation for every interactive control in the
+ * dialogue (buttons, links, inputs). Used to assert no acknowledge/override
+ * *control* exists — independent of the verbatim CLI prose rendered
+ * elsewhere in the panel, which legitimately contains those words.
+ */
+function interactiveControlLabels(wrapper: ReturnType<typeof mountDialog>): string[] {
+  return wrapper.findAll('button, a, input, [role="button"]').map((el) =>
+    [el.attributes('aria-label'), el.text(), el.attributes('value'), el.attributes('placeholder')]
+      .filter(Boolean)
+      .join(' ')
+  )
+}
+
 describe('DeleteWorktreeDialog', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -56,13 +83,14 @@ describe('DeleteWorktreeDialog', () => {
   })
 
   it('shows the ledger block with its remedies verbatim and no override control', async () => {
-    mockRemoveWorktree.mockRejectedValueOnce({
-      code: 'LEDGER_BLOCKED',
-      message:
-        'critical: repo has uncommitted planning notes\n  remedy: run `way checkpoint` before removing\n\nremoval blocked by the worktree ledger — resolve the risk above and try again.',
+    // Real production path: useWorktrees().removeWorktree() never rejects —
+    // it catches internally, records the typed WtError on the worktrees
+    // store, and resolves null. The dialogue must read the error from there.
+    mockRemoveWorktree.mockImplementationOnce(async () => {
+      useWorktreeStore().setError(LEDGER_BLOCKED_ERROR)
+      return null
     })
     const wrapper = mountDialog(baseWorktree)
-    await flushPromises()
 
     const deleteButton = wrapper.findAll('button').find((b) => b.text() === 'Delete Worktree')
     expect(deleteButton).toBeDefined()
@@ -73,8 +101,28 @@ describe('DeleteWorktreeDialog', () => {
     expect(wrapper.text()).toContain('The worktree ledger blocked this removal')
     expect(wrapper.text()).toContain('remedy:')
     expect(wrapper.text()).toContain('Nothing has been deleted')
-    // the whole dialogue offers no acknowledge/override path
-    expect(wrapper.html()).not.toMatch(/acknowledge|override|--ledger-ack/i)
+    // The real CLI prose, rendered verbatim, does name the CLI-only bypass
+    // flags — that must NOT fail this check.
+    expect(wrapper.text()).toContain('--ledger-ack')
+    // What must be true: no interactive control's accessible name offers to
+    // acknowledge/override/ledger-ack on the user's behalf.
+    const labels = interactiveControlLabels(wrapper)
+    expect(labels.some((label) => /acknowledge|override|ledger-ack/i.test(label))).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('also honours the ledger block when removeWorktree rejects directly', async () => {
+    // Fallback path: the dialogue's catch still handles a direct rejection
+    // (e.g. a differently-wired caller), not only the resolve-null path.
+    mockRemoveWorktree.mockRejectedValueOnce(LEDGER_BLOCKED_ERROR)
+    const wrapper = mountDialog(baseWorktree)
+
+    const deleteButton = wrapper.findAll('button').find((b) => b.text() === 'Delete Worktree')
+    await deleteButton!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('The worktree ledger blocked this removal')
+    expect(wrapper.text()).toContain('remedy:')
     wrapper.unmount()
   })
 

@@ -12,6 +12,7 @@ import type { Worktree, RemoveWorktreeResponse } from '../types'
 import { isWtError } from '../types'
 import { useWorktrees, useToast, useWt } from '../composables'
 import { useRepoConfigStore } from '../stores/repoConfig'
+import { useWorktreeStore } from '../stores'
 import { SButton, SModal, SCheckbox, SBadge, SInput } from '@stuntrocket/ui'
 
 type ModalPhase = 'confirm' | 'deleting' | 'results'
@@ -31,6 +32,7 @@ const { removeWorktree } = useWorktrees()
 const { toast } = useToast()
 const { ledgerCheckpoint } = useWt()
 const repoConfigStore = useRepoConfigStore()
+const worktreeStore = useWorktreeStore()
 
 const deleteBranch = ref(false)
 const dropDatabase = ref(false)
@@ -172,7 +174,18 @@ async function handleDelete() {
       phase.value = 'results'
       emit('deleted')
     } else {
-      error.value = 'Failed to delete worktree'
+      // useWorktrees().removeWorktree() catches internally and resolves null on
+      // failure, setting the typed WtError on the worktrees store rather than
+      // rejecting — this is the real production failure path (the catch below
+      // is a fallback for direct rejections, e.g. a differently-wired caller).
+      const storeError = worktreeStore.error
+      if (storeError) {
+        errorCode.value = storeError.code
+        error.value = storeError.message
+      } else {
+        errorCode.value = null
+        error.value = 'Failed to delete worktree'
+      }
       phase.value = 'confirm'
     }
   } catch (e) {
