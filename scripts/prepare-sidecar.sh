@@ -26,8 +26,10 @@ if [ -z "$TARGET" ]; then
     exit 1
 fi
 
-# Path to the grove CLI in the grove-cli repository
-GROVE_SOURCE="$PROJECT_ROOT/../grove-cli/grove"
+# Path to the grove CLI. GROVE_CLI_SOURCE overrides the sibling-checkout
+# default — needed when building from a git worktree, where ../grove-cli
+# does not resolve.
+GROVE_SOURCE="${GROVE_CLI_SOURCE:-$PROJECT_ROOT/../grove-cli/grove}"
 
 if [ ! -f "$GROVE_SOURCE" ]; then
     echo "Error: grove CLI not found at $GROVE_SOURCE"
