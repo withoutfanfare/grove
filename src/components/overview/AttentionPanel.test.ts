@@ -88,13 +88,13 @@ describe('AttentionPanel ledger items', () => {
     const wrapper = mount(AttentionPanel)
     const text = wrapper.text()
 
-    expect(text).toContain('Uncheckpointed work')
+    expect(text).toContain('Drifted or at risk')
     expect(text).toContain('Drifted since last checkpoint')
     expect(text).toContain('Critical ledger risk')
     wrapper.unmount()
   })
 
-  it('hides the uncheckpointed work group when no ledger is answerably drifted or critical', () => {
+  it('hides the drifted-or-at-risk group when no ledger is answerably drifted or critical', () => {
     const store = useOverviewStore()
     store.setWorktreeSnapshot('scooda', [
       makeWorktree({ path: '/repos/scooda/a', branch: 'a', ledger: { available: false } }),
@@ -103,7 +103,7 @@ describe('AttentionPanel ledger items', () => {
 
     const wrapper = mount(AttentionPanel)
 
-    expect(wrapper.text()).not.toContain('Uncheckpointed work')
+    expect(wrapper.text()).not.toContain('Drifted or at risk')
     wrapper.unmount()
   })
 })

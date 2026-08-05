@@ -30,6 +30,9 @@ const showUnmerged = computed(() => props.merged === false)
 const showStale = computed(() => props.stale === true)
 const showMismatch = computed(() => props.mismatch === true)
 const ledgerUnknown = computed(() => props.ledger?.available === false)
+// `risk` is always null from `way worktree resume` (today's only source for this
+// overlay) — only `removal-check` populates it. These branches are deliberate
+// forward-compatibility for when the overlay starts carrying that data.
 const ledgerRisk = computed(() => (props.ledger?.available ? props.ledger.risk ?? null : null))
 const showDrift = computed(
   () => props.ledger?.available === true && !ledgerRisk.value && props.ledger.drift === true

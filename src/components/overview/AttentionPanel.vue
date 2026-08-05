@@ -229,10 +229,10 @@ function ledgerReason(worktree: Worktree): string {
         </ul>
       </div>
 
-      <!-- Uncheckpointed work -->
+      <!-- Drifted or at risk -->
       <div v-if="ledgerAttention.length > 0" class="attention-group">
         <div class="attention-group-header">
-          <span class="attention-group-label">Uncheckpointed work</span>
+          <span class="attention-group-label">Drifted or at risk</span>
           <span class="attention-count">{{ ledgerAttention.length }}</span>
         </div>
         <ul class="attention-items">

@@ -24,7 +24,7 @@ The overlay is an optional, additive field on each `grove ls --json` row, produc
 | **Unavailable** | `ledger.available === false` | "Ledger unknown" — never rendered as safe, always as unknown. Carries `unavailable_reason` for the tooltip/detail text. |
 | **Available** | `ledger.available === true` | The real badges/details: risk (when present), checkpoint age, next action, drift, narrative status. |
 
-"No gate ran" (absent) and "the gate ran and found nothing to say" must never look the same as "the gate passed". That is why *unavailable* renders as an explicit unknown badge rather than being folded into the absent (no-UI) state.
+These three states must stay visually distinct: no gate ran (absent, no ledger UI), the gate ran but could not answer (unavailable, shown as an explicit "unknown" badge), and the gate ran and answered (available, the facts shown above). Only in that last state is no news actually good news — because the gate said so, not because it stayed silent.
 
 ## The no-bypass rule
 
