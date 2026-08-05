@@ -422,4 +422,16 @@ describe('useWt', () => {
       })
     })
   })
+
+  describe('ledgerCheckpoint', () => {
+    it('should call ledger_checkpoint with path', async () => {
+      mockTauriInvoke.mockResolvedValue('checkpointed wt_1')
+
+      const wt = useWt()
+      const result = await wt.ledgerCheckpoint('/tmp/x')
+
+      expect(result).toBe('checkpointed wt_1')
+      expect(mockTauriInvoke).toHaveBeenCalledWith('ledger_checkpoint', { path: '/tmp/x' })
+    })
+  })
 })

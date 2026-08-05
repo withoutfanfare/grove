@@ -63,3 +63,5 @@ opt-level = "s"
 [target."cfg(unix)".dependencies]
 libc = "0.2.180"
 
+[dev-dependencies]
+tempfile = "3"

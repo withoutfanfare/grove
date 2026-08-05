@@ -1959,6 +1959,20 @@ pub async fn register_repository(
 }
 
 // ============================================================================
+// Worktree Ledger
+// ============================================================================
+
+/// Record an objective-only worktree-ledger checkpoint for a worktree.
+/// Callable from frontend as: invoke('ledger_checkpoint', { path })
+#[command]
+pub async fn ledger_checkpoint(path: String) -> Result<String, WtError> {
+    let validated = validate_path(&path)?;
+    spawn_blocking(move || crate::way::checkpoint_objective_only(&validated))
+        .await
+        .map_err(|e| WtError::spawn_error(e.to_string()))?
+}
+
+// ============================================================================
 // System Tray
 // ============================================================================
 ///

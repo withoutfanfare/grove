@@ -11,6 +11,7 @@ mod operation_state;
 mod tray;
 mod types;
 mod watcher;
+mod way;
 mod wt;
 
 // Re-export types for external use
@@ -25,8 +26,8 @@ use commands::{
     get_config_files, get_diff_stats, get_dirty_details, get_recent_commits, get_recent_worktrees,
     get_remote_branches, get_repo_disk_usage, get_repo_health,
     get_resumable_operations, get_uncommitted_files, get_worktree_status, get_wt_version,
-    fetch_repo, is_watching, list_branches, list_hooks, list_repositories, list_services_status,
-    list_worktrees,
+    fetch_repo, is_watching, ledger_checkpoint, list_branches, list_hooks, list_repositories,
+    list_services_status, list_worktrees,
     mark_interrupted_operations, open_config, open_in_browser, open_in_editor, open_in_finder, open_in_git_client,
     open_in_terminal, prune_repo, pull_all_worktrees, pull_selected_worktrees, pull_worktree,
     read_config_file, read_hook, refresh_tray_menu, register_repository, remove_selected_worktrees,
@@ -154,6 +155,8 @@ pub fn run() {
             register_repository,
             // GitHub PR integration
             fetch_pr_branch,
+            // Worktree ledger
+            ledger_checkpoint,
             // System integration commands
             open_in_editor,
             open_in_git_client,

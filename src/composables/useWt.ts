@@ -546,6 +546,15 @@ export function useWt() {
   }
 
   // ============================================================================
+  // Worktree Ledger
+  // ============================================================================
+
+  /** Record an objective-only worktree-ledger checkpoint for a worktree */
+  async function ledgerCheckpoint(path: string): Promise<string> {
+    return await invoke<string>('ledger_checkpoint', { path });
+  }
+
+  // ============================================================================
   // System Tray
   // ============================================================================
 
@@ -637,6 +646,8 @@ export function useWt() {
     fetchPrBranch,
     // Repository registration
     registerRepository,
+    // Worktree ledger
+    ledgerCheckpoint,
     // System tray
     refreshTrayMenu,
     toWtError,
