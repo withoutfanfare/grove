@@ -9,7 +9,8 @@
  */
 import { ref, computed, watch, nextTick } from 'vue'
 import type { Worktree, RemoveWorktreeResponse } from '../types'
-import { useWorktrees, useToast } from '../composables'
+import { isWtError } from '../types'
+import { useWorktrees, useToast, useWt } from '../composables'
 import { useRepoConfigStore } from '../stores/repoConfig'
 import { SButton, SModal, SCheckbox, SBadge, SInput } from '@stuntrocket/ui'
 
@@ -28,6 +29,7 @@ const emit = defineEmits<{
 
 const { removeWorktree } = useWorktrees()
 const { toast } = useToast()
+const { ledgerCheckpoint } = useWt()
 const repoConfigStore = useRepoConfigStore()
 
 const deleteBranch = ref(false)
@@ -35,6 +37,8 @@ const dropDatabase = ref(false)
 const skipBackup = ref(false)
 const isSubmitting = ref(false)
 const error = ref<string | null>(null)
+const errorCode = ref<string | null>(null)
+const isCheckpointing = ref(false)
 const protectionConfirmText = ref('')
 
 // Multi-phase state
@@ -115,6 +119,8 @@ watch(() => props.isOpen, async (open) => {
     dropDatabase.value = false
     skipBackup.value = false
     error.value = null
+    errorCode.value = null
+    isCheckpointing.value = false
     phase.value = 'confirm'
     deletionResult.value = null
     requestedDropDb.value = false
@@ -146,6 +152,7 @@ async function handleDelete() {
 
   isSubmitting.value = true
   error.value = null
+  errorCode.value = null
   requestedDropDb.value = dropDatabase.value
   phase.value = 'deleting'
   startElapsedTimer()
@@ -169,13 +176,38 @@ async function handleDelete() {
       phase.value = 'confirm'
     }
   } catch (e) {
-    const errorMessage = e instanceof Error ? e.message : 'Failed to delete worktree'
-    error.value = errorMessage
-    toast.error(errorMessage)
+    if (isWtError(e)) {
+      errorCode.value = e.code
+      error.value = e.message
+      toast.error(e.message)
+    } else {
+      errorCode.value = null
+      const errorMessage = e instanceof Error ? e.message : 'Failed to delete worktree'
+      error.value = errorMessage
+      toast.error(errorMessage)
+    }
     phase.value = 'confirm'
   } finally {
     isSubmitting.value = false
     stopElapsedTimer()
+  }
+}
+
+async function handleCheckpoint() {
+  const worktree = props.worktree
+  if (!worktree) return
+
+  isCheckpointing.value = true
+  try {
+    await ledgerCheckpoint(worktree.path)
+    toast.success('Checkpoint recorded')
+  } catch (e) {
+    const message = isWtError(e)
+      ? e.message
+      : e instanceof Error ? e.message : 'Failed to record checkpoint'
+    toast.error(message)
+  } finally {
+    isCheckpointing.value = false
   }
 }
 
@@ -224,6 +256,11 @@ function handleClose() {
       <!-- Warning text -->
       <p class="text-text-secondary text-sm leading-relaxed">
         Are you sure you want to delete this worktree? This action cannot be undone.
+      </p>
+
+      <!-- Ledger unavailable note (honest, not "safe") -->
+      <p v-if="worktree?.ledger?.available === false" class="text-text-muted text-xs">
+        The worktree ledger could not answer for this worktree — this removal will not be safety-checked.
       </p>
 
       <!-- Dirty warning -->
@@ -321,13 +358,32 @@ function handleClose() {
         </Transition>
       </div>
 
+      <!-- Ledger-blocked message: shown as-is, with no bypass control -->
+      <Transition
+        enter-active-class="transition ease-out duration-150"
+        enter-from-class="opacity-0 -translate-y-1"
+        enter-to-class="opacity-100 translate-y-0"
+      >
+        <div v-if="errorCode === 'LEDGER_BLOCKED'" class="p-3 bg-danger-muted rounded-lg border border-danger/20 space-y-2">
+          <p class="text-danger text-sm font-medium flex items-center gap-2">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            The worktree ledger blocked this removal
+          </p>
+          <p class="text-danger/90 text-xs whitespace-pre-wrap font-mono">{{ error }}</p>
+          <p class="text-danger/80 text-xs">Nothing has been deleted. Deal with the risks above, then try again.</p>
+        </div>
+      </Transition>
+
       <!-- Error message -->
       <Transition
         enter-active-class="transition ease-out duration-150"
         enter-from-class="opacity-0 -translate-y-1"
         enter-to-class="opacity-100 translate-y-0"
       >
-        <div v-if="error" class="p-3 bg-danger-muted rounded-lg border border-danger/20">
+        <div v-if="error && errorCode !== 'LEDGER_BLOCKED'" class="p-3 bg-danger-muted rounded-lg border border-danger/20">
           <p class="text-danger text-sm flex items-center gap-2">
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -470,6 +526,15 @@ function handleClose() {
           :disabled="isSubmitting"
         >
           Cancel
+        </SButton>
+        <SButton
+          v-if="worktree?.ledger?.available === true"
+          variant="secondary"
+          :loading="isCheckpointing"
+          :disabled="isCheckpointing"
+          @click="handleCheckpoint"
+        >
+          Record a checkpoint first
         </SButton>
         <SButton
           variant="danger"
