@@ -7,7 +7,7 @@
  */
 import { ref, watch, computed } from 'vue'
 import type { Worktree, Commit, FileChange, HealthGrade } from '../types'
-import { useWt, useToast } from '../composables'
+import { useWt, useToast, useRelativeTime } from '../composables'
 import { copyPath, copyUrl } from '../utils/clipboard'
 import CommitList from './CommitList.vue'
 import FileChangesList from './FileChangesList.vue'
@@ -164,6 +164,36 @@ const syncExplanation = computed(() => {
 
   return parts.join('. ')
 })
+
+// Worktree ledger overlay
+const ledgerAvailable = computed(() => props.worktree.ledger?.available === true)
+const ledgerUnavailable = computed(() => props.worktree.ledger?.available === false)
+
+const { relativeTime: ledgerCheckpointRelative } = useRelativeTime(
+  () => props.worktree.ledger?.checkpoint_at
+)
+
+const ledgerNarrativeLabel = computed(() => {
+  switch (props.worktree.ledger?.narrative_status) {
+    case 'present':
+      return 'Recorded'
+    case 'missing':
+      return 'Missing'
+    default:
+      return null
+  }
+})
+
+const ledgerDriftLabel = computed(() =>
+  props.worktree.ledger?.drift === true
+    ? 'State has changed since the last checkpoint'
+    : 'In step with the last checkpoint'
+)
+
+const ledgerRiskLabel = computed(() => {
+  const risk = props.worktree.ledger?.risk
+  return risk ? `${risk} — see removal check for the remedy` : null
+})
 </script>
 
 <template>
@@ -312,6 +342,56 @@ const syncExplanation = computed(() => {
               :loading="filesLoading"
               :error="filesError"
             />
+          </section>
+
+          <!-- Worktree Ledger -->
+          <section v-if="worktree.ledger" class="space-y-2">
+            <SSectionHeader title="Worktree ledger" />
+
+            <template v-if="ledgerUnavailable">
+              <div class="p-3 rounded-lg bg-surface-overlay/50">
+                <p class="text-sm text-text-primary">
+                  The ledger could not answer for this worktree — its safety is unknown.
+                </p>
+                <p v-if="worktree.ledger.unavailable_reason" class="text-xs text-text-muted mt-0.5">
+                  {{ worktree.ledger.unavailable_reason }}
+                </p>
+              </div>
+            </template>
+
+            <template v-else-if="ledgerAvailable">
+              <div v-if="worktree.ledger.workstream_id != null" class="p-3 rounded-lg bg-surface-overlay/50">
+                <p class="text-sm text-text-primary">Workstream</p>
+                <p class="text-xs text-text-muted mt-0.5">{{ worktree.ledger.workstream_id }}</p>
+              </div>
+
+              <div v-if="worktree.ledger.checkpoint_at != null" class="p-3 rounded-lg bg-surface-overlay/50">
+                <p class="text-sm text-text-primary">Last checkpoint</p>
+                <p class="text-xs text-text-muted mt-0.5">{{ ledgerCheckpointRelative.full }}</p>
+              </div>
+
+              <div v-if="worktree.ledger.next_action != null" class="p-3 rounded-lg bg-surface-overlay/50">
+                <p class="text-sm text-text-primary">Next action</p>
+                <p class="text-xs text-text-muted mt-0.5">{{ worktree.ledger.next_action }}</p>
+              </div>
+
+              <div v-if="ledgerNarrativeLabel" class="p-3 rounded-lg bg-surface-overlay/50">
+                <p class="text-sm text-text-primary">Narrative</p>
+                <p class="text-xs text-text-muted mt-0.5">{{ ledgerNarrativeLabel }}</p>
+              </div>
+
+              <div class="p-3 rounded-lg bg-surface-overlay/50">
+                <p class="text-sm text-text-primary">Drift</p>
+                <p class="text-xs text-text-muted mt-0.5">{{ ledgerDriftLabel }}</p>
+              </div>
+
+              <div v-if="ledgerRiskLabel" class="p-3 rounded-lg bg-surface-overlay/50">
+                <p class="text-sm text-text-primary">Risk</p>
+                <p class="text-xs text-text-muted mt-0.5">{{ ledgerRiskLabel }}</p>
+              </div>
+
+              <p class="text-2xs text-text-muted">Recorded facts, as at the last list refresh.</p>
+            </template>
           </section>
         </div>
       </div>

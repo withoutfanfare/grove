@@ -89,3 +89,64 @@ describe('WorktreeDetailsPanel lazy fetch', () => {
     wrapper.unmount()
   })
 })
+
+describe('WorktreeDetailsPanel ledger section', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    resetTauriMocks()
+    mockCommands()
+  })
+
+  it('shows no ledger section when the overlay is absent', () => {
+    const wrapper = mount(WorktreeDetailsPanel, {
+      props: { worktree: worktreeFixture, repoName: 'scooda', isExpanded: false },
+    })
+
+    expect(wrapper.text()).not.toContain('Worktree ledger')
+    wrapper.unmount()
+  })
+
+  it('renders the unknown state honestly, never as safe', () => {
+    const wrapper = mount(WorktreeDetailsPanel, {
+      props: {
+        worktree: {
+          ...worktreeFixture,
+          ledger: { available: false, unavailable_reason: 'way exited 3' },
+        },
+        repoName: 'scooda',
+        isExpanded: false,
+      },
+    })
+
+    const text = wrapper.text()
+    expect(text).toContain('its safety is unknown')
+    expect(text).toContain('way exited 3')
+    wrapper.unmount()
+  })
+
+  it('renders checkpoint, next action, drift and workstream rows when available', () => {
+    const wrapper = mount(WorktreeDetailsPanel, {
+      props: {
+        worktree: {
+          ...worktreeFixture,
+          ledger: {
+            available: true,
+            workstream_id: 'ws_1',
+            checkpoint_at: '2026-08-04T12:00:00Z',
+            next_action: 'merge to develop',
+            narrative_status: 'present',
+            drift: true,
+          },
+        },
+        repoName: 'scooda',
+        isExpanded: false,
+      },
+    })
+
+    const text = wrapper.text()
+    expect(text).toContain('merge to develop')
+    expect(text).toContain('State has changed since the last checkpoint')
+    expect(text).toContain('ws_1')
+    wrapper.unmount()
+  })
+})
