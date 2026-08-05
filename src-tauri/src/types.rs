@@ -117,6 +117,45 @@ pub struct Worktree {
     /// Whether the worktree is stale (>50 commits behind)
     #[serde(default)]
     pub stale: Option<bool>,
+    /// Worktree Ledger overlay (optional; see LedgerOverlay)
+    #[serde(default)]
+    pub ledger: Option<LedgerOverlay>,
+}
+
+/// Worktree Ledger overlay relayed verbatim from `grove ls --json` (optional, additive).
+///
+/// `available: false` is NOT "nothing at risk" — it carries `unavailable_reason`
+/// and must render as "unknown", never as safe. An absent `ledger` key on a row
+/// means the integration is off or `way` was not found: render nothing.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LedgerOverlay {
+    /// Whether the ledger answered for this worktree
+    pub available: bool,
+    /// Ledger identity of the worktree (e.g. "wt_…")
+    #[serde(default)]
+    pub worktree_id: Option<String>,
+    /// Workstream the worktree belongs to, when recorded
+    #[serde(default)]
+    pub workstream_id: Option<String>,
+    /// "critical" | "warning" | "informational" when populated by removal-check;
+    /// deliberately null from `resume` — Grove never guesses risk
+    #[serde(default)]
+    pub risk: Option<String>,
+    /// ISO timestamp of the last recorded checkpoint, null when never checkpointed
+    #[serde(default)]
+    pub checkpoint_at: Option<String>,
+    /// The recorded next action for this worktree
+    #[serde(default)]
+    pub next_action: Option<String>,
+    /// "present" | "missing"
+    #[serde(default)]
+    pub narrative_status: Option<String>,
+    /// True when state has drifted since the last checkpoint
+    #[serde(default)]
+    pub drift: Option<bool>,
+    /// Why the ledger could not answer, when available is false
+    #[serde(default)]
+    pub unavailable_reason: Option<String>,
 }
 
 /// Detailed dirty state breakdown from `git status --porcelain`
@@ -1389,5 +1428,40 @@ mod tests {
             serde_json::from_str::<BranchType>("\"remote\"").unwrap(),
             BranchType::Remote
         );
+    }
+
+    #[test]
+    fn worktree_row_without_ledger_key_deserialises_to_none() {
+        let row = r#"{"branch":"develop","path":"/tmp/x","sha":"abc1234","dirty":false,
+            "changes":0,"ahead":0,"behind":0,"stale":false,"age":"1d","age_days":1,"merged":false}"#;
+        let wt: Worktree = serde_json::from_str(row).expect("row should parse");
+        assert!(wt.ledger.is_none());
+    }
+
+    #[test]
+    fn ledger_overlay_unavailable_carries_reason() {
+        let row = r#"{"branch":"b","path":"/tmp/x","sha":"abc1234","dirty":false,
+            "ahead":null,"behind":null,
+            "ledger":{"available":false,"unavailable_reason":"way exited 3"}}"#;
+        let wt: Worktree = serde_json::from_str(row).expect("row should parse");
+        let ledger = wt.ledger.expect("ledger key present");
+        assert!(!ledger.available);
+        assert_eq!(ledger.unavailable_reason.as_deref(), Some("way exited 3"));
+        assert!(ledger.risk.is_none());
+    }
+
+    #[test]
+    fn ledger_overlay_full_row_parses() {
+        let row = r#"{"branch":"b","path":"/tmp/x","sha":"abc1234","dirty":true,
+            "ahead":1,"behind":0,
+            "ledger":{"available":true,"worktree_id":"wt_1","workstream_id":null,
+                      "risk":"critical","checkpoint_at":"2026-08-05T17:00:00Z",
+                      "next_action":"merge to develop","narrative_status":"present",
+                      "drift":true,"unavailable_reason":null}}"#;
+        let wt: Worktree = serde_json::from_str(row).expect("row should parse");
+        let ledger = wt.ledger.expect("ledger key present");
+        assert!(ledger.available);
+        assert_eq!(ledger.risk.as_deref(), Some("critical"));
+        assert_eq!(ledger.drift, Some(true));
     }
 }

@@ -80,6 +80,36 @@ export interface Worktree {
   merged?: boolean;
   /** Whether the worktree is stale (>50 commits behind) */
   stale?: boolean;
+  /** Worktree Ledger overlay (optional; see LedgerOverlay) */
+  ledger?: LedgerOverlay;
+}
+
+/**
+ * Worktree Ledger overlay relayed verbatim from `grove ls --json` (optional, additive).
+ *
+ * `available: false` is NOT "nothing at risk" — it carries `unavailable_reason`
+ * and must render as "unknown", never as safe. An absent `ledger` key means the
+ * integration is off or `way` was not found: render nothing.
+ */
+export interface LedgerOverlay {
+  /** Whether the ledger answered for this worktree */
+  available: boolean;
+  /** Ledger identity of the worktree (e.g. "wt_…") */
+  worktree_id?: string | null;
+  /** Workstream the worktree belongs to, when recorded */
+  workstream_id?: string | null;
+  /** "critical" | "warning" | "informational" when populated by removal-check; null from resume */
+  risk?: 'critical' | 'warning' | 'informational' | null;
+  /** ISO timestamp of the last recorded checkpoint, null when never checkpointed */
+  checkpoint_at?: string | null;
+  /** The recorded next action for this worktree */
+  next_action?: string | null;
+  /** "present" | "missing" */
+  narrative_status?: 'present' | 'missing' | null;
+  /** True when state has drifted since the last checkpoint */
+  drift?: boolean | null;
+  /** Why the ledger could not answer, when available is false */
+  unavailable_reason?: string | null;
 }
 
 /**
