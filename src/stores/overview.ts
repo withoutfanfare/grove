@@ -152,6 +152,12 @@ export const useOverviewStore = defineStore('overview', () => {
     collectWorktrees((wt) => Boolean(wt.merged) || Boolean(wt.stale))
   );
 
+  const ledgerAttention = computed(() =>
+    collectWorktrees(
+      (wt) => wt.ledger?.available === true && (wt.ledger.drift === true || wt.ledger.risk === 'critical')
+    )
+  );
+
   const healthAttention = computed<AttentionHealthItem[]>(() => {
     const items = new Map<string, AttentionHealthItem>();
     for (const snap of Object.values(snapshots.value)) {
@@ -198,6 +204,7 @@ export const useOverviewStore = defineStore('overview', () => {
       dirtyAttention.value.length > 0 ||
       behindAttention.value.length > 0 ||
       cleanupAttention.value.length > 0 ||
+      ledgerAttention.value.length > 0 ||
       repoErrors.value.length > 0
   );
 
@@ -280,6 +287,7 @@ export const useOverviewStore = defineStore('overview', () => {
     dirtyAttention,
     behindAttention,
     cleanupAttention,
+    ledgerAttention,
     healthAttention,
     repoErrors,
     hasAttentionItems,

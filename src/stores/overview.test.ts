@@ -143,6 +143,30 @@ describe('useOverviewStore', () => {
 
       expect(store.hasAttentionItems).toBe(false)
     })
+
+    it('collects drifted and critical-risk worktrees into ledgerAttention', () => {
+      const store = useOverviewStore()
+      store.setWorktreeSnapshot('api', [
+        makeWorktree({ path: '/repos/api/a', branch: 'a', ledger: { available: true, drift: true } }),
+        makeWorktree({ path: '/repos/api/b', branch: 'b', ledger: { available: true, drift: false, risk: 'critical' } }),
+      ], 1000)
+      store.setWorktreeSnapshot('demo', [
+        makeWorktree({ path: '/repos/demo/c', branch: 'c', ledger: { available: false } }),
+        makeWorktree({ path: '/repos/demo/d', branch: 'd' }),
+      ], 1000)
+
+      expect(store.ledgerAttention).toHaveLength(2)
+    })
+
+    it('never treats an unanswerable ledger as attention-worthy', () => {
+      const store = useOverviewStore()
+      store.setWorktreeSnapshot('demo', [
+        makeWorktree({ path: '/repos/demo/a', branch: 'a', ledger: { available: false } }),
+        makeWorktree({ path: '/repos/demo/b', branch: 'b' }),
+      ], 1000)
+
+      expect(store.ledgerAttention).toHaveLength(0)
+    })
   })
 
   describe('stats', () => {
