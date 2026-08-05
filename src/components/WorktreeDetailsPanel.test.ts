@@ -149,4 +149,68 @@ describe('WorktreeDetailsPanel ledger section', () => {
     expect(text).toContain('ws_1')
     wrapper.unmount()
   })
+
+  it('renders no drift row when drift is unstated (null)', () => {
+    const wrapper = mount(WorktreeDetailsPanel, {
+      props: {
+        worktree: {
+          ...worktreeFixture,
+          ledger: {
+            available: true,
+            checkpoint_at: '2026-08-04T12:00:00Z',
+            drift: null,
+          },
+        },
+        repoName: 'scooda',
+        isExpanded: false,
+      },
+    })
+
+    const text = wrapper.text()
+    expect(text).not.toContain('In step with the last checkpoint')
+    expect(text).not.toContain('State has changed since the last checkpoint')
+    wrapper.unmount()
+  })
+
+  it('shows "No checkpoint recorded" and never "In step…" when checkpoint_at is null', () => {
+    const wrapper = mount(WorktreeDetailsPanel, {
+      props: {
+        worktree: {
+          ...worktreeFixture,
+          ledger: {
+            available: true,
+            checkpoint_at: null,
+            drift: false,
+          },
+        },
+        repoName: 'scooda',
+        isExpanded: false,
+      },
+    })
+
+    const text = wrapper.text()
+    expect(text).toContain('No checkpoint recorded')
+    expect(text).not.toContain('In step with the last checkpoint')
+    wrapper.unmount()
+  })
+
+  it('renders "In step with the last checkpoint" when drift is false and a checkpoint exists', () => {
+    const wrapper = mount(WorktreeDetailsPanel, {
+      props: {
+        worktree: {
+          ...worktreeFixture,
+          ledger: {
+            available: true,
+            checkpoint_at: '2026-08-04T12:00:00Z',
+            drift: false,
+          },
+        },
+        repoName: 'scooda',
+        isExpanded: false,
+      },
+    })
+
+    expect(wrapper.text()).toContain('In step with the last checkpoint')
+    wrapper.unmount()
+  })
 })

@@ -184,6 +184,17 @@ const ledgerNarrativeLabel = computed(() => {
   }
 })
 
+const ledgerCheckpointLabel = computed(() =>
+  props.worktree.ledger?.checkpoint_at != null ? ledgerCheckpointRelative.value.full : 'No checkpoint recorded'
+)
+
+// Drift is only meaningful once a checkpoint exists to drift from, and only
+// when `way` actually stated it (drift is null/undefined otherwise).
+const ledgerDriftVisible = computed(() => {
+  const drift = props.worktree.ledger?.drift
+  return (drift === true || drift === false) && props.worktree.ledger?.checkpoint_at != null
+})
+
 const ledgerDriftLabel = computed(() =>
   props.worktree.ledger?.drift === true
     ? 'State has changed since the last checkpoint'
@@ -365,9 +376,9 @@ const ledgerRiskLabel = computed(() => {
                 <p class="text-xs text-text-muted mt-0.5">{{ worktree.ledger.workstream_id }}</p>
               </div>
 
-              <div v-if="worktree.ledger.checkpoint_at != null" class="p-3 rounded-lg bg-surface-overlay/50">
+              <div class="p-3 rounded-lg bg-surface-overlay/50">
                 <p class="text-sm text-text-primary">Last checkpoint</p>
-                <p class="text-xs text-text-muted mt-0.5">{{ ledgerCheckpointRelative.full }}</p>
+                <p class="text-xs text-text-muted mt-0.5">{{ ledgerCheckpointLabel }}</p>
               </div>
 
               <div v-if="worktree.ledger.next_action != null" class="p-3 rounded-lg bg-surface-overlay/50">
@@ -380,7 +391,7 @@ const ledgerRiskLabel = computed(() => {
                 <p class="text-xs text-text-muted mt-0.5">{{ ledgerNarrativeLabel }}</p>
               </div>
 
-              <div class="p-3 rounded-lg bg-surface-overlay/50">
+              <div v-if="ledgerDriftVisible" class="p-3 rounded-lg bg-surface-overlay/50">
                 <p class="text-sm text-text-primary">Drift</p>
                 <p class="text-xs text-text-muted mt-0.5">{{ ledgerDriftLabel }}</p>
               </div>
