@@ -500,6 +500,22 @@ fn execute_wt(app: &tauri::AppHandle, args: &[&str]) -> WtResult<String> {
     Ok(stdout_str.into_owned())
 }
 
+/// Build the WtError for a failed CLI call from its structured stdout error,
+/// attaching stderr detail for ledger blocks: `way` prints each risk and its
+/// remedy to stderr, and a gate that blocks without saying how to proceed is
+/// exactly what teaches people to reach for -f.
+fn structured_cli_error(stdout: &str, stderr: &str) -> Option<WtError> {
+    let cli_error = extract_json_object::<CliErrorResponse>(stdout).ok()?;
+    let mut message = sanitise_error_message(&cli_error.error.message);
+    if cli_error.error.code == "LEDGER_BLOCKED" {
+        let detail = sanitise_error_message(stderr.trim());
+        if !detail.is_empty() {
+            message = format!("{}\n\n{}", detail, message);
+        }
+    }
+    Some(WtError::new(&cli_error.error.code, message))
+}
+
 /// Execute a grove CLI command and return both stdout and stderr on success.
 ///
 /// Unlike `execute_wt` which discards stderr on success, this variant returns
@@ -549,9 +565,10 @@ fn execute_wt_with_stderr(app: &tauri::AppHandle, args: &[&str]) -> WtResult<(St
 
     if !success {
         let stdout_str = String::from_utf8_lossy(&output.stdout);
-        if let Ok(cli_error) = extract_json_object::<CliErrorResponse>(&stdout_str) {
-            let sanitised = sanitise_error_message(&cli_error.error.message);
-            return Err(WtError::new(&cli_error.error.code, sanitised));
+        if let Some(err) =
+            structured_cli_error(&stdout_str, &String::from_utf8_lossy(&output.stderr))
+        {
+            return Err(err);
         }
 
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -2605,6 +2622,33 @@ mod tests {
         assert_eq!(result.branch, "2fa-enforce");
         assert!(result.branch_deleted);
         assert!(!result.db_drop_requested);
+    }
+
+    #[test]
+    fn ledger_blocked_error_carries_stderr_remedies_first() {
+        let stdout = r#"{"success": false, "error": {"code": "LEDGER_BLOCKED", "message": "removal blocked by the worktree ledger (see above). To proceed, run 'way worktree removal-check --acknowledge' in the worktree and pass the token with --ledger-ack"}}"#;
+        let stderr = "critical: uncommitted changes (3 files)\n  remedy: commit or stash them\nwarning: 2 unpushed commits\n  remedy: git push";
+        let err = structured_cli_error(stdout, stderr).expect("structured error expected");
+        assert_eq!(err.code, "LEDGER_BLOCKED");
+        assert!(err.message.starts_with("critical: uncommitted changes"));
+        assert!(err.message.contains("remedy: git push"));
+        assert!(err
+            .message
+            .contains("removal blocked by the worktree ledger"));
+    }
+
+    #[test]
+    fn non_ledger_errors_do_not_gain_stderr() {
+        let stdout = r#"{"success": false, "error": {"code": "PROTECTED_BRANCH", "message": "branch 'main' is protected"}}"#;
+        let err = structured_cli_error(stdout, "some unrelated stderr noise")
+            .expect("structured error expected");
+        assert_eq!(err.code, "PROTECTED_BRANCH");
+        assert!(!err.message.contains("unrelated stderr noise"));
+    }
+
+    #[test]
+    fn unstructured_stdout_yields_none() {
+        assert!(structured_cli_error("not json at all", "stderr").is_none());
     }
 
     #[test]
