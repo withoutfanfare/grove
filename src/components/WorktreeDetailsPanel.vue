@@ -9,7 +9,7 @@ import { ref, watch, computed } from 'vue'
 import type { Worktree, Commit, FileChange, HealthGrade } from '../types'
 import { useWt, useToast, useRelativeTime } from '../composables'
 import { copyPath, copyUrl } from '../utils/clipboard'
-import { riskWords } from '../utils/riskVocabulary'
+import { REMOVAL_BLOCKED_LABEL, riskWords } from '../utils/riskVocabulary'
 import CommitList from './CommitList.vue'
 import FileChangesList from './FileChangesList.vue'
 import GradeBadge from './GradeBadge.vue'
@@ -213,13 +213,18 @@ const ledgerRiskLabel = computed(() => {
       : 'Unknown — the risk check could not answer'
   }
   const words = riskWords(ledger.risk)
-  if (ledger.risk == null) {
-    return `${words.label} — the ledger found nothing`
-  }
   const blocked =
     ledger.removal_blocked === true
       ? ' — the ledger blocks removal until this is resolved'
       : ''
+  if (ledger.risk == null) {
+    // A block with no risk level still has to be said. This branch used to
+    // return "Clear — the ledger found nothing" regardless, so a worktree the
+    // ledger was actively refusing to release was described as clear.
+    return blocked
+      ? `${REMOVAL_BLOCKED_LABEL}${blocked} — run \`way worktree removal-check\` here for the reason`
+      : `${words.label} — the ledger found nothing`
+  }
   return `${words.label}${blocked} — run \`way worktree removal-check\` here for the remedy`
 })
 

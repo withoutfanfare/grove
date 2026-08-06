@@ -80,6 +80,17 @@ export const RISK_UNKNOWN_LABEL = 'Risk unknown';
 export const LEDGER_UNKNOWN_LABEL = 'Ledger unknown';
 
 /**
+ * Said when the ledger blocks removal.
+ *
+ * `removal_blocked` is relayed from the ledger, never derived from the risk
+ * level, so it can be true while `risk` is null. That combination must never
+ * read as "Clear": a worktree the ledger refuses to let go of is the opposite
+ * of safe, and labelling it safe is the precise failure this vocabulary exists
+ * to prevent.
+ */
+export const REMOVAL_BLOCKED_LABEL = 'Removal blocked';
+
+/**
  * The raw level names, exported so the guard test asserts against the same list
  * the type declares rather than a copy of it that can fall out of step.
  */
