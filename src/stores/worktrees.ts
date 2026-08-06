@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import type { Repository, Worktree, WtError, RecentWorktree } from '../types';
 import { useAppStore } from '../composables/useAppStore';
+import { useOverviewStore } from './overview';
 
 export const useWorktreeStore = defineStore('worktrees', () => {
   // State
@@ -137,6 +138,17 @@ export const useWorktreeStore = defineStore('worktrees', () => {
       // Clear any focused branch when switching repos
       focusedBranch.value = null;
       clearSelection();
+      // Not fetched this session? Seed from the overview's persisted snapshot
+      // (same list_worktrees data, saved to localStorage) so the first visit
+      // after a launch paints instantly and revalidates silently, instead of
+      // holding a skeleton for the full CLI round trip.
+      if (!isRepoLoaded(name)) {
+        const snapshot = useOverviewStore().snapshots[name];
+        if (snapshot && Array.isArray(snapshot.worktrees) && snapshot.worktrees.length > 0) {
+          worktreeCache.value[name] = snapshot.worktrees;
+          loadedRepos.value.add(name);
+        }
+      }
       // Stale-while-revalidate: paint cached worktrees instantly for previously
       // loaded repos (no skeleton flash); blank + show loading for uncached repos.
       if (isRepoLoaded(name)) {

@@ -40,6 +40,13 @@ let globalFetchId = 0;
 // Only updates from this fetch ID should be applied to the store
 const expectedFetchId = new Map<string, number>();
 
+// In-flight fetch per repo. Selecting a repo triggers fetches from more than
+// one owner (RepoList's click handler and Dashboard's selectedRepoName watch);
+// each `grove ls` spawns a process storm, so concurrent callers share one run
+// rather than racing duplicates. A join can return a list captured just before
+// a mutation landed; the FS watcher's follow-up fetch corrects it within ~1s.
+const inFlightFetches = new Map<string, Promise<void>>();
+
 // ============================================================================
 // Per-Worktree Operation State Tracking
 // ============================================================================
@@ -115,6 +122,16 @@ export function useWorktrees() {
    * Uses fetch IDs to prevent race conditions when rapidly switching repos (C2 fix).
    */
   async function fetchWorktreesInternal(repoName: string, opts?: { silent?: boolean }): Promise<void> {
+    const inFlight = inFlightFetches.get(repoName);
+    if (inFlight) return inFlight;
+    const run = doFetchWorktrees(repoName, opts).finally(() => {
+      inFlightFetches.delete(repoName);
+    });
+    inFlightFetches.set(repoName, run);
+    return run;
+  }
+
+  async function doFetchWorktrees(repoName: string, opts?: { silent?: boolean }): Promise<void> {
     // Generate a unique fetch ID for this request
     const fetchId = ++globalFetchId;
     expectedFetchId.set(repoName, fetchId);

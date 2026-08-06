@@ -3,11 +3,19 @@ import { useWindowFocus, useTimestamp, useThrottleFn } from '@vueuse/core';
 import { useWorktreeStore } from '../stores';
 import { useWt } from './useWt';
 
-/** Auto-refresh interval when user is active (10 seconds) */
-const ACTIVE_REFRESH_INTERVAL_MS = 10000;
+/**
+ * Auto-refresh interval when user is active (60 seconds).
+ *
+ * This poll is a backstop, not the primary update path: the file watcher and
+ * post-action refreshes catch real changes as they happen. Each refresh runs
+ * `grove ls`, which fans out git status plus three `way` ledger processes per
+ * worktree — seconds of CPU on a large repo — so polling faster than this
+ * keeps the machine hot for no visible benefit.
+ */
+const ACTIVE_REFRESH_INTERVAL_MS = 60000;
 
-/** Auto-refresh interval when user is idle (60 seconds) */
-const IDLE_REFRESH_INTERVAL_MS = 60000;
+/** Auto-refresh interval when user is idle (5 minutes) */
+const IDLE_REFRESH_INTERVAL_MS = 300000;
 
 /** Time without activity before user is considered idle (30 seconds) */
 const IDLE_TIMEOUT_MS = 30000;
@@ -31,7 +39,7 @@ export interface AutoRefreshState {
   lastUpdatedText: ComputedRef<string>;
   /** Whether the user is currently active (has interacted within IDLE_TIMEOUT_MS) */
   isUserActive: ComputedRef<boolean>;
-  /** Current refresh interval in milliseconds (10s active, 60s idle) */
+  /** Current refresh interval in milliseconds (60s active, 5m idle) */
   currentInterval: ComputedRef<number>;
 }
 
@@ -54,8 +62,8 @@ export type UseAutoRefreshReturn = AutoRefreshState & AutoRefreshControls;
  * Composable for automatic worktree status refresh with adaptive intervals.
  *
  * Uses adaptive refresh intervals based on user activity:
- * - Active (10s): User has interacted within the last 30 seconds
- * - Idle (60s): No user interaction for 30+ seconds
+ * - Active (60s): User has interacted within the last 30 seconds
+ * - Idle (5m): No user interaction for 30+ seconds
  *
  * Pauses when the window loses focus and resumes when it regains focus.
  * If data is stale (>10 seconds) when focus is regained, triggers an immediate refresh.

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useWorktreeStore } from './worktrees'
+import { useOverviewStore } from './overview'
 import type { Repository, Worktree, RecentWorktree } from '@/types'
 
 describe('useWorktreeStore', () => {
@@ -126,6 +127,25 @@ describe('useWorktreeStore', () => {
       store.selectRepository('repo')
 
       expect(store.loadingWorktrees).toBe(true)
+    })
+
+    it('should paint from the overview snapshot instead of loading when unfetched this session', () => {
+      const store = useWorktreeStore()
+      const overview = useOverviewStore()
+      const snapshotWorktrees: Worktree[] = [
+        { path: '/wt/feature', branch: 'feature', dirty: false, ahead: 1, behind: 0, sha: 'def' },
+      ]
+      overview.setWorktreeSnapshot('repo', snapshotWorktrees, Date.now())
+      store.setRepositories([{ name: 'repo', worktrees: 1 }])
+      store.setLoadingWorktrees(false)
+
+      store.selectRepository('repo')
+
+      // Stale-while-revalidate across launches: the persisted snapshot paints
+      // immediately and no skeleton shows; revalidation happens silently.
+      expect(store.worktrees).toEqual(snapshotWorktrees)
+      expect(store.loadingWorktrees).toBe(false)
+      expect(store.isRepoLoaded('repo')).toBe(true)
     })
 
     it('should clear focused branch when selecting', () => {

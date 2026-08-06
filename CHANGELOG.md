@@ -4,6 +4,18 @@ All notable changes to Grove will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.3] - 6 August 2026
+
+### Fixed
+
+- **Opening a repository no longer shows "Request timed out" while the list is still loading** - Selecting a repository raced the fetch against a 10-second timer, but `grove ls` on a fourteen-worktree repository legitimately takes ~8-9s warm and longer cold, so the toast fired while the data was seconds from arriving — an error message for something that was working. The timeout is now 60 seconds, and it should almost never be reached: the first visit to a repository after launch now paints instantly from the overview's persisted snapshot (the same `list_worktrees` data, saved across launches) and revalidates silently in the background, exactly as revisits within a session already did. The skeleton-and-wait now happens only for a repository the overview has never seen
+- **Selecting a repository no longer runs the same CLI listing twice** - Both the repository list's click handler and the dashboard's selection watcher fetched the worktree list, so every click spawned two identical `grove ls` runs — each fanning out git status plus three `way` ledger processes per worktree — and one result was thrown away. Concurrent fetches for the same repository now share a single run
+- **A file-watcher refresh no longer swaps the painted list back to skeletons** - The watcher's refresh used the visible loading path, so a change detected mid-view replaced real cards with placeholders for the length of a full CLI round trip. It now revalidates silently, updating the cards in place
+
+### Changed
+
+- **Auto-refresh polls less aggressively (60s active / 5m idle, was 10s / 60s)** - The poll re-runs `grove ls` for the selected repository, which costs seconds of CPU across dozens of processes on a large repository — every 10 seconds, indefinitely, mostly to discover nothing changed. Real changes already arrive through the file watcher and through the refresh that follows every Grove action; the poll is a backstop, and now behaves like one
+
 ## [0.3.2] - 6 August 2026
 
 ### Fixed

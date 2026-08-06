@@ -201,10 +201,12 @@ const isDragOver = ref(false)
 // Track the latest fetch request to handle race conditions
 const fetchCounter = ref(0)
 
-// Handle file system change events - triggers refresh (debounced)
+// Handle file system change events - triggers refresh (debounced).
+// Silent when the list is already painted: a watcher event must update the
+// cards in place, never swap the whole list back to skeletons.
 const handleWorktreeChange = useDebounceFn(async () => {
   if (selectedRepoName.value) {
-    await fetchWorktrees()
+    await fetchWorktrees({ silent: store.isRepoLoaded(selectedRepoName.value) })
   }
 }, 500)
 
@@ -221,7 +223,7 @@ onMounted(async () => {
   // Repository list is already loaded by App.vue during loading screen
   // Just set up auto-refresh and file watching if a repo is selected
   if (selectedRepoName.value) {
-    await fetchWorktrees()
+    await fetchWorktrees({ silent: store.isRepoLoaded(selectedRepoName.value) })
     // Start auto-refresh after initial load
     startAutoRefresh()
     // Start file watching for real-time updates

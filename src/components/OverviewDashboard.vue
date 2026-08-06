@@ -56,9 +56,10 @@ function handleManualRefresh() {
 // ── Navigation: select the repo and focus the worktree in the list view ─
 
 async function handleNavigate(repo: string, branch: string) {
-  // Same pattern as RepoList.handleNavigateToRecent: stale-while-revalidate
-  const wasCached = store.isRepoLoaded(repo)
+  // Same pattern as RepoList.handleNavigateToRecent: selectRepository seeds
+  // the cache (including from the persisted snapshot), so check after.
   selectRepository(repo)
+  const wasCached = store.isRepoLoaded(repo)
   await fetchWorktrees({ silent: wasCached })
   store.focusWorktree(branch, true, true)
 }
