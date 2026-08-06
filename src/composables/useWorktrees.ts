@@ -43,9 +43,14 @@ const expectedFetchId = new Map<string, number>();
 // In-flight fetch per repo. Selecting a repo triggers fetches from more than
 // one owner (RepoList's click handler and Dashboard's selectedRepoName watch);
 // each `grove ls` spawns a process storm, so concurrent callers share one run
-// rather than racing duplicates. A join can return a list captured just before
-// a mutation landed; the FS watcher's follow-up fetch corrects it within ~1s.
+// rather than racing duplicates. A join could return a list captured before a
+// mutation landed, so a request that joins also flags one trailing silent
+// refresh (below) to pick up whatever the shared run's capture missed.
 const inFlightFetches = new Map<string, Promise<void>>();
+
+// Repos whose in-flight fetch was joined by a later request — each runs one
+// trailing silent refresh after the shared run settles.
+const rerunRequested = new Set<string>();
 
 // ============================================================================
 // Per-Worktree Operation State Tracking
@@ -123,9 +128,20 @@ export function useWorktrees() {
    */
   async function fetchWorktreesInternal(repoName: string, opts?: { silent?: boolean }): Promise<void> {
     const inFlight = inFlightFetches.get(repoName);
-    if (inFlight) return inFlight;
+    if (inFlight) {
+      // The running CLI capture may predate whatever prompted this request
+      // (e.g. a mutation that just landed), so joining alone could leave the
+      // UI stale. Flag one trailing silent refresh to run after it settles.
+      rerunRequested.add(repoName);
+      return inFlight;
+    }
     const run = doFetchWorktrees(repoName, opts).finally(() => {
       inFlightFetches.delete(repoName);
+      if (rerunRequested.delete(repoName)) {
+        // Silent: the shared run has just painted a list; this correction
+        // must update it in place, never flash skeletons over it.
+        void fetchWorktreesInternal(repoName, { silent: true });
+      }
     });
     inFlightFetches.set(repoName, run);
     return run;
