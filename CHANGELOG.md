@@ -4,6 +4,22 @@ All notable changes to Grove will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **Worktree Ledger risk and agent lease on worktree rows** - The ledger overlay now carries the worktree's risk and its agent lease, so the risk badge finally has something to show and Grove can say when an agent session is working in a worktree ("claude working here", with the session, machine and expiry on hover). Expired claims and the full holder appear in the details panel
+- **"Risk unknown" is now stated, never implied** - Risk and lease each arrive with their own availability flag, and Grove reads that rather than the value alone: a null risk from a check that answered means nothing was found, a null risk from a check that could not run means nobody could tell. The second gets its own badge, because the *absence* of a risk badge is itself a claim ("nothing at risk"). A risk nobody could establish also joins the Overview's "Drifted or at risk" group, named as unknown rather than described as drifted — that panel is the one place that aggregates safety, so an unknown left out of it is silently counted as fine
+- **"Open in Waypoint"** - A worktree with a ledger record gains an Open in Waypoint entry in its Actions menu, opening Waypoint on that record via `waypoint://worktree?worktree_id=<id>`. Read-only in both directions: Waypoint displays the record and has no removal, acknowledge or override control to offer back. The id is validated before it goes into the URL, and the entry is hidden when there is no record to open
+
+### Fixed
+
+- **Ledger badges never actually appeared** - The overlay was produced only by `grove status --json`, but Grove reads `grove ls --json`, so no overlay had ever reached the app and the badges shipped alongside it had nothing to render. The bundled CLI now emits it from both
+
+### Changed
+
+- **Listing worktrees is slower when the ledger is in use** - Ledger facts now cost roughly 600 ms per worktree, because Grove asks the ledger for a risk and a lease it previously did not have. The three `way` calls behind each row run concurrently rather than one after another, which keeps it well under a second and a half per worktree; without `way` installed nothing changes
+
 ## [2026.06] - June 2026
 
 ### Added
