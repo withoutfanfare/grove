@@ -172,18 +172,21 @@ useKeyboardShortcuts({
   onQuickSelect: handleQuickSelect,
 })
 
-/** Loading timeout in milliseconds */
-const LOADING_TIMEOUT_MS = 10000
+/** Loading timeout in milliseconds. Only the first-ever load of a repo runs
+ * uncached; a large repo's ledger overlay can legitimately take tens of
+ * seconds, so this is a safety net, not an expectation. */
+const LOADING_TIMEOUT_MS = 60000
 
 async function handleSelectRepo(name: string) {
   // Skip if already loading this repo
   if (loadingRepoName.value === name) return
 
   loadingRepoName.value = name
-  // Stale-while-revalidate: capture cache state before selecting, then
+  // Stale-while-revalidate: selectRepository seeds the cache (including from
+  // the persisted overview snapshot), so check cache state after selecting and
   // revalidate silently for cached repos (no skeleton flash).
-  const wasCached = store.isRepoLoaded(name)
   selectRepository(name)
+  const wasCached = store.isRepoLoaded(name)
 
   // Create a timeout promise that rejects after LOADING_TIMEOUT_MS
   let timeoutId: ReturnType<typeof setTimeout> | null = null
@@ -238,11 +241,10 @@ async function handleNavigateToRecent(repoName: string, branch: string) {
   const needsRepoSwitch = selectedRepoName.value !== repoName
 
   if (needsRepoSwitch) {
-    // Stale-while-revalidate: capture cache state before selecting, then
-    // revalidate silently for cached repos (no skeleton flash).
-    const wasCached = store.isRepoLoaded(repoName)
-    // Select the repository and fetch worktrees
+    // Stale-while-revalidate: selectRepository seeds the cache (including from
+    // the persisted overview snapshot), so check cache state after selecting.
     selectRepository(repoName)
+    const wasCached = store.isRepoLoaded(repoName)
     // Wait for worktrees to load before focusing
     await fetchWorktrees({ silent: wasCached })
   }
