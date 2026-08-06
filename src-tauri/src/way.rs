@@ -285,7 +285,35 @@ fn kill_process_tree(child: &mut std::process::Child) {
     let _ = child.wait();
 }
 
-#[cfg(not(unix))]
+/// As above, for Windows. `taskkill /T` walks the tree and `/F` forces it, so
+/// the grandchildren `way` spawned die with it.
+///
+/// This matters beyond tidiness. The timeout path deliberately detaches its
+/// output readers rather than joining them, because joining on a pipe a
+/// survivor still holds would hang the very timeout that is firing. Detaching
+/// converts that hang into a leaked thread — and a leaked thread per timeout
+/// accumulates. Killing the whole tree closes the pipes, so those detached
+/// readers hit EOF and exit on their own, which is what makes the trade safe
+/// rather than merely less bad.
+///
+/// `taskkill` ships with Windows, so this costs no dependency. Its own output
+/// is discarded: it reports "process not found" whenever the child has already
+/// exited, which is an ordinary race here, not a problem.
+#[cfg(windows)]
+fn kill_process_tree(child: &mut std::process::Child) {
+    let _ = Command::new("taskkill")
+        .args(["/T", "/F", "/PID", &child.id().to_string()])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+/// Neither Unix nor Windows: kill only what we can reach. A surviving
+/// grandchild leaks the detached reader threads (see the Windows note above),
+/// which is accepted here rather than hanging the timeout to prevent it.
+#[cfg(not(any(unix, windows)))]
 fn kill_process_tree(child: &mut std::process::Child) {
     let _ = child.kill();
     let _ = child.wait();

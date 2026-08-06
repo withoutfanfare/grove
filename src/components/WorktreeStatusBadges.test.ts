@@ -81,6 +81,47 @@ describe('WorktreeStatusBadges — ledger overlay', () => {
     expect(wrapper.text()).not.toContain('Drifted')
   })
 
+  it('never says "Clear" when the ledger blocks removal', () => {
+    // `removal_blocked` is relayed from the ledger, not derived from the risk
+    // level, so blocked-with-no-risk is a reachable state. It used to satisfy
+    // showClear and label a worktree the ledger refuses to release as safe —
+    // a false-safe, the one failure this vocabulary exists to prevent.
+    const wrapper = mount(WorktreeStatusBadges, {
+      props: { ledger: available({ removal_blocked: true }) },
+    })
+    expect(wrapper.text()).not.toContain('Clear')
+    expect(wrapper.text()).toContain('Removal blocked')
+  })
+
+  it('says the removal is blocked even when a risk level was also reported', () => {
+    // The severity and the refusal are different facts; the refusal is the one
+    // that changes what the user can do next, so it is never folded away.
+    const wrapper = mount(WorktreeStatusBadges, {
+      props: { ledger: available({ risk: 'critical', removal_blocked: true }) },
+    })
+    expect(wrapper.text()).toContain('At risk')
+    expect(wrapper.text()).toContain('Removal blocked')
+    expect(wrapper.text()).not.toContain('Clear')
+  })
+
+  it('still says "Clear" when removal is explicitly not blocked', () => {
+    const wrapper = mount(WorktreeStatusBadges, {
+      props: { ledger: available({ removal_blocked: false }) },
+    })
+    expect(wrapper.text()).toContain('Clear')
+    expect(wrapper.text()).not.toContain('Removal blocked')
+  })
+
+  it('does not claim a block when the ledger itself could not answer', () => {
+    // available:false means unknown. It already renders "Ledger unknown"; it
+    // must not additionally assert a block it was never told about.
+    const wrapper = mount(WorktreeStatusBadges, {
+      props: { ledger: { available: false, unavailable_reason: 'way exited 3' } },
+    })
+    expect(wrapper.text()).not.toContain('Removal blocked')
+    expect(wrapper.text()).toContain('Ledger unknown')
+  })
+
   it('keeps existing badges working alongside ledger badges', () => {
     const wrapper = mount(WorktreeStatusBadges, {
       props: { merged: false, ledger: available({ drift: true }) },

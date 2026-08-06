@@ -4,6 +4,22 @@ All notable changes to Grove will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.2] - 6 August 2026
+
+### Fixed
+
+- **A worktree the ledger blocks removal of is no longer labelled "Clear"** - `removal_blocked` is relayed from the ledger, never derived from the risk level, so it can be true while no risk level is reported. The badge row checked only the risk, so a worktree the ledger was actively refusing to release was positively labelled **Clear**. An absent risk badge already reads as "nothing at risk"; stating "Clear" over a block is worse, because it is an explicit claim. The details panel had the same hole from the other side — it mentioned the block only when a risk level was also present, so a block on its own returned "Clear — the ledger found nothing". Both now treat the refusal as its own fact: "Clear" requires the removal not to be blocked, and a new **"Removal blocked"** badge appears whenever it is, including alongside a risk badge — the severity and the refusal are different things, and the refusal is the one that changes what you can do next
+- **The background repository refresh works at all** - Grove refreshes every repository on a five-minute timer so ahead/behind counts stay honest between actions. It did this by calling `grove fetch`, a command the CLI did not have; every call failed and the counts silently went stale. The bundled CLI now provides it — remote refs only, no checkout, nothing merged or rebased, so it is safe against a repository you are working in
+- **A hung `way` can no longer leak a thread on each timeout** - Terminating on timeout could only reach the direct child on Windows, so a surviving grandchild kept the output pipes open and the (deliberately detached) reader threads never exited, accumulating one per timeout. The whole process tree is now terminated, closing the pipes so those readers finish on their own. Compile-checked for Windows but not runtime-verified. macOS and Linux were already correct
+
+## [0.3.1] - 6 August 2026
+
+### Fixed
+
+- **Selecting a repository with many worktrees no longer looks like a freeze** - Grove reads its worktree list from `grove ls`, which walked worktrees one at a time — each costing its own git calls plus, with the ledger on, three `way` processes. The wait therefore grew in step with the worktree count, and a repository with fourteen took 15–17s (around 30s from cold) before anything appeared. At that length it does not read as slowness, it reads as a hang. The bundled CLI now gathers that status concurrently, roughly halving it (measured 15.4–17.2s to 7.8–8.5s on the same repository). Repositories with a single worktree are unaffected. Tune or disable with `GROVE_STATUS_PARALLEL` (default 8; `1` restores the old serial walk)
+- **A hung `way` can no longer defeat its own timeout** - On timing out, the checkpoint call killed the process tree and then waited for its output-reader threads. That made the timeout conditional on every writer having died: where only the direct child can be killed, a surviving grandchild keeps the inherited pipe open, the readers block on it for ever, and the wait never returns — hanging the very call the timeout exists to bound. The readers are now detached, since that path discards their output anyway
+- **The `way` lookup test no longer mutates the process-wide `PATH`** - Rust tests share one process and run concurrently, so it changed `PATH` for every test running alongside it, and left it changed if it failed part-way; anything resolving a command by name could fail intermittently. Lookup now takes an explicit search path that the test supplies
+
 ## [0.3.0] - 6 August 2026
 
 ### Changed

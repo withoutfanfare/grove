@@ -20,7 +20,12 @@
 import { computed } from 'vue'
 import { SBadge } from '@stuntrocket/ui'
 import type { LedgerOverlay } from '../types/wt'
-import { LEDGER_UNKNOWN_LABEL, RISK_UNKNOWN_LABEL, riskWords } from '../utils/riskVocabulary'
+import {
+  LEDGER_UNKNOWN_LABEL,
+  REMOVAL_BLOCKED_LABEL,
+  RISK_UNKNOWN_LABEL,
+  riskWords,
+} from '../utils/riskVocabulary'
 
 const props = defineProps<{
   /** Whether the branch has been merged into the base branch */
@@ -50,14 +55,26 @@ const ledgerRisk = computed(() =>
 const riskUnknown = computed(
   () => props.ledger?.available === true && props.ledger.risk_available !== true
 )
+// The ledger refuses to let this worktree go. Relayed from the ledger, never
+// derived from the risk level, so it can be true while `risk` is null — and
+// that combination is exactly why it has to be checked separately below.
+const removalBlocked = computed(
+  () => props.ledger?.available === true && props.ledger.removal_blocked === true
+)
 // The ledger answered, ran the risk check, and found nothing. Stated as "Clear"
 // rather than left blank for the same reason as the badge above: an empty row
 // is read as a verdict, so the verdict has to be the one the ledger gave.
+//
+// A blocked removal disqualifies "Clear" outright. Without that condition a
+// worktree the ledger is actively holding on to — blocked, but with no risk
+// level reported — was positively labelled safe, which is worse than saying
+// nothing at all.
 const showClear = computed(
   () =>
     props.ledger?.available === true &&
     props.ledger.risk_available === true &&
-    !ledgerRisk.value
+    !ledgerRisk.value &&
+    !removalBlocked.value
 )
 const riskUnknownTitle = computed(() => {
   const base =
@@ -111,6 +128,7 @@ const hasAnyBadge = computed(
     showMismatch.value ||
     ledgerUnknown.value ||
     !!ledgerRisk.value ||
+    removalBlocked.value ||
     showClear.value ||
     riskUnknown.value ||
     !!activeLease.value ||
@@ -286,6 +304,38 @@ const hasAnyBadge = computed(
         />
       </svg>
       {{ riskBadge.label }}
+    </SBadge>
+
+    <!-- LEDGER REMOVAL BLOCKED badge -->
+    <!--
+      Shown whenever the ledger blocks removal, independently of the risk
+      badge. The two are different facts — a severity, and a refusal — and the
+      refusal is the one with consequences for what the user can do next.
+    -->
+    <SBadge
+      v-if="removalBlocked"
+      variant="error"
+      class="!border-transparent gap-1 compact-badge"
+      title="The worktree ledger blocks removal of this worktree. Run `way worktree removal-check` here for the reason and the remedy."
+      role="status"
+      aria-label="Ledger blocks removal"
+    >
+      <!-- Padlock icon -->
+      <svg
+        class="w-3 h-3"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+        />
+      </svg>
+      {{ REMOVAL_BLOCKED_LABEL }}
     </SBadge>
 
     <!-- LEDGER RISK CLEAR badge -->
