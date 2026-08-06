@@ -50,7 +50,14 @@ function mountDialog(worktree: Worktree | null) {
     global: {
       stubs: {
         SModal: { template: '<div><slot /><slot name="footer" /></div>' },
-        SButton: { emits: ['click'], template: '<button @click="$emit(\'click\')"><slot /></button>' },
+        // `data-disabled` rather than the real attribute: jsdom's handling of
+        // clicks on disabled buttons is unreliable, and these tests need to
+        // prove the handler guards hold even if a click gets through.
+        SButton: {
+          props: ['disabled', 'loading'],
+          emits: ['click'],
+          template: '<button :data-disabled="disabled ? \'true\' : \'false\'" @click="$emit(\'click\')"><slot /></button>',
+        },
         SCheckbox: {
           props: ['modelValue'],
           template: '<input type="checkbox" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
@@ -155,6 +162,70 @@ describe('DeleteWorktreeDialog', () => {
     // Does not close the dialogue or trigger a delete
     expect(wrapper.emitted('close')).toBeFalsy()
     expect(mockRemoveWorktree).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('will not delete or close while a checkpoint is still running', async () => {
+    // Hold the checkpoint open so the dialogue is genuinely mid-write.
+    let finishCheckpoint: (value: string) => void = () => {}
+    mockTauriInvoke.mockImplementation((command: string) => {
+      if (command === 'ledger_checkpoint') {
+        return new Promise<string>((resolve) => {
+          finishCheckpoint = resolve
+        })
+      }
+      return Promise.resolve(undefined)
+    })
+
+    const wrapper = mountDialog({ ...baseWorktree, ledger: { available: true } })
+    const button = (label: string) => wrapper.findAll('button').find((b) => b.text() === label)
+
+    await button('Record a checkpoint first')!.trigger('click')
+    await flushPromises()
+
+    // Every conflicting control is disabled...
+    expect(button('Delete Worktree')!.attributes('data-disabled')).toBe('true')
+    expect(button('Cancel')!.attributes('data-disabled')).toBe('true')
+    expect(button('Record a checkpoint first')!.attributes('data-disabled')).toBe('true')
+
+    // ...and the handlers refuse even if a click reaches them anyway.
+    await button('Delete Worktree')!.trigger('click')
+    await button('Cancel')!.trigger('click')
+    await button('Record a checkpoint first')!.trigger('click')
+    await flushPromises()
+
+    expect(mockRemoveWorktree).not.toHaveBeenCalled()
+    expect(wrapper.emitted('close')).toBeFalsy()
+    expect(mockTauriInvoke.mock.calls.filter((call) => call[0] === 'ledger_checkpoint')).toHaveLength(1)
+
+    // Once the checkpoint settles, deletion is available again.
+    finishCheckpoint('checkpointed wt_1')
+    await flushPromises()
+
+    expect(button('Delete Worktree')!.attributes('data-disabled')).toBe('false')
+    await button('Delete Worktree')!.trigger('click')
+    await flushPromises()
+    expect(mockRemoveWorktree).toHaveBeenCalledTimes(1)
+    wrapper.unmount()
+  })
+
+  it('offers no checkpoint control once a deletion is under way', async () => {
+    let finishDelete: (value: null) => void = () => {}
+    mockRemoveWorktree.mockImplementationOnce(
+      () => new Promise((resolve) => { finishDelete = resolve })
+    )
+
+    const wrapper = mountDialog({ ...baseWorktree, ledger: { available: true } })
+    const button = (label: string) => wrapper.findAll('button').find((b) => b.text() === label)
+
+    await button('Delete Worktree')!.trigger('click')
+    await flushPromises()
+
+    expect(button('Record a checkpoint first')).toBeUndefined()
+    expect(mockTauriInvoke.mock.calls.filter((call) => call[0] === 'ledger_checkpoint')).toHaveLength(0)
+
+    finishDelete(null)
+    await flushPromises()
     wrapper.unmount()
   })
 

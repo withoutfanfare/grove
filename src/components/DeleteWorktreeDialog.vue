@@ -151,6 +151,9 @@ async function handleDelete() {
   const repoName = props.repoName
 
   if (!worktree || !repoName) return
+  // A checkpoint in flight is writing to the same ledger and worktree the
+  // removal is about to tear down — never let the two run together.
+  if (isCheckpointing.value || isSubmitting.value) return
 
   isSubmitting.value = true
   error.value = null
@@ -209,6 +212,7 @@ async function handleDelete() {
 async function handleCheckpoint() {
   const worktree = props.worktree
   if (!worktree) return
+  if (isCheckpointing.value || isSubmitting.value) return
 
   isCheckpointing.value = true
   try {
@@ -226,6 +230,9 @@ async function handleCheckpoint() {
 
 function handleClose() {
   if (phase.value === 'deleting') return
+  // Closing mid-checkpoint would leave the write running against a worktree
+  // the user may then delete from the list behind it.
+  if (isCheckpointing.value) return
   emit('close')
 }
 </script>
@@ -536,7 +543,7 @@ function handleClose() {
           ref="cancelButtonRef"
           variant="ghost"
           @click="handleClose"
-          :disabled="isSubmitting"
+          :disabled="isSubmitting || isCheckpointing"
         >
           Cancel
         </SButton>
@@ -544,7 +551,7 @@ function handleClose() {
           v-if="worktree?.ledger?.available === true"
           variant="secondary"
           :loading="isCheckpointing"
-          :disabled="isCheckpointing"
+          :disabled="isCheckpointing || isSubmitting"
           @click="handleCheckpoint"
         >
           Record a checkpoint first
@@ -552,7 +559,7 @@ function handleClose() {
         <SButton
           variant="danger"
           :loading="isSubmitting"
-          :disabled="!protectionOverridden"
+          :disabled="!protectionOverridden || isCheckpointing"
           @click="handleDelete"
         >
           Delete Worktree
