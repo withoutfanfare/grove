@@ -4,6 +4,12 @@ All notable changes to Grove will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.4] - 6 August 2026
+
+### Fixed
+
+- **Launching Grove shows the window immediately instead of thirteen seconds of nothing** - Startup built the tray menu before the hidden main window was allowed to appear, and building it runs `grove ls` for every repository in turn — so the app sat invisible for the duration, with the loading screen flashing up only after the wait was already over. The window now shows first, and the tray opens with a placeholder ("Loading worktrees…") that fills in off the main thread through the same refresh path every Grove action already uses
+
 ## [0.3.3] - 6 August 2026
 
 ### Fixed
