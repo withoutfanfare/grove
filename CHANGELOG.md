@@ -4,6 +4,13 @@ All notable changes to Grove will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.2] - 6 August 2026
+
+### Fixed
+
+- **The header and filter toolbar were a different colour to the rest of the app** - Both carried a hard-coded `rgba(3, 7, 18, ...)` background — `#030712`, a near-black blue — dating from the original dark-theme redesign, before Grove moved to the `@stuntrocket/ui` palette. Everything else moved to the library's neutral surfaces and these two did not, so the top of the window read as a visibly darker, blue-tinted band against the `#171717` content and the `#1E1E1E` sidebar. Both now derive from `--color-surface-raised`, the same token the sidebar uses, keeping their existing translucency so the backdrop blur still reads
+- **`package-lock.json` still claimed version 0.1.0** - The lockfile carries the app's own version and had never been refreshed through the 0.2.0 or 0.2.1 releases. It now tracks the real version alongside `Cargo.lock`
+
 ## [0.2.1] - 6 August 2026
 
 ### Fixed
