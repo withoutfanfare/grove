@@ -118,8 +118,11 @@ Letter grades indicate worktree health:
 
 These appear only if you have Waypoint's `way` command installed. They report what the ledger says about a worktree — Grove never works any of it out for itself.
 
-- **Risk: critical / warning / note** - The ledger has judged this worktree. A critical risk means removing it would destroy work nobody has a copy of, and `grove rm` will refuse until you deal with it.
-- **Risk unknown** - The ledger answered for this worktree but could not work out its risk. This is *not* the same as "nothing at risk", and Grove will never quietly show it as safe. Hover the badge for the reason.
+- **At risk** - The most serious verdict. Removing this worktree would destroy work nobody has a copy of, and `grove rm` will refuse until you deal with it.
+- **Needs a look** - Something is wrong but no work is about to be lost. Open the details panel for the remedy.
+- **Worth knowing** - The ledger has a note about this worktree. Nothing is at stake.
+- **Clear** - The ledger checked this worktree and found nothing. Said out loud rather than left blank, so you can tell it apart from a check that never ran.
+- **Risk unknown** - The ledger answered for this worktree but could not work out its risk. This is *not* the same as "Clear", and Grove will never quietly show it as safe. Hover the badge for the reason.
 - **Ledger unknown** - The ledger could not answer about this worktree at all. Same rule: unknown, never safe.
 - **`<tool>` working here** - An agent session (Claude, Codex) is working in this worktree right now. Hover to see which session, on which machine, and until when.
 - **Drifted** - The worktree has changed since its last recorded checkpoint.
