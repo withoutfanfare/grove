@@ -136,6 +136,15 @@ export function useWt() {
   }
 
   /**
+   * Show this worktree's ledger record in Waypoint, via its `waypoint://`
+   * deep link. Read-only: Waypoint displays the record and has no removal,
+   * acknowledge or override control to offer back.
+   */
+  async function openInWaypoint(worktreeId: string): Promise<void> {
+    await invoke('open_in_waypoint', { worktreeId });
+  }
+
+  /**
    * Create a new worktree
    */
   async function createWorktree(
@@ -546,6 +555,15 @@ export function useWt() {
   }
 
   // ============================================================================
+  // Worktree Ledger
+  // ============================================================================
+
+  /** Record an objective-only worktree-ledger checkpoint for a worktree */
+  async function ledgerCheckpoint(path: string): Promise<string> {
+    return await invoke<string>('ledger_checkpoint', { path });
+  }
+
+  // ============================================================================
   // System Tray
   // ============================================================================
 
@@ -585,6 +603,7 @@ export function useWt() {
     openInTerminal,
     openInBrowser,
     openInFinder,
+    openInWaypoint,
     createWorktree,
     removeWorktree,
     pullWorktree,
@@ -637,6 +656,8 @@ export function useWt() {
     fetchPrBranch,
     // Repository registration
     registerRepository,
+    // Worktree ledger
+    ledgerCheckpoint,
     // System tray
     refreshTrayMenu,
     toWtError,

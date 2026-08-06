@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
-const appMaster = join(root, 'assets/icon-source/app-icon.svg')
+const appMaster = join(root, 'assets/icon-source/app-icon.png')
 const trayMaster = join(root, 'assets/icon-source/tray-icon.svg')
 const iconsDir = join(root, 'src-tauri/icons')
 const previewPath = join(root, 'assets/grove.png')
@@ -73,7 +73,7 @@ function verifyTransparency(path) {
 }
 
 function verify() {
-  run('xmllint', ['--noout', appMaster, trayMaster])
+  run('xmllint', ['--noout', trayMaster])
 
   for (const [filename, expected] of expectedDimensions) {
     const path = join(iconsDir, filename)

@@ -117,6 +117,92 @@ pub struct Worktree {
     /// Whether the worktree is stale (>50 commits behind)
     #[serde(default)]
     pub stale: Option<bool>,
+    /// Worktree Ledger overlay (optional; see LedgerOverlay)
+    #[serde(default)]
+    pub ledger: Option<LedgerOverlay>,
+}
+
+/// Worktree Ledger overlay relayed verbatim from `grove ls --json` (optional, additive).
+///
+/// `available: false` is NOT "nothing at risk" — it carries `unavailable_reason`
+/// and must render as "unknown", never as safe. An absent `ledger` key on a row
+/// means the integration is off or `way` was not found: render nothing.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LedgerOverlay {
+    /// Whether the ledger answered for this worktree
+    pub available: bool,
+    /// Ledger identity of the worktree (e.g. "wt_…")
+    #[serde(default)]
+    pub worktree_id: Option<String>,
+    /// Workstream the worktree belongs to, when recorded
+    #[serde(default)]
+    pub workstream_id: Option<String>,
+    /// "critical" | "warning" | "informational", from `way worktree
+    /// removal-check`. Null means EITHER nothing was found (when
+    /// `risk_available` is true) OR the risk could not be established (when it
+    /// is false). Null alone never means safe.
+    #[serde(default)]
+    pub risk: Option<String>,
+    /// Whether the risk question was actually answered. Defaults to false, so
+    /// an older sidecar that does not emit it reads as unknown rather than
+    /// clear — the safe direction.
+    #[serde(default)]
+    pub risk_available: bool,
+    /// Why the risk could not be established, when `risk_available` is false
+    #[serde(default)]
+    pub risk_unavailable_reason: Option<String>,
+    /// Whether the ledger blocks removal. Relayed, never derived: Grove does
+    /// not decide what is risky. Null when the check could not answer.
+    #[serde(default)]
+    pub removal_blocked: Option<bool>,
+    /// Whether the lease question was answered. False means unknown, which is
+    /// not the same as "nobody is working here".
+    #[serde(default)]
+    pub lease_available: bool,
+    /// Why the lease could not be read, when `lease_available` is false
+    #[serde(default)]
+    pub lease_unavailable_reason: Option<String>,
+    /// Whether the claim below is still live. False with a `lease` present
+    /// means it expired — the holder it names is still worth showing.
+    #[serde(default)]
+    pub lease_held: Option<bool>,
+    /// Whoever holds (or last held) this worktree, when the ledger knows
+    #[serde(default)]
+    pub lease: Option<LedgerLease>,
+    /// ISO timestamp of the last recorded checkpoint, null when never checkpointed
+    #[serde(default)]
+    pub checkpoint_at: Option<String>,
+    /// The recorded next action for this worktree
+    #[serde(default)]
+    pub next_action: Option<String>,
+    /// "present" | "missing"
+    #[serde(default)]
+    pub narrative_status: Option<String>,
+    /// True when state has drifted since the last checkpoint
+    #[serde(default)]
+    pub drift: Option<bool>,
+    /// Why the ledger could not answer, when available is false
+    #[serde(default)]
+    pub unavailable_reason: Option<String>,
+}
+
+/// One agent's claim on a worktree, relayed from `way worktree lease status`.
+///
+/// A holder is tool + session + machine, never a session id alone: the same
+/// session id on two machines is two different agents.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LedgerLease {
+    /// The agent tool holding it ("claude", "codex")
+    pub tool: String,
+    /// The tool's own session or task id
+    pub session_id: String,
+    /// Which machine the holder is on
+    pub machine_id: String,
+    pub acquired_at: String,
+    pub last_heartbeat_at: String,
+    /// When the claim stops blocking others. Expiry is evaluated by `way` at
+    /// read time and reported as `lease_held`; Grove does not compare clocks.
+    pub expires_at: String,
 }
 
 /// Detailed dirty state breakdown from `git status --porcelain`
@@ -1389,5 +1475,40 @@ mod tests {
             serde_json::from_str::<BranchType>("\"remote\"").unwrap(),
             BranchType::Remote
         );
+    }
+
+    #[test]
+    fn worktree_row_without_ledger_key_deserialises_to_none() {
+        let row = r#"{"branch":"develop","path":"/tmp/x","sha":"abc1234","dirty":false,
+            "changes":0,"ahead":0,"behind":0,"stale":false,"age":"1d","age_days":1,"merged":false}"#;
+        let wt: Worktree = serde_json::from_str(row).expect("row should parse");
+        assert!(wt.ledger.is_none());
+    }
+
+    #[test]
+    fn ledger_overlay_unavailable_carries_reason() {
+        let row = r#"{"branch":"b","path":"/tmp/x","sha":"abc1234","dirty":false,
+            "ahead":null,"behind":null,
+            "ledger":{"available":false,"unavailable_reason":"way exited 3"}}"#;
+        let wt: Worktree = serde_json::from_str(row).expect("row should parse");
+        let ledger = wt.ledger.expect("ledger key present");
+        assert!(!ledger.available);
+        assert_eq!(ledger.unavailable_reason.as_deref(), Some("way exited 3"));
+        assert!(ledger.risk.is_none());
+    }
+
+    #[test]
+    fn ledger_overlay_full_row_parses() {
+        let row = r#"{"branch":"b","path":"/tmp/x","sha":"abc1234","dirty":true,
+            "ahead":1,"behind":0,
+            "ledger":{"available":true,"worktree_id":"wt_1","workstream_id":null,
+                      "risk":"critical","checkpoint_at":"2026-08-05T17:00:00Z",
+                      "next_action":"merge to develop","narrative_status":"present",
+                      "drift":true,"unavailable_reason":null}}"#;
+        let wt: Worktree = serde_json::from_str(row).expect("row should parse");
+        let ledger = wt.ledger.expect("ledger key present");
+        assert!(ledger.available);
+        assert_eq!(ledger.risk.as_deref(), Some("critical"));
+        assert_eq!(ledger.drift, Some(true));
     }
 }

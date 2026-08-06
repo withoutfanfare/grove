@@ -67,3 +67,74 @@ describe('AttentionPanel health items', () => {
     wrapper.unmount()
   })
 })
+
+describe('AttentionPanel ledger items', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    localStorage.clear()
+  })
+
+  it('renders the uncheckpointed work group with risk-wins reason text', () => {
+    const store = useOverviewStore()
+    store.setWorktreeSnapshot('scooda', [
+      makeWorktree({
+        path: '/repos/scooda/a',
+        branch: 'a',
+        ledger: { available: true, drift: true, risk_available: true, risk: null },
+      }),
+      makeWorktree({
+        path: '/repos/scooda/b',
+        branch: 'b',
+        ledger: { available: true, drift: true, risk_available: true, risk: 'critical' },
+      }),
+    ], 1000)
+
+    const wrapper = mount(AttentionPanel)
+    const text = wrapper.text()
+
+    expect(text).toContain('Drifted or at risk')
+    expect(text).toContain('Drifted since last checkpoint')
+    expect(text).toContain('Critical ledger risk')
+    wrapper.unmount()
+  })
+
+  it('lists a worktree whose risk could not be established, and names it as unknown', () => {
+    // This panel is the one place that aggregates safety. A risk nobody could
+    // establish must not be omitted here, or it is silently counted as fine —
+    // and it must not be described as merely "drifted" either.
+    const store = useOverviewStore()
+    store.setWorktreeSnapshot('scooda', [
+      makeWorktree({
+        path: '/repos/scooda/a',
+        branch: 'a',
+        ledger: {
+          available: true,
+          drift: false,
+          risk_available: false,
+          risk_unavailable_reason: 'no worktree ledger root configured',
+        },
+      }),
+    ], 1000)
+
+    const wrapper = mount(AttentionPanel)
+    const text = wrapper.text()
+
+    expect(text).toContain('Drifted or at risk')
+    expect(text).toContain('Ledger risk unknown')
+    expect(text).not.toContain('Drifted since last checkpoint')
+    wrapper.unmount()
+  })
+
+  it('hides the drifted-or-at-risk group when no ledger is answerably drifted or critical', () => {
+    const store = useOverviewStore()
+    store.setWorktreeSnapshot('scooda', [
+      makeWorktree({ path: '/repos/scooda/a', branch: 'a', ledger: { available: false } }),
+      makeWorktree({ path: '/repos/scooda/b', branch: 'b' }),
+    ], 1000)
+
+    const wrapper = mount(AttentionPanel)
+
+    expect(wrapper.text()).not.toContain('Drifted or at risk')
+    wrapper.unmount()
+  })
+})

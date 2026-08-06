@@ -218,6 +218,71 @@ describe('WorktreeCard selection checkbox', () => {
   })
 })
 
+describe('WorktreeCard — Open in Waypoint', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    resetWorktreeDiagnosticsForTests()
+    resetTauriMocks()
+    mockTauriInvoke.mockResolvedValue(undefined)
+  })
+
+  // Render the menu items rather than stubbing them away, so the entry itself
+  // is what is asserted.
+  function mountWithMenu(wt: Worktree) {
+    return mount(WorktreeCard, {
+      props: { worktree: wt, repoName: 'grove' },
+      global: {
+        stubs: {
+          Dropdown: { template: '<div><slot :close="() => {}" /></div>' },
+          DropdownItem: { template: '<button @click="$emit(\'click\')"><slot /></button>' },
+          WorktreeDetailsPanel: true,
+        },
+      },
+    })
+  }
+
+  it('offers Waypoint when the ledger gave this worktree an id', () => {
+    const wrapper = mountWithMenu({
+      ...worktree,
+      ledger: { available: true, worktree_id: 'wt_019fce56-4c9b' },
+    })
+    expect(wrapper.text()).toContain('Waypoint')
+    wrapper.unmount()
+  })
+
+  it('does not offer Waypoint without a ledger id — there is no record to open', () => {
+    const noLedger = mountWithMenu(worktree)
+    expect(noLedger.text()).not.toContain('Waypoint')
+    noLedger.unmount()
+
+    // An unavailable ledger has no id either, and guessing one would open the
+    // wrong worktree's record.
+    const unavailable = mountWithMenu({
+      ...worktree,
+      ledger: { available: false, unavailable_reason: 'way exited 3' },
+    })
+    expect(unavailable.text()).not.toContain('Waypoint')
+    unavailable.unmount()
+  })
+
+  it('opens the ledger id, not the path', async () => {
+    const wrapper = mountWithMenu({
+      ...worktree,
+      ledger: { available: true, worktree_id: 'wt_019fce56-4c9b' },
+    })
+
+    const item = wrapper.findAll('button').find((b) => b.text().includes('Waypoint'))
+    expect(item).toBeDefined()
+    await item!.trigger('click')
+    await flushPromises()
+
+    expect(mockTauriInvoke).toHaveBeenCalledWith('open_in_waypoint', {
+      worktreeId: 'wt_019fce56-4c9b',
+    })
+    wrapper.unmount()
+  })
+})
+
 function mountCardWithWorktree(wt: Worktree) {
   return mount(WorktreeCard, {
     props: { worktree: wt, repoName: 'grove' },

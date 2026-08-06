@@ -1,8 +1,8 @@
 # Grove Icon Source
 
-These deterministic SVG files are the source of truth for Grove's icon system.
+These files are the source of truth for Grove's icon system.
 
-- `app-icon.svg`: Columnar Pine app icon, 1024 x 1024.
+- `app-icon.png`: Columnar Pine app icon, 1024 x 1024 RGBA.
 - `tray-icon.svg`: purpose-built macOS menu-bar template glyph, 22 x 22.
 
 ## Palette

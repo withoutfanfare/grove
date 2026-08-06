@@ -24,6 +24,7 @@ Grove is a Tauri 2.0 desktop application providing a graphical interface for the
 | [Testing](developers/testing.md) | Test infrastructure using Vitest and Cargo test |
 | [Sidecar](developers/sidecar.md) | Bundling the `wt` CLI as a Tauri sidecar binary |
 | [Security](developers/security.md) | Threat model, input validation, and CSP configuration |
+| [Ledger Overlay](ledger-overlay.md) | Worktree Ledger overlay contract, render states, and sidecar refresh |
 
 ---
 

@@ -1,6 +1,6 @@
 [package]
 name = "grove-app"
-version = "0.1.0"
+version = "0.2.0"
 description = "A Tauri App"
 authors = ["Danny Harding"]
 edition = "2021"
@@ -63,3 +63,5 @@ opt-level = "s"
 [target."cfg(unix)".dependencies]
 libc = "0.2.180"
 
+[dev-dependencies]
+tempfile = "3"

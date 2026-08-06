@@ -8,7 +8,7 @@ import {
   getHookScopeLabel,
   getConfigLayerLabel,
 } from './wt'
-import type { ResumableOperationSummary, WtError } from './wt'
+import type { ResumableOperationSummary, WtError, Worktree, LedgerOverlay } from './wt'
 
 describe('isWtError', () => {
   it('should return true for valid WtError objects', () => {
@@ -159,5 +159,21 @@ describe('getConfigLayerLabel', () => {
 
   it('should return the layer itself for unknown layers', () => {
     expect(getConfigLayerLabel('unknown' as any)).toBe('unknown')
+  })
+})
+
+describe('LedgerOverlay', () => {
+  it('is optional on Worktree and carries the overlay contract fields', () => {
+    const unavailable: LedgerOverlay = { available: false, unavailable_reason: 'way exited 3' }
+    const full: LedgerOverlay = {
+      available: true, worktree_id: 'wt_1', workstream_id: null, risk: 'critical',
+      checkpoint_at: '2026-08-05T17:00:00Z', next_action: 'merge to develop',
+      narrative_status: 'present', drift: true, unavailable_reason: null,
+    }
+    const bare: Worktree = { path: '/tmp/x', branch: 'b', sha: 'abc', dirty: false, ahead: 0, behind: 0 }
+    const withLedger: Worktree = { ...bare, ledger: full }
+    expect(bare.ledger).toBeUndefined()
+    expect(withLedger.ledger?.risk).toBe('critical')
+    expect(unavailable.available).toBe(false)
   })
 })

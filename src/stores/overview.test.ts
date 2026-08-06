@@ -143,6 +143,56 @@ describe('useOverviewStore', () => {
 
       expect(store.hasAttentionItems).toBe(false)
     })
+
+    it('collects drifted and critical-risk worktrees into ledgerAttention', () => {
+      const store = useOverviewStore()
+      store.setWorktreeSnapshot('api', [
+        makeWorktree({
+          path: '/repos/api/a', branch: 'a',
+          ledger: { available: true, drift: true, risk_available: true, risk: null },
+        }),
+        makeWorktree({
+          path: '/repos/api/b', branch: 'b',
+          ledger: { available: true, drift: false, risk_available: true, risk: 'critical' },
+        }),
+      ], 1000)
+      store.setWorktreeSnapshot('demo', [
+        makeWorktree({ path: '/repos/demo/c', branch: 'c', ledger: { available: false } }),
+        makeWorktree({
+          path: '/repos/demo/d', branch: 'd',
+          ledger: { available: true, drift: false, risk_available: true, risk: null },
+        }),
+      ], 1000)
+
+      expect(store.ledgerAttention).toHaveLength(2)
+    })
+
+    it('counts a worktree whose risk could not be established', () => {
+      // Unknown is never zero. Leaving it out of the safety roll-up is how a
+      // worktree nobody could assess gets treated as one that is fine.
+      const store = useOverviewStore()
+      store.setWorktreeSnapshot('api', [
+        makeWorktree({
+          path: '/repos/api/a', branch: 'a',
+          ledger: { available: true, drift: false, risk_available: false, risk: null },
+        }),
+      ], 1000)
+
+      expect(store.ledgerAttention).toHaveLength(1)
+    })
+
+    it('never treats an unanswerable ledger as attention-worthy', () => {
+      // `available: false` is a different case: the ledger said nothing about
+      // this worktree at all, so there is no ledger claim to act on. The row
+      // still renders "Ledger unknown" — this is only about the roll-up.
+      const store = useOverviewStore()
+      store.setWorktreeSnapshot('demo', [
+        makeWorktree({ path: '/repos/demo/a', branch: 'a', ledger: { available: false } }),
+        makeWorktree({ path: '/repos/demo/b', branch: 'b' }),
+      ], 1000)
+
+      expect(store.ledgerAttention).toHaveLength(0)
+    })
   })
 
   describe('stats', () => {
