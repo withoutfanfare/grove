@@ -88,6 +88,51 @@
 }
 
 .dark {
+  /* --------------------------------------------------------------------
+     Dark-mode token repair (@stuntrocket/ui <= 0.9.2)
+     The library declares its light-mode `:root` block *after* its `.dark`
+     block. Both have equal specificity, so source order wins and the
+     light values silently replace the dark ones — leaving borders, hover
+     states, selection and scrollbars painted in near-black on a near-black
+     surface, i.e. invisible. Restated here because this block is emitted
+     after the library's `:root`. Remove once the library is republished
+     with the blocks in the correct order.
+     -------------------------------------------------------------------- */
+
+  /* Scrollbar */
+  --scrollbar-thumb: rgba(96, 165, 250, 0.45);
+  --scrollbar-thumb-hover: rgba(96, 165, 250, 0.66);
+  --scrollbar-thumb-active: rgba(96, 165, 250, 0.8);
+  --scrollbar-track: rgba(115, 115, 115, 0.2);
+
+  /* Alpha borders (white-based for dark backgrounds) */
+  --color-border-subtle: rgba(255, 255, 255, 0.08);
+  --color-border-default: rgba(255, 255, 255, 0.12);
+  --color-border-strong: rgba(255, 255, 255, 0.18);
+
+  /* Accent subtle */
+  --color-accent-subtle: rgba(96, 165, 250, 0.14);
+
+  /* Surface states */
+  --color-surface-hover: rgba(255, 255, 255, 0.04);
+  --color-surface-selected: rgba(150, 170, 190, 0.10);
+  --color-surface-selected-strong: rgba(150, 170, 190, 0.16);
+
+  /* Status subtles */
+  --color-success-subtle: rgba(106, 170, 123, 0.14);
+  --color-warning-subtle: rgba(212, 164, 66, 0.14);
+  --color-danger-subtle: rgba(212, 100, 100, 0.14);
+  --color-info-subtle: rgba(96, 165, 250, 0.14);
+
+  /* Shadows — heavier opacities for dark mode */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-sheet: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-focus: 0 0 0 3px rgba(96, 165, 250, 0.25);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-overlay: 0 8px 32px rgba(0, 0, 0, 0.5);
+
   /* Dark mode shadow overrides for Grove patterns */
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.5);
   --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.6), 0 10px 10px rgba(0, 0, 0, 0.4);

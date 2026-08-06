@@ -4,6 +4,12 @@ All notable changes to Grove will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- **The interface lost its borders, hover states and selection highlights** - `@stuntrocket/ui` declares its light-mode `:root` token block *after* its `.dark` block. Both selectors carry the same specificity, so source order decided it and the light values silently replaced the dark ones. Every alpha border, hover surface, selected-row surface and scrollbar was therefore painted black-on-black — `rgba(0,0,0,0.08)` over a `#171717` surface — leaving panels, cards and list rows with no visible edges and no response to the mouse. Surface, text and accent colours were unaffected, which is why the app looked drained rather than obviously broken. Fixed at source in the library by moving the light-mode block above the dark one; Grove restates the correct dark values in its own `.dark` block meanwhile, since it installs the published 0.8.2 and cannot see the source fix until the library is republished. The restatement in `src/styles.css` can be deleted at that point
+
 ## [0.2.0] - 6 August 2026
 
 > First entry to carry the app's real version. Earlier headings are calendar
