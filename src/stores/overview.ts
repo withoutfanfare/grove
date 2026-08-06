@@ -152,9 +152,18 @@ export const useOverviewStore = defineStore('overview', () => {
     collectWorktrees((wt) => Boolean(wt.merged) || Boolean(wt.stale))
   );
 
+  // A worktree needs attention when it has drifted, when the ledger reports a
+  // critical risk, OR when the risk could not be established at all. That last
+  // case is here deliberately: this panel is the one place that aggregates
+  // safety, so omitting an unknown would quietly count it as fine.
+  // `risk === 'critical'` is only trusted when the check actually answered.
   const ledgerAttention = computed(() =>
     collectWorktrees(
-      (wt) => wt.ledger?.available === true && (wt.ledger.drift === true || wt.ledger.risk === 'critical')
+      (wt) =>
+        wt.ledger?.available === true &&
+        (wt.ledger.drift === true ||
+          (wt.ledger.risk_available === true && wt.ledger.risk === 'critical') ||
+          wt.ledger.risk_available !== true)
     )
   );
 

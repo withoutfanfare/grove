@@ -137,10 +137,38 @@ pub struct LedgerOverlay {
     /// Workstream the worktree belongs to, when recorded
     #[serde(default)]
     pub workstream_id: Option<String>,
-    /// "critical" | "warning" | "informational" when populated by removal-check;
-    /// deliberately null from `resume` — Grove never guesses risk
+    /// "critical" | "warning" | "informational", from `way worktree
+    /// removal-check`. Null means EITHER nothing was found (when
+    /// `risk_available` is true) OR the risk could not be established (when it
+    /// is false). Null alone never means safe.
     #[serde(default)]
     pub risk: Option<String>,
+    /// Whether the risk question was actually answered. Defaults to false, so
+    /// an older sidecar that does not emit it reads as unknown rather than
+    /// clear — the safe direction.
+    #[serde(default)]
+    pub risk_available: bool,
+    /// Why the risk could not be established, when `risk_available` is false
+    #[serde(default)]
+    pub risk_unavailable_reason: Option<String>,
+    /// Whether the ledger blocks removal. Relayed, never derived: Grove does
+    /// not decide what is risky. Null when the check could not answer.
+    #[serde(default)]
+    pub removal_blocked: Option<bool>,
+    /// Whether the lease question was answered. False means unknown, which is
+    /// not the same as "nobody is working here".
+    #[serde(default)]
+    pub lease_available: bool,
+    /// Why the lease could not be read, when `lease_available` is false
+    #[serde(default)]
+    pub lease_unavailable_reason: Option<String>,
+    /// Whether the claim below is still live. False with a `lease` present
+    /// means it expired — the holder it names is still worth showing.
+    #[serde(default)]
+    pub lease_held: Option<bool>,
+    /// Whoever holds (or last held) this worktree, when the ledger knows
+    #[serde(default)]
+    pub lease: Option<LedgerLease>,
     /// ISO timestamp of the last recorded checkpoint, null when never checkpointed
     #[serde(default)]
     pub checkpoint_at: Option<String>,
@@ -156,6 +184,25 @@ pub struct LedgerOverlay {
     /// Why the ledger could not answer, when available is false
     #[serde(default)]
     pub unavailable_reason: Option<String>,
+}
+
+/// One agent's claim on a worktree, relayed from `way worktree lease status`.
+///
+/// A holder is tool + session + machine, never a session id alone: the same
+/// session id on two machines is two different agents.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LedgerLease {
+    /// The agent tool holding it ("claude", "codex")
+    pub tool: String,
+    /// The tool's own session or task id
+    pub session_id: String,
+    /// Which machine the holder is on
+    pub machine_id: String,
+    pub acquired_at: String,
+    pub last_heartbeat_at: String,
+    /// When the claim stops blocking others. Expiry is evaluated by `way` at
+    /// read time and reported as `lease_held`; Grove does not compare clocks.
+    pub expires_at: String,
 }
 
 /// Detailed dirty state breakdown from `git status --porcelain`
