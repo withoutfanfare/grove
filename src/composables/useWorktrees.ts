@@ -321,6 +321,23 @@ export function useWorktrees() {
   }
 
   /**
+   * Show this worktree's ledger record in Waypoint.
+   *
+   * A failure here is surfaced like any other open action rather than
+   * swallowed: "Waypoint is not installed" and "the link silently did nothing"
+   * must not look the same.
+   */
+  async function openInWaypoint(worktreeId: string): Promise<boolean> {
+    try {
+      await wt.openInWaypoint(worktreeId);
+      return true;
+    } catch (error) {
+      store.setError(wt.toWtError(error));
+      return false;
+    }
+  }
+
+  /**
    * Open All: Opens terminal, editor, and optionally browser for a worktree.
    * Opens all three (or two if no URL) simultaneously for maximum efficiency.
    *
@@ -609,6 +626,7 @@ export function useWorktrees() {
     openInTerminal,
     openInBrowser,
     openInFinder,
+    openInWaypoint,
     openAll,
     createWorktree,
     removeWorktree,

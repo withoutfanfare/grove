@@ -7,6 +7,10 @@
  * - UNMERGED: Branch has not been merged into the base branch (orange warning)
  * - STALE: Worktree is >50 commits behind (orange clock icon)
  * - MISMATCH: Directory name doesn't match branch slug (yellow warning)
+ * - LEDGER UNKNOWN / RISK UNKNOWN: the ledger, or its risk check, could not
+ *   answer. Shown explicitly because the absence of a risk badge is read as
+ *   "nothing at risk", so an unknown must never be silent.
+ * - AGENT WORKING HERE: an agent session holds a live lease on this worktree.
  *
  * Each badge has a tooltip explaining its meaning.
  */
@@ -30,10 +34,43 @@ const showUnmerged = computed(() => props.merged === false)
 const showStale = computed(() => props.stale === true)
 const showMismatch = computed(() => props.mismatch === true)
 const ledgerUnknown = computed(() => props.ledger?.available === false)
-// `risk` is always null from `way worktree resume` (today's only source for this
-// overlay) — only `removal-check` populates it. These branches are deliberate
-// forward-compatibility for when the overlay starts carrying that data.
-const ledgerRisk = computed(() => (props.ledger?.available ? props.ledger.risk ?? null : null))
+// `risk` comes from `way worktree removal-check`, which the overlay now runs
+// alongside `resume`. Only trusted when the check actually answered.
+const ledgerRisk = computed(() =>
+  props.ledger?.available && props.ledger.risk_available ? props.ledger.risk ?? null : null
+)
+// The gate ran for the worktree but could not establish its risk. This needs a
+// badge of its own precisely BECAUSE the risk badge's absence is a positive
+// claim — "no risk badge" reads as "nothing at risk", so silence here would
+// render unknown as safe.
+const riskUnknown = computed(
+  () => props.ledger?.available === true && props.ledger.risk_available !== true
+)
+const riskUnknownTitle = computed(() => {
+  const base =
+    'The ledger answered for this worktree but could not establish its risk — unknown, not clear.'
+  const reason = props.ledger?.risk_unavailable_reason
+  return reason ? `${base} ${reason}` : base
+})
+// A live lease means an agent session is working in this worktree right now.
+// Only shown when the lease was actually read AND is live: an expired claim is
+// history, and an unreadable one is unknown. Neither belongs on the row —
+// unlike risk, the absence of this badge claims nothing.
+const activeLease = computed(() =>
+  props.ledger?.available === true &&
+  props.ledger.lease_available === true &&
+  props.ledger.lease_held === true
+    ? props.ledger.lease ?? null
+    : null
+)
+const leaseBadgeText = computed(() =>
+  activeLease.value ? `${activeLease.value.tool} working here` : ''
+)
+const leaseBadgeTitle = computed(() => {
+  const lease = activeLease.value
+  if (!lease) return ''
+  return `${lease.tool} session ${lease.session_id} holds this worktree on ${lease.machine_id} until ${lease.expires_at}.`
+})
 const showDrift = computed(
   () => props.ledger?.available === true && !ledgerRisk.value && props.ledger.drift === true
 )
@@ -91,6 +128,8 @@ const hasAnyBadge = computed(
     showMismatch.value ||
     ledgerUnknown.value ||
     !!ledgerRisk.value ||
+    riskUnknown.value ||
+    !!activeLease.value ||
     showDrift.value ||
     showNoCheckpoint.value
 )
@@ -263,6 +302,60 @@ const hasAnyBadge = computed(
         />
       </svg>
       {{ riskBadgeText }}
+    </SBadge>
+
+    <!-- LEDGER RISK UNKNOWN badge -->
+    <SBadge
+      v-if="riskUnknown"
+      variant="default"
+      class="!border-transparent gap-1 compact-badge"
+      :title="riskUnknownTitle"
+      role="status"
+      aria-label="Ledger risk unknown"
+    >
+      <!-- Question mark icon -->
+      <svg
+        class="w-3 h-3"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+      </svg>
+      Risk unknown
+    </SBadge>
+
+    <!-- LEDGER ACTIVE LEASE badge -->
+    <SBadge
+      v-if="activeLease"
+      variant="default"
+      class="!border-transparent gap-1 compact-badge"
+      :title="leaseBadgeTitle"
+      role="status"
+      :aria-label="`An agent is working here: ${activeLease.tool}`"
+    >
+      <!-- Person icon -->
+      <svg
+        class="w-3 h-3"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+        />
+      </svg>
+      {{ leaseBadgeText }}
     </SBadge>
 
     <!-- LEDGER DRIFT badge -->

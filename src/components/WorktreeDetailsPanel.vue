@@ -201,9 +201,42 @@ const ledgerDriftLabel = computed(() =>
     : 'In step with the last checkpoint'
 )
 
+// Risk is only a fact when the check answered. When it did not, the panel says
+// so in words rather than showing nothing, which would read as "no risk".
 const ledgerRiskLabel = computed(() => {
-  const risk = props.worktree.ledger?.risk
-  return risk ? `${risk} — see removal check for the remedy` : null
+  const ledger = props.worktree.ledger
+  if (ledger?.risk_available !== true) {
+    const reason = ledger?.risk_unavailable_reason
+    return reason
+      ? `Unknown — the risk check could not answer: ${reason}`
+      : 'Unknown — the risk check could not answer'
+  }
+  if (ledger.risk == null) {
+    return 'None found by the ledger'
+  }
+  const blocked =
+    ledger.removal_blocked === true
+      ? ' — the ledger blocks removal until this is resolved'
+      : ''
+  return `${ledger.risk}${blocked} — run \`way worktree removal-check\` here for the remedy`
+})
+
+// The lease answers "is an agent working in this worktree?". Three distinct
+// states, and the unreadable one must not read as "nobody is here".
+const ledgerLeaseLabel = computed(() => {
+  const ledger = props.worktree.ledger
+  if (ledger?.lease_available !== true) {
+    const reason = ledger?.lease_unavailable_reason
+    return reason ? `Unknown — ${reason}` : 'Unknown — the lease could not be read'
+  }
+  const lease = ledger.lease
+  if (lease == null) {
+    return 'No agent has claimed this worktree'
+  }
+  const holder = `${lease.tool} session ${lease.session_id} on ${lease.machine_id}`
+  return ledger.lease_held === true
+    ? `${holder} — holds it until ${lease.expires_at}`
+    : `${holder} — claim expired at ${lease.expires_at}`
 })
 </script>
 
@@ -396,9 +429,16 @@ const ledgerRiskLabel = computed(() => {
                 <p class="text-xs text-text-muted mt-0.5">{{ ledgerDriftLabel }}</p>
               </div>
 
-              <div v-if="ledgerRiskLabel" class="p-3 rounded-lg bg-surface-overlay/50">
+              <!-- Always rendered: an omitted Risk row reads as "no risk", so
+                   unknown has to be stated rather than left out. -->
+              <div class="p-3 rounded-lg bg-surface-overlay/50">
                 <p class="text-sm text-text-primary">Risk</p>
                 <p class="text-xs text-text-muted mt-0.5">{{ ledgerRiskLabel }}</p>
+              </div>
+
+              <div class="p-3 rounded-lg bg-surface-overlay/50">
+                <p class="text-sm text-text-primary">Agent lease</p>
+                <p class="text-xs text-text-muted mt-0.5">{{ ledgerLeaseLabel }}</p>
               </div>
 
               <p class="text-2xs text-text-muted">Recorded facts, as at the last list refresh.</p>

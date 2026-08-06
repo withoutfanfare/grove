@@ -136,6 +136,15 @@ export function useWt() {
   }
 
   /**
+   * Show this worktree's ledger record in Waypoint, via its `waypoint://`
+   * deep link. Read-only: Waypoint displays the record and has no removal,
+   * acknowledge or override control to offer back.
+   */
+  async function openInWaypoint(worktreeId: string): Promise<void> {
+    await invoke('open_in_waypoint', { worktreeId });
+  }
+
+  /**
    * Create a new worktree
    */
   async function createWorktree(
@@ -594,6 +603,7 @@ export function useWt() {
     openInTerminal,
     openInBrowser,
     openInFinder,
+    openInWaypoint,
     createWorktree,
     removeWorktree,
     pullWorktree,

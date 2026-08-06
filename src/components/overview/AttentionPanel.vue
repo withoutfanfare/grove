@@ -77,9 +77,17 @@ function healthSummary(message: string): string {
   return titles.length > 0 ? titles.join(' · ') : message
 }
 
-/** Per-item ledger reason: risk wins when both drift and critical risk are present */
+/**
+ * Per-item ledger reason, most serious first: a stated critical risk, then a
+ * risk that could not be established, then drift. An unestablished risk is
+ * named rather than falling through to "drifted", which would describe the
+ * worktree as merely out of date when nobody knows whether it is safe.
+ */
 function ledgerReason(worktree: Worktree): string {
-  return worktree.ledger?.risk === 'critical' ? 'Critical ledger risk' : 'Drifted since last checkpoint'
+  const ledger = worktree.ledger
+  if (ledger?.risk_available === true && ledger.risk === 'critical') return 'Critical ledger risk'
+  if (ledger?.risk_available !== true) return 'Ledger risk unknown'
+  return 'Drifted since last checkpoint'
 }
 </script>
 
@@ -240,7 +248,9 @@ function ledgerReason(worktree: Worktree): string {
             <button class="attention-item-body" @click="emit('navigate', item.repo, item.worktree.branch)">
               <span class="attention-item-title">
                 <span class="severity-dot"
-                  :class="item.worktree.ledger?.risk === 'critical' ? 'bg-danger' : 'bg-warning'" />
+                  :class="item.worktree.ledger?.risk_available === true && item.worktree.ledger.risk === 'critical'
+                    ? 'bg-danger'
+                    : 'bg-warning'" />
                 <span class="font-mono">{{ item.repo }}</span>
                 <span class="text-text-muted">·</span>
                 <span class="truncate">{{ item.worktree.branch }}</span>

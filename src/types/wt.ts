@@ -98,8 +98,35 @@ export interface LedgerOverlay {
   worktree_id?: string | null;
   /** Workstream the worktree belongs to, when recorded */
   workstream_id?: string | null;
-  /** "critical" | "warning" | "informational" when populated by removal-check; null from resume */
+  /**
+   * "critical" | "warning" | "informational", from `way worktree removal-check`.
+   * Null means EITHER nothing was found (when `risk_available` is true) OR the
+   * risk could not be established (when it is false). Null alone never means safe.
+   */
   risk?: 'critical' | 'warning' | 'informational' | null;
+  /**
+   * Whether the risk question was actually answered. Absent or false means
+   * unknown — an older sidecar does not emit it, and unknown is never clear.
+   */
+  risk_available?: boolean;
+  /** Why the risk could not be established, when risk_available is false */
+  risk_unavailable_reason?: string | null;
+  /**
+   * Whether the ledger blocks removal. Relayed, never derived: Grove does not
+   * decide what is risky. Null when the check could not answer.
+   */
+  removal_blocked?: boolean | null;
+  /** Whether the lease question was answered. False means unknown, not "nobody is here". */
+  lease_available?: boolean;
+  /** Why the lease could not be read, when lease_available is false */
+  lease_unavailable_reason?: string | null;
+  /**
+   * Whether the claim below is still live. False with a `lease` present means
+   * it expired — the holder it names is still worth showing.
+   */
+  lease_held?: boolean | null;
+  /** Whoever holds (or last held) this worktree, when the ledger knows */
+  lease?: LedgerLease | null;
   /** ISO timestamp of the last recorded checkpoint, null when never checkpointed */
   checkpoint_at?: string | null;
   /** The recorded next action for this worktree */
@@ -110,6 +137,28 @@ export interface LedgerOverlay {
   drift?: boolean | null;
   /** Why the ledger could not answer, when available is false */
   unavailable_reason?: string | null;
+}
+
+/**
+ * One agent's claim on a worktree, relayed from `way worktree lease status`.
+ *
+ * A holder is tool + session + machine, never a session id alone: the same
+ * session id on two machines is two different agents.
+ */
+export interface LedgerLease {
+  /** The agent tool holding it ("claude", "codex") */
+  tool: string;
+  /** The tool's own session or task id */
+  session_id: string;
+  /** Which machine the holder is on */
+  machine_id: string;
+  acquired_at: string;
+  last_heartbeat_at: string;
+  /**
+   * When the claim stops blocking others. Expiry is decided by `way` at read
+   * time and reported as `lease_held`; Grove does not compare clocks.
+   */
+  expires_at: string;
 }
 
 /**
