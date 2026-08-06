@@ -4,6 +4,14 @@ All notable changes to Grove will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.2] - 6 August 2026
+
+### Fixed
+
+- **A worktree the ledger blocks removal of is no longer labelled "Clear"** - `removal_blocked` is relayed from the ledger, never derived from the risk level, so it can be true while no risk level is reported. The badge row checked only the risk, so a worktree the ledger was actively refusing to release was positively labelled **Clear**. An absent risk badge already reads as "nothing at risk"; stating "Clear" over a block is worse, because it is an explicit claim. The details panel had the same hole from the other side — it mentioned the block only when a risk level was also present, so a block on its own returned "Clear — the ledger found nothing". Both now treat the refusal as its own fact: "Clear" requires the removal not to be blocked, and a new **"Removal blocked"** badge appears whenever it is, including alongside a risk badge — the severity and the refusal are different things, and the refusal is the one that changes what you can do next
+- **The background repository refresh works at all** - Grove refreshes every repository on a five-minute timer so ahead/behind counts stay honest between actions. It did this by calling `grove fetch`, a command the CLI did not have; every call failed and the counts silently went stale. The bundled CLI now provides it — remote refs only, no checkout, nothing merged or rebased, so it is safe against a repository you are working in
+- **A hung `way` can no longer leak a thread on each timeout** - Terminating on timeout could only reach the direct child on Windows, so a surviving grandchild kept the output pipes open and the (deliberately detached) reader threads never exited, accumulating one per timeout. The whole process tree is now terminated, closing the pipes so those readers finish on their own. Compile-checked for Windows but not runtime-verified. macOS and Linux were already correct
+
 ## [0.3.1] - 6 August 2026
 
 ### Fixed
