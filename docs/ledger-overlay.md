@@ -24,6 +24,8 @@ Building one overlay runs three `way` commands concurrently, because no single c
 
 Grove renders `risk` (`"critical" | "warning" | "informational"`) but never derives it, and never derives `removal_blocked` from it either — whether a risk blocks removal is the ledger's rule to state.
 
+Those three names are the *service's* vocabulary and never reach a human. Grove shows Waypoint's words for them — "At risk", "Needs a look", "Worth knowing", and "Clear" when the check answered and found nothing — because both apps read the same `removal-check` and must not describe it in two languages. The words live in `src/utils/riskVocabulary.ts`, and `src/components/guards.test.ts` fails if a raw level name reaches user-facing text.
+
 ### Null is not "safe" — read the availability flag
 
 `risk` and `lease` are each null in two completely different situations, and the flag beside them is what tells those apart:

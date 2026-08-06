@@ -39,11 +39,23 @@ describe('WorktreeStatusBadges — ledger overlay', () => {
   })
 
   it('renders risk when populated, and risk beats drift', () => {
+    // The word is Waypoint's, not the service's — see utils/riskVocabulary.
     const wrapper = mount(WorktreeStatusBadges, {
       props: { ledger: available({ risk: 'critical', drift: true }) },
     })
-    expect(wrapper.text()).toContain('Risk: critical')
+    expect(wrapper.text()).toContain('At risk')
     expect(wrapper.text()).not.toContain('Drifted')
+  })
+
+  it('renders each level in the words Waypoint uses', () => {
+    const words = { critical: 'At risk', warning: 'Needs a look', informational: 'Worth knowing' } as const
+    for (const [level, label] of Object.entries(words)) {
+      const wrapper = mount(WorktreeStatusBadges, {
+        props: { ledger: available({ risk: level as 'critical' | 'warning' | 'informational' }) },
+      })
+      expect(wrapper.text()).toContain(label)
+      wrapper.unmount()
+    }
   })
 
   it('renders Drifted when state moved since the last checkpoint', () => {
@@ -58,9 +70,14 @@ describe('WorktreeStatusBadges — ledger overlay', () => {
     expect(wrapper.text()).toContain('No checkpoint')
   })
 
-  it('renders no ledger badge for a clean, checkpointed, risk-free worktree', () => {
+  it('says "Clear" for a clean, checkpointed, risk-free worktree', () => {
+    // The check answered and found nothing, so the row says so. Leaving it
+    // blank would make the same claim silently, and a silent claim is the one
+    // nobody re-reads.
     const wrapper = mount(WorktreeStatusBadges, { props: { ledger: available() } })
-    expect(wrapper.text()).not.toContain('Ledger')
+    expect(wrapper.text()).toContain('Clear')
+    expect(wrapper.text()).not.toContain('Ledger unknown')
+    expect(wrapper.text()).not.toContain('Risk unknown')
     expect(wrapper.text()).not.toContain('Drifted')
   })
 
@@ -108,8 +125,9 @@ describe('WorktreeStatusBadges — ledger overlay', () => {
     const wrapper = mount(WorktreeStatusBadges, {
       props: { ledger: available({ risk: 'critical', removal_blocked: true }) },
     })
-    expect(wrapper.text()).toContain('Risk: critical')
+    expect(wrapper.text()).toContain('At risk')
     expect(wrapper.text()).not.toContain('Risk unknown')
+    expect(wrapper.text()).not.toContain('Clear')
   })
 
   it('names the agent holding a live lease', () => {

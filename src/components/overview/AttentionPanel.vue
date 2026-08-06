@@ -15,6 +15,7 @@ import { storeToRefs } from 'pinia'
 import { useOverviewStore } from '../../stores'
 import type { Worktree } from '../../types'
 import { parseHealthIssueMessage, severityExplanation } from '../../utils/healthIssues'
+import { riskWords } from '../../utils/riskVocabulary'
 
 const props = withDefaults(
   defineProps<{
@@ -82,10 +83,15 @@ function healthSummary(message: string): string {
  * risk that could not be established, then drift. An unestablished risk is
  * named rather than falling through to "drifted", which would describe the
  * worktree as merely out of date when nobody knows whether it is safe.
+ *
+ * The comparison below is logic and stays on the raw level; only the word a
+ * human reads comes from the vocabulary.
  */
 function ledgerReason(worktree: Worktree): string {
   const ledger = worktree.ledger
-  if (ledger?.risk_available === true && ledger.risk === 'critical') return 'Critical ledger risk'
+  if (ledger?.risk_available === true && ledger.risk === 'critical') {
+    return `${riskWords('critical').label} — the worktree ledger says so`
+  }
   if (ledger?.risk_available !== true) return 'Ledger risk unknown'
   return 'Drifted since last checkpoint'
 }
