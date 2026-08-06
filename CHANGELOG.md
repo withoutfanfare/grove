@@ -4,6 +4,21 @@ All notable changes to Grove will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.5] - 6 August 2026
+
+### Changed
+
+- **Tray menu rebuilds are 6× faster (measured 16.1s → 2.5s)** - The menu-bar tray rebuilds after every Grove action, and each rebuild listed every repository serially with the full ledger overlay — three Waypoint processes per worktree — despite the menu showing only branch names, dirty dots and behind-counts, none of which come from the ledger. Rebuilds now use a ledger-free listing and fetch all repositories concurrently
+- **Disk usage no longer pays for a ledger listing it doesn't read** - Working out a repository's disk usage listed its worktrees with the full ledger overlay just to learn their paths. It now uses the same ledger-free listing
+- **Health checks and disk scans respect their 5-minute throttle across relaunches** - The overview's expensive tier (repository health at ~3.5s per repo, plus a full directory walk of every worktree) was throttled to once per five minutes — but the throttle clock lived in memory, so every app launch started from zero and re-ran the lot. The timestamp is now saved with the cached snapshots, so relaunching within the window costs nothing
+- **A failed worktree listing no longer runs the identical command a second time** - The "fallback" from the status fetch to the list fetch invoked the very same CLI command, doubling the wait on every failure before the error could surface
+
+## [0.3.4] - 6 August 2026
+
+### Fixed
+
+- **Launching Grove shows the window immediately instead of thirteen seconds of nothing** - Startup built the tray menu before the hidden main window was allowed to appear, and building it runs `grove ls` for every repository in turn — so the app sat invisible for the duration, with the loading screen flashing up only after the wait was already over. The window now shows first, and the tray opens with a placeholder ("Loading worktrees…") that fills in off the main thread through the same refresh path every Grove action already uses
+
 ## [0.3.3] - 6 August 2026
 
 ### Fixed

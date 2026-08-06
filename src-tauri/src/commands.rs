@@ -1798,7 +1798,8 @@ pub async fn get_repo_disk_usage(
     app: tauri::AppHandle,
 ) -> Result<crate::types::RepoDiskUsage, WtError> {
     spawn_blocking(move || {
-        let worktrees = wt::get_worktrees(&app, &repo_name)?;
+        // Fast listing: only paths are needed here, so skip the ledger overlay
+        let worktrees = wt::get_worktrees_fast(&app, &repo_name)?;
         let mut wt_usages = Vec::new();
         let mut total_bytes: u64 = 0;
 

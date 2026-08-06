@@ -77,7 +77,16 @@ pub fn run() {
         // Phase 5: Distribution — auto-updater
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
-            // Set up system tray with worktree menu
+            // Show main window FIRST (window-state plugin handles position
+            // restoration). Nothing below may run before it: setup blocks the
+            // main thread, and a slow step here is a blank screen, not a
+            // loading screen.
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+            }
+
+            // Set up system tray with worktree menu (placeholder now, filled
+            // in off the main thread)
             if let Err(e) = tray::setup_tray(app.handle()) {
                 log::error!("[tray] Failed to set up system tray: {}", e);
             }
@@ -87,11 +96,6 @@ pub fn run() {
 
             // Register global shortcuts
             setup_global_shortcuts(app.handle());
-
-            // Show main window (window-state plugin handles position restoration)
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-            }
 
             log::info!("Grove started successfully");
 

@@ -144,7 +144,9 @@ export const useWorktreeStore = defineStore('worktrees', () => {
       // holding a skeleton for the full CLI round trip.
       if (!isRepoLoaded(name)) {
         const snapshot = useOverviewStore().snapshots[name];
-        if (snapshot && Array.isArray(snapshot.worktrees) && snapshot.worktrees.length > 0) {
+        // An empty array is a valid snapshot (a repo with no worktrees) —
+        // painting it beats a skeleton and a foreground CLI round trip.
+        if (snapshot && Array.isArray(snapshot.worktrees)) {
           worktreeCache.value[name] = snapshot.worktrees;
           loadedRepos.value.add(name);
         }
