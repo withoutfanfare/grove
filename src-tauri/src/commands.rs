@@ -680,37 +680,33 @@ pub fn open_in_waypoint(worktree_id: String) -> Result<(), WtError> {
     let url = format!("waypoint://worktree?worktree_id={}", worktree_id);
 
     #[cfg(target_os = "macos")]
-    {
-        Command::new("open")
-            .arg(&url)
-            .status()
-            .map_err(|e| {
-                WtError::new("OPEN_FAILED", format!("Failed to open Waypoint: {}", e))
-            })?;
-
-        Ok(())
-    }
+    let status = Command::new("open").arg(&url).status();
 
     #[cfg(target_os = "windows")]
-    {
-        Command::new("cmd")
-            .args(["/C", "start", ""])
-            .arg(&url)
-            .status()
-            .map_err(|e| WtError::new("OPEN_FAILED", format!("Failed to open Waypoint: {}", e)))?;
-
-        Ok(())
-    }
+    let status = Command::new("cmd")
+        .args(["/C", "start", ""])
+        .arg(&url)
+        .status();
 
     #[cfg(target_os = "linux")]
-    {
-        Command::new("xdg-open")
-            .arg(&url)
-            .status()
-            .map_err(|e| WtError::new("OPEN_FAILED", format!("Failed to open Waypoint: {}", e)))?;
+    let status = Command::new("xdg-open").arg(&url).status();
 
-        Ok(())
+    let status =
+        status.map_err(|e| WtError::new("OPEN_FAILED", format!("Failed to open Waypoint: {}", e)))?;
+
+    // Without this, a machine with no Waypoint handler registered reports
+    // success and the frontend claims it opened something it did not.
+    if !status.success() {
+        return Err(WtError::new(
+            "OPEN_FAILED",
+            format!(
+                "Failed to open Waypoint ({}). Is Waypoint installed?",
+                status
+            ),
+        ));
     }
+
+    Ok(())
 }
 
 /// Open a path in the file manager
