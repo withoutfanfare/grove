@@ -4,6 +4,14 @@ All notable changes to Grove will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.1] - 6 August 2026
+
+### Fixed
+
+- **Selecting a repository with many worktrees no longer looks like a freeze** - Grove reads its worktree list from `grove ls`, which walked worktrees one at a time — each costing its own git calls plus, with the ledger on, three `way` processes. The wait therefore grew in step with the worktree count, and a repository with fourteen took 15–17s (around 30s from cold) before anything appeared. At that length it does not read as slowness, it reads as a hang. The bundled CLI now gathers that status concurrently, roughly halving it (measured 15.4–17.2s to 7.8–8.5s on the same repository). Repositories with a single worktree are unaffected. Tune or disable with `GROVE_STATUS_PARALLEL` (default 8; `1` restores the old serial walk)
+- **A hung `way` can no longer defeat its own timeout** - On timing out, the checkpoint call killed the process tree and then waited for its output-reader threads. That made the timeout conditional on every writer having died: where only the direct child can be killed, a surviving grandchild keeps the inherited pipe open, the readers block on it for ever, and the wait never returns — hanging the very call the timeout exists to bound. The readers are now detached, since that path discards their output anyway
+- **The `way` lookup test no longer mutates the process-wide `PATH`** - Rust tests share one process and run concurrently, so it changed `PATH` for every test running alongside it, and left it changed if it failed part-way; anything resolving a command by name could fail intermittently. Lookup now takes an explicit search path that the test supplies
+
 ## [0.3.0] - 6 August 2026
 
 ### Changed
