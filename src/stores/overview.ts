@@ -18,6 +18,12 @@ export interface RepoSnapshot {
   diskUsage?: RepoDiskUsage;
   /** Unix ms when the cheap tier last refreshed this repo */
   refreshedAt: number;
+  /**
+   * Unix ms when the expensive tier (health + disk usage) last ran.
+   * Persisted with the snapshot so a relaunch within the throttle window
+   * doesn't re-run seconds of health checks and disk walks per repository.
+   */
+  expensiveRefreshedAt?: number;
   /** Error message when the repo failed to load (stale data retained) */
   error?: string;
 }
@@ -96,8 +102,6 @@ export const useOverviewStore = defineStore('overview', () => {
   const snapshots = ref<Record<string, RepoSnapshot>>(loadSnapshots());
   // Cheap-tier refresh in flight (drives the "Refreshing…" indicator)
   const refreshing = ref(false);
-  // Unix ms of the last expensive-tier refresh per repo (in-memory only)
-  const lastExpensiveRefresh = ref<Record<string, number>>({});
 
   // Persist snapshots so the next launch paints instantly
   watch(snapshots, (snaps) => saveSnapshots(snaps), { deep: true });
@@ -227,6 +231,7 @@ export const useOverviewStore = defineStore('overview', () => {
       health: existing?.health,
       diskUsage: existing?.diskUsage,
       refreshedAt,
+      expensiveRefreshedAt: existing?.expensiveRefreshedAt,
       error: undefined,
     };
   }
@@ -240,6 +245,7 @@ export const useOverviewStore = defineStore('overview', () => {
       health: existing?.health,
       diskUsage: existing?.diskUsage,
       refreshedAt: existing?.refreshedAt ?? refreshedAt,
+      expensiveRefreshedAt: existing?.expensiveRefreshedAt,
       error,
     };
   }
@@ -262,7 +268,6 @@ export const useOverviewStore = defineStore('overview', () => {
     for (const repo of Object.keys(snapshots.value)) {
       if (!active.has(repo)) {
         delete snapshots.value[repo];
-        delete lastExpensiveRefresh.value[repo];
       }
     }
   }
@@ -271,20 +276,22 @@ export const useOverviewStore = defineStore('overview', () => {
     refreshing.value = value;
   }
 
-  /** Whether the expensive tier may run for this repo (5-minute throttle) */
+  /** Whether the expensive tier may run for this repo (5-minute throttle,
+   * persisted with the snapshot so it survives an app relaunch) */
   function shouldRefreshExpensive(repo: string, now: number): boolean {
-    const last = lastExpensiveRefresh.value[repo];
+    const last = snapshots.value[repo]?.expensiveRefreshedAt;
     return last === undefined || now - last >= EXPENSIVE_REFRESH_INTERVAL_MS;
   }
 
   function markExpensiveRefreshed(repo: string, now: number) {
-    lastExpensiveRefresh.value[repo] = now;
+    const existing = snapshots.value[repo];
+    if (!existing) return;
+    snapshots.value[repo] = { ...existing, expensiveRefreshedAt: now };
   }
 
   function reset() {
     snapshots.value = {};
     refreshing.value = false;
-    lastExpensiveRefresh.value = {};
   }
 
   return {

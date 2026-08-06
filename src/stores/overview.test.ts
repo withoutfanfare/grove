@@ -292,6 +292,9 @@ describe('useOverviewStore', () => {
 
     it('blocks refresh within the 5-minute window', () => {
       const store = useOverviewStore()
+      // The mark lives on the snapshot (persisted), which the cheap tier
+      // always creates before the expensive tier runs.
+      store.setWorktreeSnapshot('demo', [], 1_000_000)
       store.markExpensiveRefreshed('demo', 1_000_000)
 
       expect(store.shouldRefreshExpensive('demo', 1_000_000 + EXPENSIVE_REFRESH_INTERVAL_MS - 1)).toBe(false)
@@ -299,9 +302,21 @@ describe('useOverviewStore', () => {
 
     it('allows refresh after the window elapses', () => {
       const store = useOverviewStore()
+      store.setWorktreeSnapshot('demo', [], 1_000_000)
       store.markExpensiveRefreshed('demo', 1_000_000)
 
       expect(store.shouldRefreshExpensive('demo', 1_000_000 + EXPENSIVE_REFRESH_INTERVAL_MS)).toBe(true)
+    })
+
+    it('keeps the throttle mark across a cheap-tier refresh', () => {
+      const store = useOverviewStore()
+      store.setWorktreeSnapshot('demo', [], 1_000_000)
+      store.markExpensiveRefreshed('demo', 1_000_000)
+
+      // A later cheap-tier refresh must not wipe the persisted mark
+      store.setWorktreeSnapshot('demo', [], 1_000_100)
+
+      expect(store.shouldRefreshExpensive('demo', 1_000_000 + EXPENSIVE_REFRESH_INTERVAL_MS - 1)).toBe(false)
     })
   })
 

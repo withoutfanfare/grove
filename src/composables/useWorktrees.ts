@@ -144,7 +144,9 @@ export function useWorktrees() {
     store.clearError();
 
     try {
-      // Try getWorktreeStatus first for richer information
+      // get_worktree_status and list_worktrees run the identical CLI command,
+      // so there is no fallback here: retrying the same command after a
+      // failure only doubled the error-path latency.
       try {
         const worktrees = await wt.getWorktreeStatus(repoName);
 
@@ -162,41 +164,17 @@ export function useWorktrees() {
         }
 
         store.setWorktrees(worktrees);
-        return;
-      } catch (primaryError) {
-        console.warn('getWorktreeStatus failed, falling back to listWorktrees:', primaryError);
-
-        // Fall back to list_worktrees if status fails
-        try {
-          const worktrees = await wt.listWorktrees(repoName);
-
-          // C2 Fix: Validate fetch ID before updating store
-          if (expectedFetchId.get(repoName) !== fetchId) {
-            console.debug(`[useWorktrees] Stale fallback fetch response for ${repoName}, discarding`);
-            return;
-          }
-
-          if (store.selectedRepoName !== repoName) {
-            console.debug(`[useWorktrees] Repo changed during fallback fetch, discarding response for ${repoName}`);
-            return;
-          }
-
-          store.setWorktrees(worktrees);
-        } catch (fallbackError) {
-          // C2 Fix: Only set error if this is still the active fetch.
-          // Silent revalidation must never surface an error banner over the
-          // usable cached list (plan item 4 risk note) — a transient background
-          // fetch failure leaves the cached worktrees untouched and unannounced.
-          if (!opts?.silent && expectedFetchId.get(repoName) === fetchId && store.selectedRepoName === repoName) {
-            // Combine both errors for better debugging
-            const primaryErr = wt.toWtError(primaryError);
-            const fallbackErr = wt.toWtError(fallbackError);
-
-            store.setError({
-              code: 'FETCH_FAILED',
-              message: `Failed to fetch worktrees: ${primaryErr.message}. Fallback also failed: ${fallbackErr.message}`,
-            });
-          }
+      } catch (error) {
+        // C2 Fix: Only set error if this is still the active fetch.
+        // Silent revalidation must never surface an error banner over the
+        // usable cached list (plan item 4 risk note) — a transient background
+        // fetch failure leaves the cached worktrees untouched and unannounced.
+        if (!opts?.silent && expectedFetchId.get(repoName) === fetchId && store.selectedRepoName === repoName) {
+          const wtError = wt.toWtError(error);
+          store.setError({
+            code: 'FETCH_FAILED',
+            message: `Failed to fetch worktrees: ${wtError.message}`,
+          });
         }
       }
     } finally {

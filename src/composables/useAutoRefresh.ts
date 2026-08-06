@@ -212,7 +212,9 @@ export function useAutoRefresh(): UseAutoRefreshReturn {
     isRefreshing.value = true;
 
     try {
-      // Try getWorktreeStatus first for richer information
+      // get_worktree_status and list_worktrees run the identical CLI command,
+      // so there is no fallback here — a failed refresh just logs and waits
+      // for the next tick (no error spam during background refreshes).
       try {
         const worktrees = await wt.getWorktreeStatus(repoName);
 
@@ -224,26 +226,8 @@ export function useAutoRefresh(): UseAutoRefreshReturn {
 
         store.setWorktrees(worktrees);
         lastRefreshTime.value = Date.now();
-      } catch (primaryError) {
-        console.warn('[useAutoRefresh] getWorktreeStatus failed, falling back to listWorktrees:', primaryError);
-
-        // Fall back to list_worktrees if status fails
-        try {
-          const worktrees = await wt.listWorktrees(repoName);
-
-          // Guard against stale fallback responses
-          if (store.selectedRepoName !== repoName) {
-            console.debug(`[useAutoRefresh] Stale fallback response for ${repoName}, discarding`);
-            return;
-          }
-
-          store.setWorktrees(worktrees);
-          lastRefreshTime.value = Date.now();
-        } catch (fallbackError) {
-          // Log but don't set error for auto-refresh failures
-          // We don't want to spam the user with errors during background refreshes
-          console.warn('[useAutoRefresh] Fallback also failed:', fallbackError);
-        }
+      } catch (error) {
+        console.warn('[useAutoRefresh] Refresh failed:', error);
       }
     } finally {
       // H12 Fix: Ensure isRefreshing is always reset in finally block

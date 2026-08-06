@@ -123,9 +123,23 @@ fn build_tray_menu(app: &AppHandle) -> Result<Menu<Wry>, Box<dyn std::error::Err
                 .build(app)?;
             menu_builder = menu_builder.item(&no_repos);
         } else {
-            // Build submenu for each repository
-            for repo in repos {
-                let submenu = build_repo_submenu(app, &repo)?;
+            // Fetch every repository's worktrees concurrently (spawn all, then
+            // join in order): each fetch is its own sidecar run, and doing them
+            // serially made the rebuild cost the sum of all repositories.
+            let fetch_handles: Vec<_> = repos
+                .iter()
+                .map(|repo| {
+                    let app_clone = app.clone();
+                    let repo_name = repo.name.clone();
+                    std::thread::spawn(move || wt::get_worktrees_fast(&app_clone, &repo_name))
+                })
+                .collect();
+
+            for (repo, handle) in repos.iter().zip(fetch_handles) {
+                let worktrees_result = handle
+                    .join()
+                    .map_err(|_| "Failed to fetch worktrees on background thread")?;
+                let submenu = build_repo_submenu(app, repo, worktrees_result)?;
                 menu_builder = menu_builder.item(&submenu);
             }
         }
@@ -166,19 +180,13 @@ fn append_standard_items<'a>(
         .item(&quit_item))
 }
 
-/// Build a submenu for a single repository containing its worktrees.
+/// Build a submenu for a single repository from its already-fetched worktrees.
 fn build_repo_submenu(
     app: &AppHandle,
     repo: &Repository,
+    worktrees_result: crate::types::WtResult<Vec<Worktree>>,
 ) -> Result<tauri::menu::Submenu<Wry>, Box<dyn std::error::Error>> {
     let mut submenu_builder = SubmenuBuilder::new(app, &repo.name);
-
-    // Fetch worktrees for this repo
-    let app_clone = app.clone();
-    let repo_name = repo.name.clone();
-    let worktrees_result = std::thread::spawn(move || wt::get_worktrees(&app_clone, &repo_name))
-        .join()
-        .map_err(|_| "Failed to fetch worktrees on background thread")?;
 
     if let Ok(worktrees) = worktrees_result {
         if worktrees.is_empty() {

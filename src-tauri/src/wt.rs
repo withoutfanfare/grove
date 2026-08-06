@@ -409,16 +409,30 @@ fn validate_repo_name(name: &str) -> WtResult<()> {
 const SIDECAR_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
 
 fn execute_wt(app: &tauri::AppHandle, args: &[&str]) -> WtResult<String> {
+    execute_wt_with_env(app, args, &[])
+}
+
+/// As `execute_wt`, but with extra environment variables on the sidecar —
+/// the seam that lets internal consumers request a cheaper listing (see
+/// `get_worktrees_fast`) without touching the CLI's defaults.
+fn execute_wt_with_env(
+    app: &tauri::AppHandle,
+    args: &[&str],
+    envs: &[(&str, &str)],
+) -> WtResult<String> {
     log::debug!("Executing sidecar: grove {}", args.join(" "));
 
     // Get the sidecar command for the bundled grove binary
-    let sidecar = app.shell().sidecar("grove").map_err(|e| {
+    let mut sidecar = app.shell().sidecar("grove").map_err(|e| {
         log::error!("Failed to initialise grove sidecar: {}", e);
         WtError::new(
             "SIDECAR_ERROR",
             format!("Failed to initialise grove sidecar: {}", e),
         )
     })?;
+    for (key, value) in envs {
+        sidecar = sidecar.env(key, value);
+    }
 
     // Execute with timeout to prevent indefinite hangs
     // Use a scoped thread to avoid "Cannot start a runtime from within a runtime"
@@ -844,6 +858,21 @@ pub fn get_worktrees(app: &tauri::AppHandle, repo_name: &str) -> WtResult<Vec<Wo
 pub fn get_worktree_status(app: &tauri::AppHandle, repo_name: &str) -> WtResult<Vec<Worktree>> {
     // Status information is included in ls --json output
     get_worktrees(app, repo_name)
+}
+
+/// Get worktrees WITHOUT the ledger overlay — for internal consumers (the
+/// tray menu, disk usage) that render no ledger fields. The overlay is the
+/// bulk of the listing cost (three `way` processes per worktree, roughly 75%
+/// of the wall time on a large repository), so consumers that only need
+/// branch/path/git status must not pay for it.
+pub fn get_worktrees_fast(app: &tauri::AppHandle, repo_name: &str) -> WtResult<Vec<Worktree>> {
+    validate_repo_name(repo_name)?;
+    let output = execute_wt_with_env(
+        app,
+        &["ls", repo_name, "--json"],
+        &[("LEDGER_INTEGRATION", "off")],
+    )?;
+    extract_json_array(&output)
 }
 
 /// Check if the grove CLI is available
