@@ -475,6 +475,7 @@ async function handleOpenAll() {
           <SBadge v-if="diffStats && diffStats.files_changed > 0"
             variant="default"
             class="font-mono compact-badge"
+            data-testid="diff-stats"
             :title="diffStats.file_list.join('\n')">
             <span>{{ diffStats.files_changed }} file{{ diffStats.files_changed === 1 ? '' : 's' }}</span>,&#32;
             <span class="text-success">+{{ diffStats.lines_added }}</span><span class="text-text-muted">/</span><span class="text-danger">-{{ diffStats.lines_removed }}</span>

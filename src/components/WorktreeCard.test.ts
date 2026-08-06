@@ -55,8 +55,12 @@ describe('WorktreeCard diff-stats badge', () => {
     const wrapper = mountCard()
     await flushPromises()
 
-    const added = wrapper.find('span.text-success')
-    const removed = wrapper.find('span.text-danger')
+    // Scope to the diff-stats badge: other badges on the card (e.g. "Synced")
+    // also render success-coloured spans, and an unscoped find takes whichever
+    // comes first in the DOM.
+    const badge = wrapper.find('[data-testid="diff-stats"]')
+    const added = badge.find('span.text-success')
+    const removed = badge.find('span.text-danger')
 
     expect(added.exists()).toBe(true)
     expect(added.text()).toBe('+120')
