@@ -4,7 +4,10 @@ All notable changes to Grove will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.2.0] - 6 August 2026
+
+> First entry to carry the app's real version. Earlier headings are calendar
+> months from before the version was tracked; they are left as they were.
 
 ### Added
 
