@@ -40,7 +40,7 @@ Those three names are the *service's* vocabulary and never reach a human. Grove 
 | `lease_available: true`, `lease_held` absent, `lease: {…}` | Somebody claimed it; the ledger did not say whether the claim still stands | Nothing on the row; the panel names the holder and says the state was not stated |
 | `lease_available: false` | The lease could not be read | Nothing on the row; the panel says "Unknown" and why |
 
-`lease_held` is optional, so the third row matters: an unstated value is not evidence the claim lapsed, and calling it expired would invent a fact the ledger did not give.
+`lease_held` is optional, so the row where it is **absent** matters: an unstated value is not evidence the claim lapsed, and calling it expired would invent a fact the ledger did not give.
 
 Risk-unknown gets a badge and lease-unknown does not, and the asymmetry is deliberate: the **absence** of a risk badge is itself a claim ("nothing at risk"), so an unknown there has to speak up. The absence of a lease badge claims nothing. Both are stated plainly in the details panel, and a risk that could not be established also joins the overview's "Drifted or at risk" group — the one place that aggregates safety must not quietly count an unknown as fine.
 
