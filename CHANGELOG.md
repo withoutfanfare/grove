@@ -4,6 +4,16 @@ All notable changes to Grove will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.3] - 6 August 2026
+
+### Fixed
+
+- **Six review findings in the Waypoint seam and the delete dialogue** - A missing worktree directory failed the same way a missing binary does, so users were wrongly told to install Waypoint; the directory is now checked first. Locating the binary no longer runs an untimed `way --version` that a hung `way` on `PATH` could wedge. Delete and checkpoint can no longer run concurrently in a way that conflicts. Documentation now distinguishes an *unstated* claim from an *expired* one
+
+### Changed
+
+- **`@stuntrocket/ui` upgraded to 0.9.3, and Grove's local token patch removed** - 0.9.3 carries the `tokens.css` ordering fix at source, so Grove no longer restates the dark-mode borders, hover surfaces, selection, scrollbars, status subtles and shadows in its own `.dark` block. No visual change — the resolved colours are identical either way; the fix simply now lives in the design system rather than being worked around downstream. The upgrade adds a success-coloured span to the status badge, which sits before the diff-stats badge in the DOM, so `WorktreeCard`'s unscoped `find('span.text-success')` began matching "Synced" instead of "+120"; the rendered output was never wrong, and the assertion is now scoped to the diff-stats badge by `data-testid`
+
 ## [0.2.2] - 6 August 2026
 
 ### Fixed
