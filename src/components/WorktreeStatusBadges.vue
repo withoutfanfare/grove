@@ -13,10 +13,14 @@
  * - AGENT WORKING HERE: an agent session holds a live lease on this worktree.
  *
  * Each badge has a tooltip explaining its meaning.
+ *
+ * Every risk word here comes from `riskVocabulary`, never from the raw level
+ * name — see that module for why.
  */
 import { computed } from 'vue'
 import { SBadge } from '@stuntrocket/ui'
 import type { LedgerOverlay } from '../types/wt'
+import { LEDGER_UNKNOWN_LABEL, RISK_UNKNOWN_LABEL, riskWords } from '../utils/riskVocabulary'
 
 const props = defineProps<{
   /** Whether the branch has been merged into the base branch */
@@ -45,6 +49,15 @@ const ledgerRisk = computed(() =>
 // render unknown as safe.
 const riskUnknown = computed(
   () => props.ledger?.available === true && props.ledger.risk_available !== true
+)
+// The ledger answered, ran the risk check, and found nothing. Stated as "Clear"
+// rather than left blank for the same reason as the badge above: an empty row
+// is read as a verdict, so the verdict has to be the one the ledger gave.
+const showClear = computed(
+  () =>
+    props.ledger?.available === true &&
+    props.ledger.risk_available === true &&
+    !ledgerRisk.value
 )
 const riskUnknownTitle = computed(() => {
   const base =
@@ -86,40 +99,10 @@ const ledgerUnknownTitle = computed(() => {
   const reason = props.ledger?.unavailable_reason
   return reason ? `${base} ${reason}` : base
 })
-const riskBadgeText = computed(() => {
-  switch (ledgerRisk.value) {
-    case 'critical':
-      return 'Risk: critical'
-    case 'warning':
-      return 'Risk: warning'
-    case 'informational':
-      return 'Risk: note'
-    default:
-      return ''
-  }
-})
-const riskBadgeVariant = computed(() => {
-  switch (ledgerRisk.value) {
-    case 'critical':
-      return 'error'
-    case 'warning':
-      return 'warning'
-    default:
-      return 'default'
-  }
-})
-const riskBadgeTitle = computed(() => {
-  switch (ledgerRisk.value) {
-    case 'critical':
-      return 'The worktree ledger reports a critical risk. Open the details panel for the remedy.'
-    case 'warning':
-      return 'The worktree ledger reports a warning. Open the details panel for the remedy.'
-    case 'informational':
-      return 'The worktree ledger has an informational note for this worktree.'
-    default:
-      return ''
-  }
-})
+// One lookup drives the word, the colour and the tooltip, so no caller can pick
+// a word the vocabulary does not own.
+const riskBadge = computed(() => riskWords(ledgerRisk.value))
+const clearBadge = riskWords(null)
 const hasAnyBadge = computed(
   () =>
     showMerged.value ||
@@ -128,6 +111,7 @@ const hasAnyBadge = computed(
     showMismatch.value ||
     ledgerUnknown.value ||
     !!ledgerRisk.value ||
+    showClear.value ||
     riskUnknown.value ||
     !!activeLease.value ||
     showDrift.value ||
@@ -274,17 +258,17 @@ const hasAnyBadge = computed(
           d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
         />
       </svg>
-      Ledger unknown
+      {{ LEDGER_UNKNOWN_LABEL }}
     </SBadge>
 
     <!-- LEDGER RISK badge -->
     <SBadge
       v-if="ledgerRisk"
-      :variant="riskBadgeVariant"
+      :variant="riskBadge.variant"
       class="!border-transparent gap-1 compact-badge"
-      :title="riskBadgeTitle"
+      :title="riskBadge.description"
       role="status"
-      :aria-label="`Ledger risk: ${ledgerRisk}`"
+      :aria-label="`Ledger risk: ${riskBadge.label}`"
     >
       <!-- Warning triangle icon -->
       <svg
@@ -301,7 +285,34 @@ const hasAnyBadge = computed(
           d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
         />
       </svg>
-      {{ riskBadgeText }}
+      {{ riskBadge.label }}
+    </SBadge>
+
+    <!-- LEDGER RISK CLEAR badge -->
+    <SBadge
+      v-if="showClear"
+      :variant="clearBadge.variant"
+      class="!border-transparent gap-1 compact-badge"
+      :title="clearBadge.description"
+      role="status"
+      :aria-label="`Ledger risk: ${clearBadge.label}`"
+    >
+      <!-- Tick icon -->
+      <svg
+        class="w-3 h-3"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M5 13l4 4L19 7"
+        />
+      </svg>
+      {{ clearBadge.label }}
     </SBadge>
 
     <!-- LEDGER RISK UNKNOWN badge -->
@@ -328,7 +339,7 @@ const hasAnyBadge = computed(
           d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
         />
       </svg>
-      Risk unknown
+      {{ RISK_UNKNOWN_LABEL }}
     </SBadge>
 
     <!-- LEDGER ACTIVE LEASE badge -->

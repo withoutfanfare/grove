@@ -44,9 +44,17 @@ fn way_binary() -> Option<PathBuf> {
 /// timeout-protected checkpoint call begins, so a hung binary on `PATH` could
 /// wedge the whole action despite that protection.
 fn way_on_path() -> Option<PathBuf> {
-    let path = std::env::var_os("PATH")?;
+    way_in_search_path(&std::env::var_os("PATH")?)
+}
+
+/// As `way_on_path`, but over an explicit search path — the seam the lookup
+/// test uses. Tests run concurrently in one process, so a test that set the
+/// real `PATH` would change it for every other test at the same time (and
+/// leave it changed if it panicked before restoring it), breaking any that
+/// resolve a command by name.
+fn way_in_search_path(search_path: &std::ffi::OsStr) -> Option<PathBuf> {
     let names: &[&str] = if cfg!(windows) { &["way.exe", "way"] } else { &["way"] };
-    std::env::split_paths(&path)
+    std::env::split_paths(search_path)
         .flat_map(|dir| names.iter().map(move |name| dir.join(name)))
         .find(|p| is_executable_file(p))
 }
@@ -228,12 +236,19 @@ fn checkpoint_with_binary_and_limits(
             Ok(None) => {
                 if Instant::now() >= deadline {
                     // Take down the whole group, so nothing `way` spawned is
-                    // left holding the pipes. With every writer gone the
-                    // readers finish, so joining them here is prompt and
-                    // leaves no orphan threads behind.
+                    // left holding the pipes.
+                    //
+                    // The reader threads are then DETACHED, not joined. Joining
+                    // here would make the timeout depend on every writer having
+                    // died: on Unix the process-group kill guarantees that, but
+                    // where `kill_process_tree` can only reach the direct child
+                    // a surviving grandchild keeps its inherited pipe end open,
+                    // the readers block on it forever, and the join hangs — the
+                    // one thing this timeout exists to prevent. The output is
+                    // discarded on this path anyway, so there is nothing to wait
+                    // for. A detached reader exits on its own once the pipe
+                    // finally closes.
                     kill_process_tree(&mut child);
-                    let _ = stdout_handle.join();
-                    let _ = stderr_handle.join();
                     return Err(WtError::new(
                         "WAY_TIMEOUT",
                         format!(
@@ -245,9 +260,10 @@ fn checkpoint_with_binary_and_limits(
                 thread::sleep(Duration::from_millis(20));
             }
             Err(e) => {
+                // Detached rather than joined, for the same reason as the
+                // timeout path above: this branch discards the output, so it
+                // must not be able to block on a pipe a survivor still holds.
                 kill_process_tree(&mut child);
-                let _ = stdout_handle.join();
-                let _ = stderr_handle.join();
                 return Err(WtError::new(
                     "IO_ERROR",
                     format!("Failed to wait for way: {e}"),
@@ -422,15 +438,12 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
 
-        let original = std::env::var_os("PATH");
-        std::env::set_var("PATH", dir.path());
+        // Search an explicit path rather than setting the real `PATH`: these
+        // tests share one process and run concurrently, so mutating it here
+        // would break any test resolving a command by name at the same moment.
         let started = Instant::now();
-        let found = way_on_path();
+        let found = way_in_search_path(dir.path().as_os_str());
         let elapsed = started.elapsed();
-        match original {
-            Some(value) => std::env::set_var("PATH", value),
-            None => std::env::remove_var("PATH"),
-        }
 
         assert_eq!(found.as_deref(), Some(bin.as_path()));
         assert!(

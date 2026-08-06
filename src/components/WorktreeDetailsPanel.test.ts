@@ -233,7 +233,10 @@ describe('WorktreeDetailsPanel ledger section', () => {
     })
 
     const text = wrapper.text()
-    expect(text).toContain('critical')
+    // "At risk", not "critical": the raw level is the service's word, and
+    // Waypoint already says this to a human — see utils/riskVocabulary.
+    expect(text).toContain('At risk')
+    expect(text).not.toContain('critical')
     expect(text).toContain('blocks removal')
     // Overriding stays a recorded command-line act. No control here may offer
     // it, and no control here may remove the worktree either.
@@ -287,7 +290,7 @@ describe('WorktreeDetailsPanel ledger section', () => {
     })
 
     const text = wrapper.text()
-    expect(text).toContain('None found by the ledger')
+    expect(text).toContain('Clear — the ledger found nothing')
     expect(text).not.toContain('the risk check could not answer')
     wrapper.unmount()
   })

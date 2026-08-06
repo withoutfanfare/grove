@@ -9,6 +9,7 @@ import { ref, watch, computed } from 'vue'
 import type { Worktree, Commit, FileChange, HealthGrade } from '../types'
 import { useWt, useToast, useRelativeTime } from '../composables'
 import { copyPath, copyUrl } from '../utils/clipboard'
+import { riskWords } from '../utils/riskVocabulary'
 import CommitList from './CommitList.vue'
 import FileChangesList from './FileChangesList.vue'
 import GradeBadge from './GradeBadge.vue'
@@ -211,14 +212,15 @@ const ledgerRiskLabel = computed(() => {
       ? `Unknown — the risk check could not answer: ${reason}`
       : 'Unknown — the risk check could not answer'
   }
+  const words = riskWords(ledger.risk)
   if (ledger.risk == null) {
-    return 'None found by the ledger'
+    return `${words.label} — the ledger found nothing`
   }
   const blocked =
     ledger.removal_blocked === true
       ? ' — the ledger blocks removal until this is resolved'
       : ''
-  return `${ledger.risk}${blocked} — run \`way worktree removal-check\` here for the remedy`
+  return `${words.label}${blocked} — run \`way worktree removal-check\` here for the remedy`
 })
 
 // The lease answers "is an agent working in this worktree?". Three distinct

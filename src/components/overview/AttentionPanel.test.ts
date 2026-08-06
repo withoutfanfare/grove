@@ -94,7 +94,7 @@ describe('AttentionPanel ledger items', () => {
 
     expect(text).toContain('Drifted or at risk')
     expect(text).toContain('Drifted since last checkpoint')
-    expect(text).toContain('Critical ledger risk')
+    expect(text).toContain('At risk — the worktree ledger says so')
     wrapper.unmount()
   })
 
