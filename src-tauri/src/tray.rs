@@ -56,7 +56,11 @@ lazy_static::lazy_static! {
 /// - Show Window option
 /// - Quit option
 pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    let menu = build_tray_menu(app)?;
+    // Start with a placeholder menu: the real one needs `grove ls` for every
+    // repository (seconds each), and setup blocks the main thread before the
+    // window is allowed to show. The full menu is filled in just below, off
+    // the main thread, via the same path the frontend's refresh already uses.
+    let menu = build_placeholder_menu(app)?;
 
     // Load dedicated tray icon (monochromatic for template mode)
     let icon = Image::from_bytes(TRAY_ICON_BYTES)?;
@@ -77,9 +81,27 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         Err(e) => { *e.into_inner() = Some(tray.id().0.clone()); }
     }
 
+    // Populate the real menu in the background so startup never waits on it
+    let app_handle = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        refresh_tray_menu(&app_handle);
+    });
+
     log::info!("System tray set up successfully");
 
     Ok(())
+}
+
+/// Build the instant startup menu: a disabled loading row plus the standard
+/// items, so the tray is usable while the worktree data is still being fetched.
+fn build_placeholder_menu(app: &AppHandle) -> Result<Menu<Wry>, Box<dyn std::error::Error>> {
+    let mut menu_builder = MenuBuilder::new(app);
+    let loading = MenuItemBuilder::with_id("loading", "Loading worktrees…")
+        .enabled(false)
+        .build(app)?;
+    menu_builder = menu_builder.item(&loading);
+    menu_builder = append_standard_items(menu_builder, app)?;
+    Ok(menu_builder.build()?)
 }
 
 /// Build the tray menu with worktrees grouped by repository.
@@ -115,7 +137,17 @@ fn build_tray_menu(app: &AppHandle) -> Result<Menu<Wry>, Box<dyn std::error::Err
         menu_builder = menu_builder.item(&error_item);
     }
 
-    // Add separator and standard items
+    menu_builder = append_standard_items(menu_builder, app)?;
+
+    Ok(menu_builder.build()?)
+}
+
+/// Append the separator and the Refresh / Show Window / Quit items shared by
+/// the placeholder and the full menu.
+fn append_standard_items<'a>(
+    menu_builder: MenuBuilder<'a, Wry, AppHandle>,
+    app: &AppHandle,
+) -> Result<MenuBuilder<'a, Wry, AppHandle>, Box<dyn std::error::Error>> {
     let separator = PredefinedMenuItem::separator(app)?;
     let refresh_item = MenuItemBuilder::with_id("refresh", "Refresh")
         .accelerator("CmdOrCtrl+R")
@@ -127,13 +159,11 @@ fn build_tray_menu(app: &AppHandle) -> Result<Menu<Wry>, Box<dyn std::error::Err
         .accelerator("CmdOrCtrl+Q")
         .build(app)?;
 
-    menu_builder = menu_builder
+    Ok(menu_builder
         .item(&separator)
         .item(&refresh_item)
         .item(&show_item)
-        .item(&quit_item);
-
-    Ok(menu_builder.build()?)
+        .item(&quit_item))
 }
 
 /// Build a submenu for a single repository containing its worktrees.
