@@ -4,6 +4,17 @@ All notable changes to Grove will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0] - 6 August 2026
+
+### Changed
+
+- **Grove now uses Waypoint's words for a ledger risk, not the service's** - A worktree read as `Risk: critical`, `Risk: warning` or `Risk: note`, while Waypoint — reading the same `way worktree removal-check` — said "At risk", "Needs a look" and "Worth knowing". Two apps answering the same question in two vocabularies is how a reader learns to trust neither, so Grove has adopted Waypoint's, which are plain English and already shipped. The badge, its tooltip, its screen-reader label, the details panel's Risk row and the overview's attention list all now say the same words. The raw level names stay where they belong — on the wire, and in the comparisons that decide what needs attention
+
+### Added
+
+- **A "Clear" badge for a worktree the ledger checked and cleared** - Previously a risk-free worktree showed no risk badge at all, which is a verdict delivered by silence: the reader cannot tell "the ledger checked and found nothing" from "nobody asked". Grove now says "Clear" when the check answered and found nothing, keeping "Risk unknown" for when it could not answer. A null risk still never reads as safe
+- **A guard test that fails if a raw level name reaches user-facing text** - `src/components/guards.test.ts` mounts the three components that show a risk and asserts no rendered text, tooltip or `aria-label` contains `critical`, `warning` or `informational`, and that the words still match Waypoint's. Grove and Waypoint drifted apart on exactly this wording within one slice; the guard is what makes the next drift fail a test rather than reach a user. Waypoint carries the matching guard
+
 ## [0.2.3] - 6 August 2026
 
 ### Fixed

@@ -1,6 +1,6 @@
 [package]
 name = "grove-app"
-version = "0.2.3"
+version = "0.3.0"
 description = "A Tauri App"
 authors = ["Danny Harding"]
 edition = "2021"
