@@ -1038,7 +1038,7 @@ async function handleTitlebarDrag(e: MouseEvent) {
         <main class="flex flex-col min-w-0 h-full bg-surface-base overflow-y-auto relative">
           <!-- Header (Sticky & Glassmorphic) -->
           <header class="sticky top-0 border-b border-white/5"
-            style="background-color: rgba(3, 7, 18, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); z-index: 100;">
+            style="background-color: color-mix(in srgb, var(--color-surface-raised) 92%, transparent); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); z-index: 100;">
             <div class="px-5 py-2.5 pt-7 flex items-center gap-3">
               <!-- Left: repo info -->
               <div class="flex items-center gap-2.5 flex-shrink-0 min-w-0">
@@ -1187,8 +1187,7 @@ async function handleTitlebarDrag(e: MouseEvent) {
 
           <!-- Filter/sort toolbar (visible when worktrees exist) -->
           <div v-if="selectedRepo && worktrees.length > 0"
-            class="worktree-toolbar"
-            style="background-color: rgba(3, 7, 18, 0.8);">
+            class="worktree-toolbar">
             <!-- Select all (filtered, selectable) -->
             <button
               type="button"
@@ -1509,6 +1508,7 @@ button, a, input, select, textarea,
   gap: 12px;
   min-height: 42px;
   padding: 6px 20px;
+  background-color: color-mix(in srgb, var(--color-surface-raised) 80%, transparent);
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
