@@ -334,6 +334,35 @@ describe('WorktreeDetailsPanel ledger section', () => {
     expired.unmount()
   })
 
+  it('does not call a lease expired when the ledger left lease_held unstated', () => {
+    const holder = {
+      tool: 'claude', session_id: 's1', machine_id: 'machine_x',
+      acquired_at: '2026-08-06T08:00:00Z', last_heartbeat_at: '2026-08-06T08:20:00Z',
+      expires_at: '2026-08-06T08:50:00Z',
+    }
+
+    const wrapper = mount(WorktreeDetailsPanel, {
+      props: {
+        worktree: {
+          ...worktreeFixture,
+          ledger: {
+            available: true, checkpoint_at: '2026-08-04T12:00:00Z',
+            lease_available: true, lease_held: null, lease: holder,
+          },
+        },
+        repoName: 'scooda',
+        isExpanded: false,
+      },
+    })
+
+    const text = wrapper.text()
+    expect(text).toContain('claude session s1 on machine_x')
+    expect(text).toContain('did not say whether the claim still stands')
+    expect(text).not.toContain('claim expired at')
+    expect(text).not.toContain('holds it until')
+    wrapper.unmount()
+  })
+
   it('says the lease is unknown rather than "no agent has claimed this worktree"', () => {
     const wrapper = mount(WorktreeDetailsPanel, {
       props: {

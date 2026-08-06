@@ -35,7 +35,10 @@ Grove renders `risk` (`"critical" | "warning" | "informational"`) but never deri
 | `lease_available: true`, `lease: null` | Checked; nobody has claimed it | Nothing on the row |
 | `lease_available: true`, `lease_held: false`, `lease: {…}` | The claim **expired** | Nothing on the row; the panel names the last holder |
 | `lease_available: true`, `lease_held: true` | An agent is working here **now** | A **"<tool> working here"** badge |
+| `lease_available: true`, `lease_held` absent, `lease: {…}` | Somebody claimed it; the ledger did not say whether the claim still stands | Nothing on the row; the panel names the holder and says the state was not stated |
 | `lease_available: false` | The lease could not be read | Nothing on the row; the panel says "Unknown" and why |
+
+`lease_held` is optional, so the third row matters: an unstated value is not evidence the claim lapsed, and calling it expired would invent a fact the ledger did not give.
 
 Risk-unknown gets a badge and lease-unknown does not, and the asymmetry is deliberate: the **absence** of a risk badge is itself a claim ("nothing at risk"), so an unknown there has to speak up. The absence of a lease badge claims nothing. Both are stated plainly in the details panel, and a risk that could not be established also joins the overview's "Drifted or at risk" group — the one place that aggregates safety must not quietly count an unknown as fine.
 
@@ -66,6 +69,8 @@ The handover is read-only in both directions: Waypoint *displays* the record and
 ## The no-bypass rule
 
 No control in Grove may acknowledge or bypass the ledger's removal gate. There is no override button, and a force-remove flag (`-f`) is never treated as ledger consent. When `way` blocks a removal, Grove shows the blocking message and remedies exactly as `way` returned them, with a "record a checkpoint first" action that shells out to `way` — it does not let the user skip the check from the UI.
+
+While that checkpoint is running, the delete dialogue's Delete, Cancel and checkpoint buttons are all disabled and their handlers refuse to act: the checkpoint writes to the same ledger and worktree a removal would tear down, so the two must never overlap, and closing the dialogue mid-write would leave it running against a worktree the user could then delete from the list behind it.
 
 ## Sidecar and binary dependencies
 

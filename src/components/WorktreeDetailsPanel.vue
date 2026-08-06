@@ -234,9 +234,15 @@ const ledgerLeaseLabel = computed(() => {
     return 'No agent has claimed this worktree'
   }
   const holder = `${lease.tool} session ${lease.session_id} on ${lease.machine_id}`
-  return ledger.lease_held === true
-    ? `${holder} — holds it until ${lease.expires_at}`
-    : `${holder} — claim expired at ${lease.expires_at}`
+  // `lease_held` is optional: unstated means the ledger did not say whether the
+  // claim still stands, which is not the same as it having expired.
+  if (ledger.lease_held === true) {
+    return `${holder} — holds it until ${lease.expires_at}`
+  }
+  if (ledger.lease_held === false) {
+    return `${holder} — claim expired at ${lease.expires_at}`
+  }
+  return `${holder} — the ledger did not say whether the claim still stands (it was due to end at ${lease.expires_at})`
 })
 </script>
 
