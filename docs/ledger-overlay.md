@@ -4,17 +4,42 @@ The Worktree Ledger overlay surfaces risk, checkpoint and next-action informatio
 
 ## Overlay contract
 
-The overlay is an optional, additive field on each `grove ls --json` row, produced by `grove-cli/lib/13-ledger.sh`'s `ledger_overlay_json()` (which shells out to `way worktree resume`). Grove relays it as-is — it does not reshape it.
+The overlay is an optional, additive field on each `grove ls --json` row, produced by `grove-cli/lib/13-ledger.sh`'s `ledger_overlay_json()`. Grove relays it as-is — it does not reshape it.
 
 ```json
 { "available": true,
-  "worktree_id": "wt_…",        "workstream_id": null,
-  "risk": null,                  "checkpoint_at": "2026-08-05T17:00:00Z",
-  "next_action": "…",           "narrative_status": "present",
-  "drift": false,                "unavailable_reason": null }
+  "worktree_id": "wt_…",         "workstream_id": null,
+  "risk": "critical",            "risk_available": true,
+  "risk_unavailable_reason": null, "removal_blocked": true,
+  "lease_available": true,       "lease_unavailable_reason": null,
+  "lease_held": true,
+  "lease": { "tool": "claude", "session_id": "…", "machine_id": "machine_…",
+             "acquired_at": "…", "last_heartbeat_at": "…", "expires_at": "…" },
+  "checkpoint_at": "2026-08-05T17:00:00Z",
+  "next_action": "…",            "narrative_status": "present",
+  "drift": false,                 "unavailable_reason": null }
 ```
 
-`risk` is deliberately `null` from `resume` (only `removal-check` computes risk); Grove renders it when present (`"critical" | "warning" | "informational"`) but never derives it. On failure the object is `{"available": false, "unavailable_reason": "…"}`. The key is omitted entirely when the integration is off or `way` is absent.
+Building one overlay runs three `way` commands concurrently, because no single command answers everything: `resume` (identity, checkpoint, next action, drift), `removal-check --json` (`risk`, `removal_blocked`) and `lease status --json` (`lease_held`, `lease`). `resume` is the identity source, so only a failure there makes the whole object unavailable — `{"available": false, "unavailable_reason": "…"}`. The key is omitted entirely when the integration is off or `way` is absent.
+
+Grove renders `risk` (`"critical" | "warning" | "informational"`) but never derives it, and never derives `removal_blocked` from it either — whether a risk blocks removal is the ledger's rule to state.
+
+### Null is not "safe" — read the availability flag
+
+`risk` and `lease` are each null in two completely different situations, and the flag beside them is what tells those apart:
+
+| Fields | Means | Grove shows |
+|---|---|---|
+| `risk_available: true`, `risk: null` | Checked; nothing found | No risk badge (a true claim of "nothing at risk") |
+| `risk_available: false` | The check could not answer | A **"Risk unknown"** badge, and the reason in the details panel |
+| `lease_available: true`, `lease: null` | Checked; nobody has claimed it | Nothing on the row |
+| `lease_available: true`, `lease_held: false`, `lease: {…}` | The claim **expired** | Nothing on the row; the panel names the last holder |
+| `lease_available: true`, `lease_held: true` | An agent is working here **now** | A **"<tool> working here"** badge |
+| `lease_available: false` | The lease could not be read | Nothing on the row; the panel says "Unknown" and why |
+
+Risk-unknown gets a badge and lease-unknown does not, and the asymmetry is deliberate: the **absence** of a risk badge is itself a claim ("nothing at risk"), so an unknown there has to speak up. The absence of a lease badge claims nothing. Both are stated plainly in the details panel, and a risk that could not be established also joins the overview's "Drifted or at risk" group — the one place that aggregates safety must not quietly count an unknown as fine.
+
+Both flags default to **false** when absent, so an older sidecar that does not emit them reads as unknown rather than clear.
 
 ## The three render states
 
@@ -25,6 +50,18 @@ The overlay is an optional, additive field on each `grove ls --json` row, produc
 | **Available** | `ledger.available === true` | The real badges/details: risk (when present), checkpoint age, next action, drift, narrative status. |
 
 These three states must stay visually distinct: no gate ran (absent, no ledger UI), the gate ran but could not answer (unavailable, shown as an explicit "unknown" badge), and the gate ran and answered (available, the facts shown above). Only in that last state is no news actually good news — because the gate said so, not because it stayed silent.
+
+## "Open in Waypoint"
+
+When the overlay carries a `worktree_id`, the worktree's Actions (⋯) menu gains an **Open in Waypoint** entry beside the other "Open in …" items. It opens `waypoint://worktree?worktree_id=<id>` through the `open_in_waypoint` command.
+
+Three things about it are deliberate:
+
+- **The id is validated at the boundary** (`validate_worktree_id`, `src-tauri/src/commands.rs`): `wt_` prefix, ASCII alphanumerics/hyphen/underscore only, length-capped. The id crosses a process boundary into a URL, so it is checked rather than trusted for having come from `way`.
+- **It does not reuse `open_in_browser`.** That command permits http and https only, and loosening it so a custom scheme could pass would weaken a check that exists to stop `file://` and `javascript:` URLs.
+- **The entry is hidden without a ledger id.** There is no record for Waypoint to show, and guessing a target would open the wrong worktree's record.
+
+The handover is read-only in both directions: Waypoint *displays* the record and has no removal, acknowledge or override control to offer back. Waypoint allowlists its deep-link verbs and rejects unknown ones, so the verb (`worktree`) and the parameter name (`worktree_id`, snake_case like the ids `way` prints) are a contract, not a formatting choice.
 
 ## The no-bypass rule
 

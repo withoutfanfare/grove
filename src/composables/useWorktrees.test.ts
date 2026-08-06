@@ -40,6 +40,36 @@ describe('useWorktrees', () => {
     })
   })
 
+  describe('openInWaypoint', () => {
+    it('opens the worktree verb with the ledger id, not the path', async () => {
+      // Waypoint allowlists its deep-link verbs, and the record is keyed by
+      // ledger id — a path would open nothing.
+      mockTauriInvoke.mockResolvedValue(undefined)
+      const { openInWaypoint } = useWorktrees()
+
+      const result = await openInWaypoint('wt_019fce56-4c9b-7931-8ab8-4ec29125ed9a')
+
+      expect(result).toBe(true)
+      expect(mockTauriInvoke).toHaveBeenCalledWith('open_in_waypoint', {
+        worktreeId: 'wt_019fce56-4c9b-7931-8ab8-4ec29125ed9a',
+      })
+    })
+
+    it('surfaces a failure rather than swallowing it', async () => {
+      // "Waypoint is not installed" and "the link silently did nothing" must
+      // not look the same to the user.
+      const error = { code: 'OPEN_FAILED', message: 'Failed to open Waypoint' }
+      mockTauriInvoke.mockRejectedValue(error)
+      const { openInWaypoint } = useWorktrees()
+      const store = useWorktreeStore()
+
+      const result = await openInWaypoint('wt_abc')
+
+      expect(result).toBe(false)
+      expect(store.error).toEqual(error)
+    })
+  })
+
   describe('openAll', () => {
     it('reports full success when all open operations succeed', async () => {
       mockTauriInvoke.mockResolvedValue(undefined)

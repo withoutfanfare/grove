@@ -29,7 +29,7 @@ use commands::{
     fetch_repo, is_watching, ledger_checkpoint, list_branches, list_hooks, list_repositories,
     list_services_status, list_worktrees,
     mark_interrupted_operations, open_config, open_in_browser, open_in_editor, open_in_finder, open_in_git_client,
-    open_in_terminal, prune_repo, pull_all_worktrees, pull_selected_worktrees, pull_worktree,
+    open_in_terminal, open_in_waypoint, prune_repo, pull_all_worktrees, pull_selected_worktrees, pull_worktree,
     read_config_file, read_hook, refresh_tray_menu, register_repository, remove_selected_worktrees,
     remove_worktree, rename_hook,
     repair_repository, resume_operation, run_service_action, set_hook_executable,
@@ -163,6 +163,7 @@ pub fn run() {
             open_in_terminal,
             open_in_browser,
             open_in_finder,
+            open_in_waypoint,
             open_config,
             // Configuration commands
             get_config,
