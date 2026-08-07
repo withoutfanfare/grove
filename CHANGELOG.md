@@ -4,6 +4,12 @@ All notable changes to Grove will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.7] - 7 August 2026
+
+### Changed
+
+- **Release metadata only** - No functional change. `package-lock.json` was left at the previous number during the 0.3.6 release; this release brings every version file back into step
+
 ## [0.3.6] - 7 August 2026
 
 ### Changed
