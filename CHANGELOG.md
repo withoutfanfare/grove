@@ -4,6 +4,12 @@ All notable changes to Grove will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.6] - 7 August 2026
+
+### Changed
+
+- **Bundled grove CLI updated to 4.1.0, cutting the cost of every worktree listing** - Listing a repository's worktrees previously spawned three Waypoint processes per worktree to fetch the ledger overlay, which was around three quarters of the time a listing took. The bundled CLI now fetches the whole overlay in a single batch per listing, so the cost no longer scales with the number of worktrees. This is the CLI-side fix that the app-side mitigations in 0.3.3 were working around
+
 ## [0.3.5] - 6 August 2026
 
 ### Changed
