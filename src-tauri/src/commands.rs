@@ -627,88 +627,6 @@ pub fn open_in_browser(url: String) -> Result<(), WtError> {
     }
 }
 
-/// Validate a Worktree Ledger identifier before it is put in a URL.
-///
-/// Ledger ids are minted by `way` as `wt_` + a UUIDv7, so the permitted
-/// alphabet is tiny. Whitelisting it means nothing from the ledger document can
-/// smuggle a query separator, a scheme, or a shell-significant character into
-/// the deep link — the id crosses a process boundary, so it is checked at the
-/// boundary rather than trusted for having come from `way`.
-fn validate_worktree_id(worktree_id: &str) -> Result<(), WtError> {
-    if !worktree_id.starts_with("wt_") {
-        return Err(WtError::new(
-            "INVALID_WORKTREE_ID",
-            "A worktree ledger id must start with 'wt_'",
-        ));
-    }
-    // 64 is comfortably past `wt_` + a UUIDv7 and well short of anything that
-    // could be a payload.
-    if worktree_id.len() > 64 {
-        return Err(WtError::new(
-            "INVALID_WORKTREE_ID",
-            "Worktree ledger id is too long",
-        ));
-    }
-    if !worktree_id
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-    {
-        return Err(WtError::new(
-            "INVALID_WORKTREE_ID",
-            "Worktree ledger id contains invalid characters",
-        ));
-    }
-    Ok(())
-}
-
-/// Open a worktree's record in Waypoint via its `waypoint://` deep link.
-///
-/// Waypoint registers the scheme and accepts a fixed allowlist of verbs, of
-/// which `worktree` is one; it rejects anything else by design. This is a
-/// read-only handover — Grove asks Waypoint to *show* the record, and Waypoint
-/// has no removal, acknowledge or override control to hand back.
-///
-/// Deliberately not routed through `open_in_browser`: that command permits only
-/// http and https, and loosening it so a custom scheme could pass would weaken
-/// a check that exists to stop `file://` and `javascript:` URLs.
-///
-/// Callable from frontend as: invoke('open_in_waypoint', { worktreeId: 'wt_…' })
-#[command(rename_all = "camelCase")]
-pub fn open_in_waypoint(worktree_id: String) -> Result<(), WtError> {
-    validate_worktree_id(&worktree_id)?;
-
-    let url = format!("waypoint://worktree?worktree_id={}", worktree_id);
-
-    #[cfg(target_os = "macos")]
-    let status = Command::new("open").arg(&url).status();
-
-    #[cfg(target_os = "windows")]
-    let status = Command::new("cmd")
-        .args(["/C", "start", ""])
-        .arg(&url)
-        .status();
-
-    #[cfg(target_os = "linux")]
-    let status = Command::new("xdg-open").arg(&url).status();
-
-    let status =
-        status.map_err(|e| WtError::new("OPEN_FAILED", format!("Failed to open Waypoint: {}", e)))?;
-
-    // Without this, a machine with no Waypoint handler registered reports
-    // success and the frontend claims it opened something it did not.
-    if !status.success() {
-        return Err(WtError::new(
-            "OPEN_FAILED",
-            format!(
-                "Failed to open Waypoint ({}). Is Waypoint installed?",
-                status
-            ),
-        ));
-    }
-
-    Ok(())
-}
-
 /// Open a path in the file manager
 ///
 /// Uses Finder on macOS, Explorer on Windows, or xdg-open on Linux.
@@ -1798,8 +1716,7 @@ pub async fn get_repo_disk_usage(
     app: tauri::AppHandle,
 ) -> Result<crate::types::RepoDiskUsage, WtError> {
     spawn_blocking(move || {
-        // Fast listing: only paths are needed here, so skip the ledger overlay
-        let worktrees = wt::get_worktrees_fast(&app, &repo_name)?;
+        let worktrees = wt::get_worktrees(&app, &repo_name)?;
         let mut wt_usages = Vec::new();
         let mut total_bytes: u64 = 0;
 
@@ -2042,20 +1959,6 @@ pub async fn register_repository(
 }
 
 // ============================================================================
-// Worktree Ledger
-// ============================================================================
-
-/// Record an objective-only worktree-ledger checkpoint for a worktree.
-/// Callable from frontend as: invoke('ledger_checkpoint', { path })
-#[command]
-pub async fn ledger_checkpoint(path: String) -> Result<String, WtError> {
-    let validated = validate_path(&path)?;
-    spawn_blocking(move || crate::way::checkpoint_objective_only(&validated))
-        .await
-        .map_err(|e| WtError::spawn_error(e.to_string()))?
-}
-
-// ============================================================================
 // System Tray
 // ============================================================================
 ///
@@ -2241,44 +2144,6 @@ mod tests {
     fn test_validate_url_injection_attempts() {
         assert!(validate_url("https://example.com\nX-Injected: header").is_err());
         assert!(validate_url("https://example.com\0").is_err());
-    }
-
-    #[test]
-    fn test_validate_worktree_id_accepts_a_real_ledger_id() {
-        assert!(validate_worktree_id("wt_019fce56-4c9b-7931-8ab8-4ec29125ed9a").is_ok());
-    }
-
-    #[test]
-    fn test_validate_worktree_id_rejects_anything_but_a_ledger_id() {
-        // Wrong shape entirely
-        assert!(validate_worktree_id("").is_err());
-        assert!(validate_worktree_id("019fce56-4c9b").is_err());
-        assert!(validate_worktree_id("ws_019fce56").is_err());
-        // Query smuggling: a second parameter, or a different verb
-        assert!(validate_worktree_id("wt_abc&verb=append").is_err());
-        assert!(validate_worktree_id("wt_abc?path=/etc/passwd").is_err());
-        assert!(validate_worktree_id("wt_abc#fragment").is_err());
-        // Scheme and shell metacharacters
-        assert!(validate_worktree_id("wt_abc file:///etc/passwd").is_err());
-        assert!(validate_worktree_id("wt_abc; rm -rf /").is_err());
-        assert!(validate_worktree_id("wt_abc$(whoami)").is_err());
-        assert!(validate_worktree_id("wt_abc\nX: y").is_err());
-        assert!(validate_worktree_id("wt_abc\0").is_err());
-        // Length ceiling
-        assert!(validate_worktree_id(&format!("wt_{}", "a".repeat(100))).is_err());
-    }
-
-    #[test]
-    fn test_waypoint_deep_link_targets_the_worktree_verb() {
-        // Waypoint allowlists its deep-link verbs and rejects unknown ones, so
-        // the verb and the parameter name are a contract, not a formatting
-        // choice. The parameter stays snake_case, like the ids `way` prints.
-        let worktree_id = "wt_019fce56-4c9b-7931-8ab8-4ec29125ed9a";
-        let url = format!("waypoint://worktree?worktree_id={}", worktree_id);
-        assert_eq!(
-            url,
-            "waypoint://worktree?worktree_id=wt_019fce56-4c9b-7931-8ab8-4ec29125ed9a"
-        );
     }
 
     #[test]

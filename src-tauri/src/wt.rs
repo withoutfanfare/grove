@@ -409,31 +409,16 @@ fn validate_repo_name(name: &str) -> WtResult<()> {
 const SIDECAR_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
 
 fn execute_wt(app: &tauri::AppHandle, args: &[&str]) -> WtResult<String> {
-    execute_wt_with_env(app, args, &[])
-}
-
-/// As `execute_wt`, but with extra environment variables on the sidecar —
-/// the seam that lets internal consumers request a cheaper listing (see
-/// `get_worktrees_fast`) without touching the CLI's defaults.
-fn execute_wt_with_env(
-    app: &tauri::AppHandle,
-    args: &[&str],
-    envs: &[(&str, &str)],
-) -> WtResult<String> {
     log::debug!("Executing sidecar: grove {}", args.join(" "));
 
     // Get the sidecar command for the bundled grove binary
-    let mut sidecar = app.shell().sidecar("grove").map_err(|e| {
+    let sidecar = app.shell().sidecar("grove").map_err(|e| {
         log::error!("Failed to initialise grove sidecar: {}", e);
         WtError::new(
             "SIDECAR_ERROR",
             format!("Failed to initialise grove sidecar: {}", e),
         )
     })?;
-    for (key, value) in envs {
-        sidecar = sidecar.env(key, value);
-    }
-
     // Execute with timeout to prevent indefinite hangs
     // Use a scoped thread to avoid "Cannot start a runtime from within a runtime"
     // panics when called from spawn_blocking (which retains tokio runtime context)
@@ -514,20 +499,16 @@ fn execute_wt_with_env(
     Ok(stdout_str.into_owned())
 }
 
-/// Build the WtError for a failed CLI call from its structured stdout error,
-/// attaching stderr detail for ledger blocks: `way` prints each risk and its
-/// remedy to stderr, and a gate that blocks without saying how to proceed is
-/// exactly what teaches people to reach for -f.
-fn structured_cli_error(stdout: &str, stderr: &str) -> Option<WtError> {
+/// Build the WtError for a failed CLI call from its structured stdout error.
+/// The message is relayed whole: for `REMOVAL_BLOCKED` it is the removal
+/// gate's multi-line account of what would be lost, and a gate that blocks
+/// without saying what it protects is what teaches people to force it.
+fn structured_cli_error(stdout: &str) -> Option<WtError> {
     let cli_error = extract_json_object::<CliErrorResponse>(stdout).ok()?;
-    let mut message = sanitise_error_message(&cli_error.error.message);
-    if cli_error.error.code == "LEDGER_BLOCKED" {
-        let detail = sanitise_error_message(stderr.trim());
-        if !detail.is_empty() {
-            message = format!("{}\n\n{}", detail, message);
-        }
-    }
-    Some(WtError::new(&cli_error.error.code, message))
+    Some(WtError::new(
+        &cli_error.error.code,
+        sanitise_error_message(&cli_error.error.message),
+    ))
 }
 
 /// Execute a grove CLI command and return both stdout and stderr on success.
@@ -580,7 +561,7 @@ fn execute_wt_with_stderr(app: &tauri::AppHandle, args: &[&str]) -> WtResult<(St
     if !success {
         let stdout_str = String::from_utf8_lossy(&output.stdout);
         if let Some(err) =
-            structured_cli_error(&stdout_str, &String::from_utf8_lossy(&output.stderr))
+            structured_cli_error(&stdout_str)
         {
             return Err(err);
         }
@@ -858,21 +839,6 @@ pub fn get_worktrees(app: &tauri::AppHandle, repo_name: &str) -> WtResult<Vec<Wo
 pub fn get_worktree_status(app: &tauri::AppHandle, repo_name: &str) -> WtResult<Vec<Worktree>> {
     // Status information is included in ls --json output
     get_worktrees(app, repo_name)
-}
-
-/// Get worktrees WITHOUT the ledger overlay — for internal consumers (the
-/// tray menu, disk usage) that render no ledger fields. The overlay is the
-/// bulk of the listing cost (three `way` processes per worktree, roughly 75%
-/// of the wall time on a large repository), so consumers that only need
-/// branch/path/git status must not pay for it.
-pub fn get_worktrees_fast(app: &tauri::AppHandle, repo_name: &str) -> WtResult<Vec<Worktree>> {
-    validate_repo_name(repo_name)?;
-    let output = execute_wt_with_env(
-        app,
-        &["ls", repo_name, "--json"],
-        &[("LEDGER_INTEGRATION", "off")],
-    )?;
-    extract_json_array(&output)
 }
 
 /// Check if the grove CLI is available
@@ -2654,30 +2620,25 @@ mod tests {
     }
 
     #[test]
-    fn ledger_blocked_error_carries_stderr_remedies_first() {
-        let stdout = r#"{"success": false, "error": {"code": "LEDGER_BLOCKED", "message": "removal blocked by the worktree ledger (see above). To proceed, run 'way worktree removal-check --acknowledge' in the worktree and pass the token with --ledger-ack"}}"#;
-        let stderr = "critical: uncommitted changes (3 files)\n  remedy: commit or stash them\nwarning: 2 unpushed commits\n  remedy: git push";
-        let err = structured_cli_error(stdout, stderr).expect("structured error expected");
-        assert_eq!(err.code, "LEDGER_BLOCKED");
-        assert!(err.message.starts_with("critical: uncommitted changes"));
-        assert!(err.message.contains("remedy: git push"));
-        assert!(err
-            .message
-            .contains("removal blocked by the worktree ledger"));
+    fn removal_blocked_error_keeps_the_gate_account_line_by_line() {
+        let stdout = r#"{"success": false, "error": {"code": "REMOVAL_BLOCKED", "message": "Removing feature-y would lose:\n  - 1 uncommitted change(s):\n      ?? notes.txt\n  - 1 commit(s) no remote has:\n      3fe9562 local only\nCommit and push the work, or wait for the session to end, then try again."}}"#;
+        let err = structured_cli_error(stdout).expect("structured error expected");
+        assert_eq!(err.code, "REMOVAL_BLOCKED");
+        assert!(err.message.contains("would lose:\n  - 1 uncommitted change(s):\n      ?? notes.txt"));
+        assert!(err.message.ends_with("then try again."));
     }
 
     #[test]
-    fn non_ledger_errors_do_not_gain_stderr() {
+    fn structured_errors_relay_code_and_message() {
         let stdout = r#"{"success": false, "error": {"code": "PROTECTED_BRANCH", "message": "branch 'main' is protected"}}"#;
-        let err = structured_cli_error(stdout, "some unrelated stderr noise")
-            .expect("structured error expected");
+        let err = structured_cli_error(stdout).expect("structured error expected");
         assert_eq!(err.code, "PROTECTED_BRANCH");
-        assert!(!err.message.contains("unrelated stderr noise"));
+        assert_eq!(err.message, "branch 'main' is protected");
     }
 
     #[test]
     fn unstructured_stdout_yields_none() {
-        assert!(structured_cli_error("not json at all", "stderr").is_none());
+        assert!(structured_cli_error("not json at all").is_none());
     }
 
     #[test]

@@ -25,23 +25,19 @@ const baseWorktree: Worktree = {
   behind: 0,
 }
 
-// The real CLI's LEDGER_BLOCKED message (see src-tauri/src/wt.rs's
-// `ledger_blocked_error_carries_stderr_remedies_first` test): way's verbatim
-// risks/remedies, a blank line, then the CLI's instruction line — which
-// itself names the CLI-only bypass flags (`--acknowledge`, `--ledger-ack`).
-// The dialogue must render this verbatim without offering an in-GUI control
-// that performs the bypass for the user.
-const LEDGER_BLOCKED_ERROR = {
-  code: 'LEDGER_BLOCKED',
+// The real CLI's REMOVAL_BLOCKED message (see src-tauri/src/wt.rs's
+// `removal_blocked_error_keeps_the_gate_account_line_by_line` test): the
+// removal gate's account of what would be lost, one line per item, then its
+// instruction. The dialogue must render this verbatim without offering an
+// in-GUI control that forces the removal past it.
+const REMOVAL_BLOCKED_ERROR = {
+  code: 'REMOVAL_BLOCKED',
   message:
-    "critical: uncommitted changes (3 files)\n  remedy: commit or stash them\nwarning: 2 unpushed commits\n  remedy: git push\n\nremoval blocked by the worktree ledger (see above). To proceed, run 'way worktree removal-check --acknowledge' in the worktree and pass the token with --ledger-ack",
+    'Removing ~/Herd/scooda-worktrees/feature-x would lose:\n  - 1 uncommitted change(s):\n      ?? notes.txt\n  - 1 commit(s) no remote has:\n      3fe9562 local only\n  - a live agent session working here: codex session abcdef12…, last seen 01:10\nCommit and push the work, or wait for the session to end, then try again.',
 }
 
 function mockCommands() {
-  mockTauriInvoke.mockImplementation((command: string) => {
-    if (command === 'ledger_checkpoint') return Promise.resolve('checkpointed wt_1')
-    return Promise.resolve(undefined)
-  })
+  mockTauriInvoke.mockResolvedValue(undefined)
 }
 
 function mountDialog(worktree: Worktree | null) {
@@ -69,9 +65,9 @@ function mountDialog(worktree: Worktree | null) {
 
 /**
  * Accessible-name approximation for every interactive control in the
- * dialogue (buttons, links, inputs). Used to assert no acknowledge/override
+ * dialogue (buttons, links, inputs). Used to assert no force/override
  * *control* exists — independent of the verbatim CLI prose rendered
- * elsewhere in the panel, which legitimately contains those words.
+ * elsewhere in the panel.
  */
 function interactiveControlLabels(wrapper: ReturnType<typeof mountDialog>): string[] {
   return wrapper.findAll('button, a, input, [role="button"]').map((el) =>
@@ -89,12 +85,12 @@ describe('DeleteWorktreeDialog', () => {
     mockRemoveWorktree.mockReset()
   })
 
-  it('shows the ledger block with its remedies verbatim and no override control', async () => {
+  it("shows the removal gate's account line by line and no override control", async () => {
     // Real production path: useWorktrees().removeWorktree() never rejects —
     // it catches internally, records the typed WtError on the worktrees
     // store, and resolves null. The dialogue must read the error from there.
     mockRemoveWorktree.mockImplementationOnce(async () => {
-      useWorktreeStore().setError(LEDGER_BLOCKED_ERROR)
+      useWorktreeStore().setError(REMOVAL_BLOCKED_ERROR)
       return null
     })
     const wrapper = mountDialog(baseWorktree)
@@ -105,136 +101,33 @@ describe('DeleteWorktreeDialog', () => {
     await deleteButton!.trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('The worktree ledger blocked this removal')
-    expect(wrapper.text()).toContain('remedy:')
+    expect(wrapper.text()).toContain('This worktree cannot be removed yet')
     expect(wrapper.text()).toContain('Nothing has been deleted')
-    // The real CLI prose, rendered verbatim, does name the CLI-only bypass
-    // flags — that must NOT fail this check.
-    expect(wrapper.text()).toContain('--ledger-ack')
-    // What must be true: no interactive control's accessible name offers to
-    // acknowledge/override/ledger-ack on the user's behalf.
+    // The gate's lines stay separate: a run-together account of three
+    // different losses is not an account anyone can act on.
+    const account = wrapper.get('.whitespace-pre-wrap').text()
+    expect(account).toContain('would lose:\n  - 1 uncommitted change(s):\n      ?? notes.txt')
+    expect(account).toContain('3fe9562 local only')
+    expect(account).toContain('a live agent session working here')
+    // No interactive control's accessible name offers to force, override or
+    // remove anyway on the user's behalf.
     const labels = interactiveControlLabels(wrapper)
-    expect(labels.some((label) => /acknowledge|override|ledger-ack/i.test(label))).toBe(false)
+    expect(labels.some((label) => /force|override|anyway/i.test(label))).toBe(false)
     wrapper.unmount()
   })
 
-  it('also honours the ledger block when removeWorktree rejects directly', async () => {
+  it('also honours the removal gate when removeWorktree rejects directly', async () => {
     // Fallback path: the dialogue's catch still handles a direct rejection
     // (e.g. a differently-wired caller), not only the resolve-null path.
-    mockRemoveWorktree.mockRejectedValueOnce(LEDGER_BLOCKED_ERROR)
+    mockRemoveWorktree.mockRejectedValueOnce(REMOVAL_BLOCKED_ERROR)
     const wrapper = mountDialog(baseWorktree)
 
     const deleteButton = wrapper.findAll('button').find((b) => b.text() === 'Delete Worktree')
     await deleteButton!.trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('The worktree ledger blocked this removal')
-    expect(wrapper.text()).toContain('remedy:')
-    wrapper.unmount()
-  })
-
-  it('marks an unanswerable ledger honestly in the confirm body', () => {
-    const wrapper = mountDialog({
-      ...baseWorktree,
-      ledger: { available: false, unavailable_reason: 'way exited 3' },
-    })
-
-    expect(wrapper.text()).toContain('will not be safety-checked')
-    wrapper.unmount()
-  })
-
-  it('offers "Record a checkpoint first" only when the ledger is available, and invokes it', async () => {
-    const wrapper = mountDialog({
-      ...baseWorktree,
-      ledger: { available: true },
-    })
-
-    const checkpointButton = wrapper.findAll('button').find((b) => b.text() === 'Record a checkpoint first')
-    expect(checkpointButton).toBeDefined()
-
-    await checkpointButton!.trigger('click')
-    await flushPromises()
-
-    const checkpointCalls = mockTauriInvoke.mock.calls.filter((call) => call[0] === 'ledger_checkpoint')
-    expect(checkpointCalls).toHaveLength(1)
-    expect(checkpointCalls[0][1]).toMatchObject({ path: baseWorktree.path })
-
-    // Does not close the dialogue or trigger a delete
-    expect(wrapper.emitted('close')).toBeFalsy()
-    expect(mockRemoveWorktree).not.toHaveBeenCalled()
-    wrapper.unmount()
-  })
-
-  it('will not delete or close while a checkpoint is still running', async () => {
-    // Hold the checkpoint open so the dialogue is genuinely mid-write.
-    let finishCheckpoint: (value: string) => void = () => {}
-    mockTauriInvoke.mockImplementation((command: string) => {
-      if (command === 'ledger_checkpoint') {
-        return new Promise<string>((resolve) => {
-          finishCheckpoint = resolve
-        })
-      }
-      return Promise.resolve(undefined)
-    })
-
-    const wrapper = mountDialog({ ...baseWorktree, ledger: { available: true } })
-    const button = (label: string) => wrapper.findAll('button').find((b) => b.text() === label)
-
-    await button('Record a checkpoint first')!.trigger('click')
-    await flushPromises()
-
-    // Every conflicting control is disabled...
-    expect(button('Delete Worktree')!.attributes('data-disabled')).toBe('true')
-    expect(button('Cancel')!.attributes('data-disabled')).toBe('true')
-    expect(button('Record a checkpoint first')!.attributes('data-disabled')).toBe('true')
-
-    // ...and the handlers refuse even if a click reaches them anyway.
-    await button('Delete Worktree')!.trigger('click')
-    await button('Cancel')!.trigger('click')
-    await button('Record a checkpoint first')!.trigger('click')
-    await flushPromises()
-
-    expect(mockRemoveWorktree).not.toHaveBeenCalled()
-    expect(wrapper.emitted('close')).toBeFalsy()
-    expect(mockTauriInvoke.mock.calls.filter((call) => call[0] === 'ledger_checkpoint')).toHaveLength(1)
-
-    // Once the checkpoint settles, deletion is available again.
-    finishCheckpoint('checkpointed wt_1')
-    await flushPromises()
-
-    expect(button('Delete Worktree')!.attributes('data-disabled')).toBe('false')
-    await button('Delete Worktree')!.trigger('click')
-    await flushPromises()
-    expect(mockRemoveWorktree).toHaveBeenCalledTimes(1)
-    wrapper.unmount()
-  })
-
-  it('offers no checkpoint control once a deletion is under way', async () => {
-    let finishDelete: (value: null) => void = () => {}
-    mockRemoveWorktree.mockImplementationOnce(
-      () => new Promise((resolve) => { finishDelete = resolve })
-    )
-
-    const wrapper = mountDialog({ ...baseWorktree, ledger: { available: true } })
-    const button = (label: string) => wrapper.findAll('button').find((b) => b.text() === label)
-
-    await button('Delete Worktree')!.trigger('click')
-    await flushPromises()
-
-    expect(button('Record a checkpoint first')).toBeUndefined()
-    expect(mockTauriInvoke.mock.calls.filter((call) => call[0] === 'ledger_checkpoint')).toHaveLength(0)
-
-    finishDelete(null)
-    await flushPromises()
-    wrapper.unmount()
-  })
-
-  it('shows no ledger note when the overlay is absent', () => {
-    const wrapper = mountDialog(baseWorktree)
-
-    expect(wrapper.text()).not.toContain('safety-checked')
-    const checkpointButton = wrapper.findAll('button').find((b) => b.text() === 'Record a checkpoint first')
-    expect(checkpointButton).toBeUndefined()
+    expect(wrapper.text()).toContain('This worktree cannot be removed yet')
+    expect(wrapper.text()).toContain('?? notes.txt')
     wrapper.unmount()
   })
 })

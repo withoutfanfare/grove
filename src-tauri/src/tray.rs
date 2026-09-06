@@ -135,7 +135,7 @@ fn build_tray_menu(app: &AppHandle) -> Result<Menu<Wry>, Box<dyn std::error::Err
                     .map(|repo| {
                         let app_clone = app.clone();
                         let repo_name = repo.name.clone();
-                        std::thread::spawn(move || wt::get_worktrees_fast(&app_clone, &repo_name))
+                        std::thread::spawn(move || wt::get_worktrees(&app_clone, &repo_name))
                     })
                     .collect();
 
