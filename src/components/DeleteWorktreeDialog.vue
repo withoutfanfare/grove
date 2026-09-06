@@ -10,7 +10,7 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import type { Worktree, RemoveWorktreeResponse } from '../types'
 import { isWtError } from '../types'
-import { useWorktrees, useToast, useWt } from '../composables'
+import { useWorktrees, useToast } from '../composables'
 import { useRepoConfigStore } from '../stores/repoConfig'
 import { useWorktreeStore } from '../stores'
 import { SButton, SModal, SCheckbox, SBadge, SInput } from '@stuntrocket/ui'
@@ -30,7 +30,6 @@ const emit = defineEmits<{
 
 const { removeWorktree } = useWorktrees()
 const { toast } = useToast()
-const { ledgerCheckpoint } = useWt()
 const repoConfigStore = useRepoConfigStore()
 const worktreeStore = useWorktreeStore()
 
@@ -40,7 +39,6 @@ const skipBackup = ref(false)
 const isSubmitting = ref(false)
 const error = ref<string | null>(null)
 const errorCode = ref<string | null>(null)
-const isCheckpointing = ref(false)
 const protectionConfirmText = ref('')
 
 // Multi-phase state
@@ -122,7 +120,6 @@ watch(() => props.isOpen, async (open) => {
     skipBackup.value = false
     error.value = null
     errorCode.value = null
-    isCheckpointing.value = false
     phase.value = 'confirm'
     deletionResult.value = null
     requestedDropDb.value = false
@@ -151,9 +148,7 @@ async function handleDelete() {
   const repoName = props.repoName
 
   if (!worktree || !repoName) return
-  // A checkpoint in flight is writing to the same ledger and worktree the
-  // removal is about to tear down — never let the two run together.
-  if (isCheckpointing.value || isSubmitting.value) return
+  if (isSubmitting.value) return
 
   isSubmitting.value = true
   error.value = null
@@ -209,30 +204,8 @@ async function handleDelete() {
   }
 }
 
-async function handleCheckpoint() {
-  const worktree = props.worktree
-  if (!worktree) return
-  if (isCheckpointing.value || isSubmitting.value) return
-
-  isCheckpointing.value = true
-  try {
-    await ledgerCheckpoint(worktree.path)
-    toast.success('Checkpoint recorded')
-  } catch (e) {
-    const message = isWtError(e)
-      ? e.message
-      : e instanceof Error ? e.message : 'Failed to record checkpoint'
-    toast.error(message)
-  } finally {
-    isCheckpointing.value = false
-  }
-}
-
 function handleClose() {
   if (phase.value === 'deleting') return
-  // Closing mid-checkpoint would leave the write running against a worktree
-  // the user may then delete from the list behind it.
-  if (isCheckpointing.value) return
   emit('close')
 }
 </script>
@@ -276,11 +249,6 @@ function handleClose() {
       <!-- Warning text -->
       <p class="text-text-secondary text-sm leading-relaxed">
         Are you sure you want to delete this worktree? This action cannot be undone.
-      </p>
-
-      <!-- Ledger unavailable note (honest, not "safe") -->
-      <p v-if="worktree?.ledger?.available === false" class="text-text-muted text-xs">
-        The worktree ledger could not answer for this worktree — this removal will not be safety-checked.
       </p>
 
       <!-- Dirty warning -->
@@ -378,22 +346,22 @@ function handleClose() {
         </Transition>
       </div>
 
-      <!-- Ledger-blocked message: shown as-is, with no bypass control -->
+      <!-- Removal gate refusal: shown as-is, with no bypass control -->
       <Transition
         enter-active-class="transition ease-out duration-150"
         enter-from-class="opacity-0 -translate-y-1"
         enter-to-class="opacity-100 translate-y-0"
       >
-        <div v-if="errorCode === 'LEDGER_BLOCKED'" class="p-3 bg-danger-muted rounded-lg border border-danger/20 space-y-2">
+        <div v-if="errorCode === 'REMOVAL_BLOCKED'" class="p-3 bg-danger-muted rounded-lg border border-danger/20 space-y-2">
           <p class="text-danger text-sm font-medium flex items-center gap-2">
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            The worktree ledger blocked this removal
+            This worktree cannot be removed yet
           </p>
           <p class="text-danger/90 text-xs whitespace-pre-wrap font-mono">{{ error }}</p>
-          <p class="text-danger/80 text-xs">Nothing has been deleted. Deal with the risks above, then try again.</p>
+          <p class="text-danger/80 text-xs">Nothing has been deleted. There is no override here: save the work, or wait for the session to end, then try again.</p>
         </div>
       </Transition>
 
@@ -403,7 +371,7 @@ function handleClose() {
         enter-from-class="opacity-0 -translate-y-1"
         enter-to-class="opacity-100 translate-y-0"
       >
-        <div v-if="error && errorCode !== 'LEDGER_BLOCKED'" class="p-3 bg-danger-muted rounded-lg border border-danger/20">
+        <div v-if="error && errorCode !== 'REMOVAL_BLOCKED'" class="p-3 bg-danger-muted rounded-lg border border-danger/20">
           <p class="text-danger text-sm flex items-center gap-2">
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -543,23 +511,14 @@ function handleClose() {
           ref="cancelButtonRef"
           variant="ghost"
           @click="handleClose"
-          :disabled="isSubmitting || isCheckpointing"
+          :disabled="isSubmitting"
         >
           Cancel
         </SButton>
         <SButton
-          v-if="worktree?.ledger?.available === true"
-          variant="secondary"
-          :loading="isCheckpointing"
-          :disabled="isCheckpointing || isSubmitting"
-          @click="handleCheckpoint"
-        >
-          Record a checkpoint first
-        </SButton>
-        <SButton
           variant="danger"
           :loading="isSubmitting"
-          :disabled="!protectionOverridden || isCheckpointing"
+          :disabled="!protectionOverridden"
           @click="handleDelete"
         >
           Delete Worktree

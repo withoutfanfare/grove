@@ -7,9 +7,8 @@
  */
 import { ref, watch, computed } from 'vue'
 import type { Worktree, Commit, FileChange, HealthGrade } from '../types'
-import { useWt, useToast, useRelativeTime } from '../composables'
+import { useWt, useToast } from '../composables'
 import { copyPath, copyUrl } from '../utils/clipboard'
-import { REMOVAL_BLOCKED_LABEL, riskWords } from '../utils/riskVocabulary'
 import CommitList from './CommitList.vue'
 import FileChangesList from './FileChangesList.vue'
 import GradeBadge from './GradeBadge.vue'
@@ -165,92 +164,6 @@ const syncExplanation = computed(() => {
 
   return parts.join('. ')
 })
-
-// Worktree ledger overlay
-const ledgerAvailable = computed(() => props.worktree.ledger?.available === true)
-const ledgerUnavailable = computed(() => props.worktree.ledger?.available === false)
-
-const { relativeTime: ledgerCheckpointRelative } = useRelativeTime(
-  () => props.worktree.ledger?.checkpoint_at
-)
-
-const ledgerNarrativeLabel = computed(() => {
-  switch (props.worktree.ledger?.narrative_status) {
-    case 'present':
-      return 'Recorded'
-    case 'missing':
-      return 'Missing'
-    default:
-      return null
-  }
-})
-
-const ledgerCheckpointLabel = computed(() =>
-  props.worktree.ledger?.checkpoint_at != null ? ledgerCheckpointRelative.value.full : 'No checkpoint recorded'
-)
-
-// Drift is only meaningful once a checkpoint exists to drift from, and only
-// when `way` actually stated it (drift is null/undefined otherwise).
-const ledgerDriftVisible = computed(() => {
-  const drift = props.worktree.ledger?.drift
-  return (drift === true || drift === false) && props.worktree.ledger?.checkpoint_at != null
-})
-
-const ledgerDriftLabel = computed(() =>
-  props.worktree.ledger?.drift === true
-    ? 'State has changed since the last checkpoint'
-    : 'In step with the last checkpoint'
-)
-
-// Risk is only a fact when the check answered. When it did not, the panel says
-// so in words rather than showing nothing, which would read as "no risk".
-const ledgerRiskLabel = computed(() => {
-  const ledger = props.worktree.ledger
-  if (ledger?.risk_available !== true) {
-    const reason = ledger?.risk_unavailable_reason
-    return reason
-      ? `Unknown — the risk check could not answer: ${reason}`
-      : 'Unknown — the risk check could not answer'
-  }
-  const words = riskWords(ledger.risk)
-  const blocked =
-    ledger.removal_blocked === true
-      ? ' — the ledger blocks removal until this is resolved'
-      : ''
-  if (ledger.risk == null) {
-    // A block with no risk level still has to be said. This branch used to
-    // return "Clear — the ledger found nothing" regardless, so a worktree the
-    // ledger was actively refusing to release was described as clear.
-    return blocked
-      ? `${REMOVAL_BLOCKED_LABEL}${blocked} — run \`way worktree removal-check\` here for the reason`
-      : `${words.label} — the ledger found nothing`
-  }
-  return `${words.label}${blocked} — run \`way worktree removal-check\` here for the remedy`
-})
-
-// The lease answers "is an agent working in this worktree?". Three distinct
-// states, and the unreadable one must not read as "nobody is here".
-const ledgerLeaseLabel = computed(() => {
-  const ledger = props.worktree.ledger
-  if (ledger?.lease_available !== true) {
-    const reason = ledger?.lease_unavailable_reason
-    return reason ? `Unknown — ${reason}` : 'Unknown — the lease could not be read'
-  }
-  const lease = ledger.lease
-  if (lease == null) {
-    return 'No agent has claimed this worktree'
-  }
-  const holder = `${lease.tool} session ${lease.session_id} on ${lease.machine_id}`
-  // `lease_held` is optional: unstated means the ledger did not say whether the
-  // claim still stands, which is not the same as it having expired.
-  if (ledger.lease_held === true) {
-    return `${holder} — holds it until ${lease.expires_at}`
-  }
-  if (ledger.lease_held === false) {
-    return `${holder} — claim expired at ${lease.expires_at}`
-  }
-  return `${holder} — the ledger did not say whether the claim still stands (it was due to end at ${lease.expires_at})`
-})
 </script>
 
 <template>
@@ -399,63 +312,6 @@ const ledgerLeaseLabel = computed(() => {
               :loading="filesLoading"
               :error="filesError"
             />
-          </section>
-
-          <!-- Worktree Ledger -->
-          <section v-if="worktree.ledger" class="space-y-2">
-            <SSectionHeader title="Worktree ledger" />
-
-            <template v-if="ledgerUnavailable">
-              <div class="p-3 rounded-lg bg-surface-overlay/50">
-                <p class="text-sm text-text-primary">
-                  The ledger could not answer for this worktree — its safety is unknown.
-                </p>
-                <p v-if="worktree.ledger.unavailable_reason" class="text-xs text-text-muted mt-0.5">
-                  {{ worktree.ledger.unavailable_reason }}
-                </p>
-              </div>
-            </template>
-
-            <template v-else-if="ledgerAvailable">
-              <div v-if="worktree.ledger.workstream_id != null" class="p-3 rounded-lg bg-surface-overlay/50">
-                <p class="text-sm text-text-primary">Workstream</p>
-                <p class="text-xs text-text-muted mt-0.5">{{ worktree.ledger.workstream_id }}</p>
-              </div>
-
-              <div class="p-3 rounded-lg bg-surface-overlay/50">
-                <p class="text-sm text-text-primary">Last checkpoint</p>
-                <p class="text-xs text-text-muted mt-0.5">{{ ledgerCheckpointLabel }}</p>
-              </div>
-
-              <div v-if="worktree.ledger.next_action != null" class="p-3 rounded-lg bg-surface-overlay/50">
-                <p class="text-sm text-text-primary">Next action</p>
-                <p class="text-xs text-text-muted mt-0.5">{{ worktree.ledger.next_action }}</p>
-              </div>
-
-              <div v-if="ledgerNarrativeLabel" class="p-3 rounded-lg bg-surface-overlay/50">
-                <p class="text-sm text-text-primary">Narrative</p>
-                <p class="text-xs text-text-muted mt-0.5">{{ ledgerNarrativeLabel }}</p>
-              </div>
-
-              <div v-if="ledgerDriftVisible" class="p-3 rounded-lg bg-surface-overlay/50">
-                <p class="text-sm text-text-primary">Drift</p>
-                <p class="text-xs text-text-muted mt-0.5">{{ ledgerDriftLabel }}</p>
-              </div>
-
-              <!-- Always rendered: an omitted Risk row reads as "no risk", so
-                   unknown has to be stated rather than left out. -->
-              <div class="p-3 rounded-lg bg-surface-overlay/50">
-                <p class="text-sm text-text-primary">Risk</p>
-                <p class="text-xs text-text-muted mt-0.5">{{ ledgerRiskLabel }}</p>
-              </div>
-
-              <div class="p-3 rounded-lg bg-surface-overlay/50">
-                <p class="text-sm text-text-primary">Agent lease</p>
-                <p class="text-xs text-text-muted mt-0.5">{{ ledgerLeaseLabel }}</p>
-              </div>
-
-              <p class="text-2xs text-text-muted">Recorded facts, as at the last list refresh.</p>
-            </template>
           </section>
         </div>
       </div>

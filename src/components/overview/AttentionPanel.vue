@@ -15,7 +15,6 @@ import { storeToRefs } from 'pinia'
 import { useOverviewStore } from '../../stores'
 import type { Worktree } from '../../types'
 import { parseHealthIssueMessage, severityExplanation } from '../../utils/healthIssues'
-import { riskWords } from '../../utils/riskVocabulary'
 
 const props = withDefaults(
   defineProps<{
@@ -53,7 +52,6 @@ const {
   dirtyAttention,
   behindAttention,
   cleanupAttention,
-  ledgerAttention,
   repoErrors,
   hasAttentionItems,
 } = storeToRefs(overviewStore)
@@ -76,24 +74,6 @@ function cleanupLabel(worktree: Worktree): string {
 function healthSummary(message: string): string {
   const titles = parseHealthIssueMessage(message).map((finding) => finding.title)
   return titles.length > 0 ? titles.join(' · ') : message
-}
-
-/**
- * Per-item ledger reason, most serious first: a stated critical risk, then a
- * risk that could not be established, then drift. An unestablished risk is
- * named rather than falling through to "drifted", which would describe the
- * worktree as merely out of date when nobody knows whether it is safe.
- *
- * The comparison below is logic and stays on the raw level; only the word a
- * human reads comes from the vocabulary.
- */
-function ledgerReason(worktree: Worktree): string {
-  const ledger = worktree.ledger
-  if (ledger?.risk_available === true && ledger.risk === 'critical') {
-    return `${riskWords('critical').label} — the worktree ledger says so`
-  }
-  if (ledger?.risk_available !== true) return 'Ledger risk unknown'
-  return 'Drifted since last checkpoint'
 }
 </script>
 
@@ -239,30 +219,6 @@ function ledgerReason(worktree: Worktree): string {
               <span class="attention-item-sub">{{ cleanupLabel(item.worktree) }}</span>
             </button>
             <button class="attention-action" @click="emit('remove', item.repo, item.worktree)">Remove</button>
-          </li>
-        </ul>
-      </div>
-
-      <!-- Drifted or at risk -->
-      <div v-if="ledgerAttention.length > 0" class="attention-group">
-        <div class="attention-group-header">
-          <span class="attention-group-label">Drifted or at risk</span>
-          <span class="attention-count">{{ ledgerAttention.length }}</span>
-        </div>
-        <ul class="attention-items">
-          <li v-for="item in ledgerAttention" :key="item.worktree.path" class="attention-item">
-            <button class="attention-item-body" @click="emit('navigate', item.repo, item.worktree.branch)">
-              <span class="attention-item-title">
-                <span class="severity-dot"
-                  :class="item.worktree.ledger?.risk_available === true && item.worktree.ledger.risk === 'critical'
-                    ? 'bg-danger'
-                    : 'bg-warning'" />
-                <span class="font-mono">{{ item.repo }}</span>
-                <span class="text-text-muted">·</span>
-                <span class="truncate">{{ item.worktree.branch }}</span>
-              </span>
-              <span class="attention-item-sub">{{ ledgerReason(item.worktree) }}</span>
-            </button>
           </li>
         </ul>
       </div>

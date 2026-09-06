@@ -4,6 +4,22 @@ All notable changes to Grove will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+
+- **Deleting a worktree runs the removal gate, and the dialogue relays its answer** - `grove rm` now refuses when a worktree has uncommitted changes, commits no remote has, or a live agent session, and says exactly what would be lost. The delete dialogue shows that account line by line and offers no way past it: save the work, or wait for the session to end, then try again
+
+### Removed
+
+- **The Worktree Ledger integration** - The ledger risk, drift, checkpoint and lease badges, the details panel's ledger section, the overview's "Drifted or at risk" group, "Record a checkpoint first" and "Open in Waypoint" are gone, and Grove no longer runs `way`. The ledger is retired; the removal gate and the per-worktree lease that replace it live in the CLI and the agent hooks
+
+## [0.3.7] - 7 August 2026
+
+### Changed
+
+- **Release metadata only** - No functional change. `package-lock.json` was left at the previous number during the 0.3.6 release; this release brings every version file back into step
+
 ## [0.3.6] - 7 August 2026
 
 ### Changed

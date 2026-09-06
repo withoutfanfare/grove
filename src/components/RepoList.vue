@@ -173,8 +173,8 @@ useKeyboardShortcuts({
 })
 
 /** Loading timeout in milliseconds. Only the first-ever load of a repo runs
- * uncached; a large repo's ledger overlay can legitimately take tens of
- * seconds, so this is a safety net, not an expectation. */
+ * uncached; a large repo's listing can legitimately take tens of seconds, so
+ * this is a safety net, not an expectation. */
 const LOADING_TIMEOUT_MS = 60000
 
 async function handleSelectRepo(name: string) {

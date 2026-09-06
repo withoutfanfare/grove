@@ -8,9 +8,9 @@ import { useWt } from './useWt';
  *
  * This poll is a backstop, not the primary update path: the file watcher and
  * post-action refreshes catch real changes as they happen. Each refresh runs
- * `grove ls`, which fans out git status plus three `way` ledger processes per
- * worktree — seconds of CPU on a large repo — so polling faster than this
- * keeps the machine hot for no visible benefit.
+ * `grove ls`, which runs git status for every worktree — seconds of CPU on a
+ * large repo — so polling faster than this keeps the machine hot for no
+ * visible benefit.
  */
 const ACTIVE_REFRESH_INTERVAL_MS = 60000;
 

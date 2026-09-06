@@ -114,22 +114,6 @@ Letter grades indicate worktree health:
 - **+N ahead** - Commits ahead of remote
 - **-N behind** - Commits behind remote
 
-### Worktree Ledger Badges
-
-These appear only if you have Waypoint's `way` command installed. They report what the ledger says about a worktree — Grove never works any of it out for itself.
-
-- **At risk** - The most serious verdict. Removing this worktree would destroy work nobody has a copy of, and `grove rm` will refuse until you deal with it.
-- **Needs a look** - Something is wrong but no work is about to be lost. Open the details panel for the remedy.
-- **Worth knowing** - The ledger has a note about this worktree. Nothing is at stake.
-- **Clear** - The ledger checked this worktree and found nothing. Said out loud rather than left blank, so you can tell it apart from a check that never ran.
-- **Risk unknown** - The ledger answered for this worktree but could not work out its risk. This is *not* the same as "Clear", and Grove will never quietly show it as safe. Hover the badge for the reason.
-- **Ledger unknown** - The ledger could not answer about this worktree at all. Same rule: unknown, never safe.
-- **`<tool>` working here** - An agent session (Claude, Codex) is working in this worktree right now. Hover to see which session, on which machine, and until when.
-- **Drifted** - The worktree has changed since its last recorded checkpoint.
-- **No checkpoint** - Nothing has ever been recorded about this worktree.
-
-Expand a worktree's details for the full picture, including an expired agent claim and who last held it. Nothing in Grove can override the ledger — that stays a deliberate command-line step, so it is always recorded.
-
 ### Path
 
 Shows the filesystem path to the worktree directory.
@@ -174,15 +158,9 @@ Click the **⋯** button on any worktree card for the full set of actions. (Righ
 - **Edit / Delete note** - Manage the worktree's purpose note
 - **Open All** - Terminal, editor and browser together
 - **Pull** / **Sync** - Update from remote (Sync is disabled while the worktree is dirty)
-- **Open in** - Editor, Terminal, Git Client, Browser, Finder, and **Waypoint**
+- **Open in** - Editor, Terminal, Git Client, Browser, and Finder
 - **Copy** - Path, branch name, URL, or a ready-made `cd` command
 - **Delete Worktree** - Remove it, with confirmation
-
-#### Open in Waypoint
-
-Shown only when the worktree has a record in the Worktree Ledger. It opens Waypoint on that record, where you can see the full risk detail and the remedy for each one.
-
-This is a one-way, read-only handover: Waypoint shows you what it knows, and cannot remove, acknowledge or override anything on your behalf.
 
 ## Header Actions
 
