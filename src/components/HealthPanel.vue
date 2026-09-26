@@ -98,6 +98,7 @@ const gradeStyles: Record<HealthGrade, { text: string; bg: string; ring: string 
   C: { text: 'text-warning', bg: 'bg-warning-muted', ring: 'ring-warning/20' },
   D: { text: 'text-danger', bg: 'bg-danger-muted', ring: 'ring-danger/20' },
   F: { text: 'text-danger', bg: 'bg-danger-muted', ring: 'ring-danger/20' },
+  '?': { text: 'text-text-muted', bg: 'bg-surface-overlay', ring: 'ring-border-subtle' },
 }
 
 const overallGradeStyle = computed(() => {
@@ -148,7 +149,7 @@ const totalFindings = computed(() =>
   issueGroups.value.reduce((sum, group) => sum + group.findings.length, 0)
 )
 
-/** Parsed finding count for a worktree row (fixes the joined-token count) */
+/** Parsed finding count for a worktree row */
 function worktreeFindingCount(issues: string[]): number {
   return issues.reduce((sum, issue) => sum + parseHealthIssueMessage(issue).length, 0)
 }

@@ -68,23 +68,18 @@ describe('parseHealthIssueMessage', () => {
     })
   })
 
-  describe('comma-joined messages (CLI split bug tolerance)', () => {
-    it('splits comma-joined tokens into separate findings', () => {
-      const findings = parseHealthIssueMessage('changes:37,age:105d')
-      expect(findings).toHaveLength(2)
-      expect(findings[0].title).toBe('37 uncommitted changes')
-      expect(findings[1].title).toBe('No commits for 105 days')
-    })
+  it('translates separate issue array entries without splitting their contents', () => {
+    const findings = ['changes:1', 'unmerged'].flatMap(parseHealthIssueMessage)
+    expect(findings.map(f => f.kind)).toEqual(['changes', 'unmerged'])
+    expect(parseHealthIssueMessage('future,issue')).toHaveLength(1)
+    expect(parseHealthIssueMessage('')).toEqual([])
+  })
 
-    it('handles single tokens identically (post-CLI-fix shape)', () => {
-      expect(parseHealthIssueMessage('changes:37')).toHaveLength(1)
-    })
-
-    it('ignores empty segments and whitespace', () => {
-      expect(parseHealthIssueMessage(' changes:2 , ,age:20d ')).toHaveLength(2)
-      expect(parseHealthIssueMessage('')).toEqual([])
-      expect(parseHealthIssueMessage('   ')).toEqual([])
-    })
+  it('explains unknown merge status without a score penalty', () => {
+    const finding = parseHealthIssueMessage('merge-unknown')[0]
+    expect(finding.title).toBe('Merge status unknown')
+    expect(finding.scoreImpact).toBe(0)
+    expect(finding.actions.map(a => a.id)).toEqual(['view-worktree'])
   })
 
   describe('unknown tokens', () => {

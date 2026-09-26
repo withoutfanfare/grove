@@ -835,7 +835,6 @@ pub fn get_worktrees(app: &tauri::AppHandle, repo_name: &str) -> WtResult<Vec<Wo
 /// Get status of worktrees in a repository
 ///
 /// Note: This runs `grove ls <repo> --json` as status is provided in the ls output.
-/// The grove status command doesn't currently support --json output.
 pub fn get_worktree_status(app: &tauri::AppHandle, repo_name: &str) -> WtResult<Vec<Worktree>> {
     // Status information is included in ls --json output
     get_worktrees(app, repo_name)
@@ -2422,16 +2421,24 @@ pub fn repair_repository(app: &tauri::AppHandle, repo_name: &str) -> WtResult<Re
     extract_json_object(&output)
 }
 
-/// Unlock a repository (remove stale lock files)
-///
-/// Executes `wt unlock <repo> --json` and returns the result.
-/// Removes git lock files that may have been left behind after crashes.
+/// Unlock without forcing: preserve recent locks and locks held by running processes.
+/// The CLI reports this command on stderr, including when --json is supplied.
 pub fn unlock_repository(app: &tauri::AppHandle, repo_name: &str) -> WtResult<UnlockResult> {
     validate_repo_name(repo_name)?;
+    let (stdout, stderr) = execute_wt_with_stderr(app, &["unlock", repo_name])?;
+    Ok(unlock_result(repo_name, &stdout, &stderr))
+}
 
-    let output = execute_wt(app, &["unlock", repo_name, "--json"])?;
-
-    extract_json_object(&output)
+fn unlock_result(repo_name: &str, stdout: &str, stderr: &str) -> UnlockResult {
+    let output = strip_ansi(&format!("{}\n{}", stdout, stderr));
+    UnlockResult {
+        success: true,
+        repo: repo_name.to_string(),
+        message: format!(
+            "{}\nRecent locks (under five minutes old) and locks in use are left in place to protect running Git operations.",
+            output.trim()
+        ),
+    }
 }
 
 /// Get the path to the grove config file
@@ -2595,6 +2602,65 @@ mod tests {
         // This will pass if wt is installed, fail if not
         // Just ensure it doesn't panic
         // Requires AppHandle - tested via integration tests
+    }
+
+    #[test]
+    fn cli_pr4_output_contract() {
+        // Captured from main at 7538a34 using isolated local Git repositories.
+        let fixtures: serde_json::Value = serde_json::from_str(include_str!("../tests/fixtures/cli-pr4.json")).unwrap();
+        for key in ["ls", "status", "empty-ls", "missing-base-ls", "threshold-ls", "invalid-base-ls"] {
+            let rows: Vec<Worktree> = extract_json_array(&fixtures[key].to_string()).unwrap();
+            if key == "ls" {
+                assert!(rows[0].dirty);
+                assert_eq!(rows[0].stale, Some(true));
+                assert_eq!(rows[0].behind, Some(0));
+                assert_eq!(rows[0].sha.len(), 7);
+            }
+            if key == "missing-base-ls" { assert_eq!(rows[0].merged, Some(false)); }
+            if key == "threshold-ls" { assert_eq!(rows[0].stale, Some(false)); }
+        }
+        for key in ["health", "missing-base-health"] {
+            let health: HealthResult = extract_json_object(&fixtures[key].to_string()).unwrap();
+            if key == "missing-base-health" {
+                assert!(health.worktrees[0].issues.iter().any(|issue| issue == "merge-unknown"));
+            }
+        }
+        let _: BranchesResult = extract_json_object(&fixtures["branches"].to_string()).unwrap();
+        for key in ["repos", "empty-repos"] {
+            let _: Vec<Repository> = extract_json_array(&fixtures[key].to_string()).unwrap();
+        }
+        let _: Vec<RecentWorktree> = extract_json_array(&fixtures["recent"].to_string()).unwrap();
+        let log: crate::types::LogResult = extract_json_object(&fixtures["log"].to_string()).unwrap();
+        assert_eq!(log.commits[0].message, "Subject | keeps author intact");
+        assert_eq!(log.commits[0].author, "Compatibility Test");
+        let changes: crate::types::ChangesResult = extract_json_object(&fixtures["changes"].to_string()).unwrap();
+        assert!(changes.files.iter().any(|file| file.path == "new name.txt" && file.status == "R"));
+        for path in ["café.txt", "quote\"name.txt", "space name.txt", "literal -> arrow.txt"] {
+            assert!(changes.files.iter().any(|file| file.path == path));
+        }
+        let _: PruneResult = extract_json_object(&fixtures["prune"].to_string()).unwrap();
+        let pulls: PullAllResult = extract_json_object(&fixtures["pull-all"].to_string()).unwrap();
+        assert_eq!(pulls.summary.failed, 1);
+        assert!(pulls.worktrees[0].already_up_to_date);
+        assert!(!pulls.worktrees[1].success);
+        let _: ServicesStatusResult = extract_json_object(&fixtures["services-status"].to_string()).unwrap();
+        let repair: RepairResult = extract_json_object(&fixtures["damaged-repair"].to_string()).unwrap();
+        assert!(!repair.success);
+        assert_eq!(repair.issues_fixed, 0);
+        assert!(repair.message.contains("--recovery"));
+        let error = structured_cli_error(r#"{"success":false,"error":{"code":"WORKTREE_NOT_FOUND","message":"missing\nbranch\tname\u0001"}}"#).unwrap();
+        assert_eq!(error.code, "WORKTREE_NOT_FOUND");
+        assert_eq!(error.message, "missing\nbranch\tname\u{0001}");
+    }
+
+    #[test]
+    fn unlock_preserves_cli_explanation_and_does_not_claim_no_locks_exist() {
+        let result = unlock_result("demo", "", "\u{1b}[33mLock is under 5 minutes old, not removing: topic\u{1b}[0m\nNo lock files removed for demo");
+        assert!(result.success);
+        assert!(result.message.contains("not removing: topic"));
+        assert!(result.message.contains("protect running Git operations"));
+        assert!(!result.message.contains('\u{1b}'));
+        assert!(!result.message.contains("No locks found"));
     }
 
     #[test]

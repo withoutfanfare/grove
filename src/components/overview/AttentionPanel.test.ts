@@ -27,7 +27,12 @@ const healthFixture: HealthResult = {
     {
       severity: 'critical',
       worktree: 'enneagram-assessment',
-      message: 'changes:37,age:105d',
+      message: 'changes:37',
+    },
+    {
+      severity: 'critical',
+      worktree: 'enneagram-assessment',
+      message: 'age:105d',
     },
   ],
   worktrees: [],

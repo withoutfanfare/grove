@@ -5,7 +5,7 @@
  * Displays status badges for worktree conditions:
  * - MERGED: Branch has been merged into the base branch (green tag)
  * - UNMERGED: Branch has not been merged into the base branch (orange warning)
- * - STALE: Worktree is >50 commits behind (orange clock icon)
+ * - STALE: Worktree is beyond the configured threshold behind base (orange clock icon)
  * - MISMATCH: Directory name doesn't match branch slug (yellow warning)
  *
  * Each badge has a tooltip explaining its meaning.
@@ -16,7 +16,7 @@ import { SBadge } from '@stuntrocket/ui'
 const props = defineProps<{
   /** Whether the branch has been merged into the base branch */
   merged?: boolean
-  /** Whether the worktree is stale (>50 commits behind) */
+  /** Whether the worktree is stale (beyond the configured threshold behind base) */
   stale?: boolean
   /** Whether there's a mismatch between directory name and branch slug */
   mismatch?: boolean
@@ -47,7 +47,7 @@ const hasAnyBadge = computed(
       v-if="showMerged"
       variant="success"
       class="!border-transparent gap-1 compact-badge"
-      title="This branch has been merged into the base branch and can be safely removed"
+      title="This branch has been merged into the base branch"
       role="status"
       aria-label="Branch merged into base"
     >
@@ -74,7 +74,7 @@ const hasAnyBadge = computed(
       v-if="showUnmerged"
       variant="warning"
       class="!border-transparent gap-1 compact-badge"
-      title="This branch has not been merged into the base branch"
+      title="This branch is not confirmed as merged into the base branch"
       role="status"
       aria-label="Branch not merged"
     >
@@ -101,7 +101,7 @@ const hasAnyBadge = computed(
       v-if="showStale"
       variant="warning"
       class="!border-transparent gap-1 compact-badge"
-      title="This worktree is significantly behind the base branch (>50 commits). Consider syncing or removing it."
+      title="This worktree is behind the base branch beyond the repository’s configured stale threshold. Consider syncing it."
       role="status"
       aria-label="Worktree is stale"
     >

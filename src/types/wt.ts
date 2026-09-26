@@ -64,9 +64,9 @@ export interface Worktree {
   url?: string;
   /** Whether the worktree has uncommitted changes */
   dirty: boolean;
-  /** Number of commits ahead of the tracking branch (null when the base ref is unresolvable) */
+  /** Number of commits ahead of the tracking branch (null when there is no upstream) */
   ahead: number | null;
-  /** Number of commits behind the tracking branch (null when the base ref is unresolvable) */
+  /** Number of commits behind the tracking branch (null when there is no upstream) */
   behind: number | null;
   /** Whether there's a branch mismatch */
   mismatch?: boolean;
@@ -78,7 +78,7 @@ export interface Worktree {
   lastAccessed?: string;
   /** Whether the branch has been merged into the base branch */
   merged?: boolean;
-  /** Whether the worktree is stale (>50 commits behind) */
+  /** Whether the worktree is stale (beyond the configured threshold behind base) */
   stale?: boolean;
 }
 
@@ -112,7 +112,7 @@ export interface WtError {
  *
  * These values are serialised as uppercase single letters in JSON.
  */
-export type HealthGrade = 'A' | 'B' | 'C' | 'D' | 'F';
+export type HealthGrade = 'A' | 'B' | 'C' | 'D' | 'F' | '?';
 
 /**
  * Status for worktree display
@@ -540,8 +540,6 @@ export interface UnlockResult {
   success: boolean;
   /** Repository name */
   repo: string;
-  /** Number of locks removed */
-  locks_removed: number;
   /** Output message */
   message: string;
 }

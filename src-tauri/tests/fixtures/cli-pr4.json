@@ -1,0 +1,288 @@
+{
+  "ls": [
+    {
+      "path": "/fixtures/root/demo-worktrees/topic",
+      "branch": "topic",
+      "sha": "3290402",
+      "url": "https://topic.test",
+      "dirty": true,
+      "ahead": 0,
+      "behind": 0,
+      "mismatch": false,
+      "health_grade": "D",
+      "health_score": 65,
+      "lastAccessed": "2026-09-26T12:52:51Z",
+      "merged": true,
+      "stale": true
+    }
+  ],
+  "status": [
+    {
+      "branch": "topic",
+      "path": "/fixtures/root/demo-worktrees/topic",
+      "sha": "3290402",
+      "dirty": true,
+      "changes": 1,
+      "ahead": null,
+      "behind": null,
+      "stale": true,
+      "age": "<1h",
+      "age_days": 0,
+      "merged": true
+    }
+  ],
+  "health": {
+    "repo": "demo",
+    "overall_grade": "D",
+    "overall_score": 65,
+    "worktree_count": 1,
+    "summary": {
+      "healthy": 0,
+      "warning": 1,
+      "critical": 0
+    },
+    "issues": [
+      {
+        "severity": "warning",
+        "worktree": "topic",
+        "message": "behind:60"
+      },
+      {
+        "severity": "warning",
+        "worktree": "topic",
+        "message": "changes:1"
+      }
+    ],
+    "worktrees": [
+      {
+        "branch": "topic",
+        "grade": "D",
+        "score": 65,
+        "issues": [
+          "behind:60",
+          "changes:1"
+        ]
+      }
+    ]
+  },
+  "branches": {
+    "repo": "demo",
+    "branches": [
+      {
+        "name": "main",
+        "type": "local",
+        "has_worktree": false,
+        "worktree_path": null,
+        "sha": "71f5680",
+        "last_commit_at": 1790427172
+      },
+      {
+        "name": "topic",
+        "type": "local",
+        "has_worktree": true,
+        "worktree_path": "/fixtures/root/demo-worktrees/topic",
+        "sha": "3290402",
+        "last_commit_at": 1790427171
+      }
+    ]
+  },
+  "repos": [
+    {
+      "name": "demo",
+      "worktrees": 1
+    },
+    {
+      "name": "empty",
+      "worktrees": 0
+    }
+  ],
+  "recent": [
+    {
+      "repo": "demo",
+      "branch": "topic",
+      "path": "/fixtures/root/demo-worktrees/topic",
+      "url": "https://topic.test",
+      "accessed_at": 1790427171,
+      "accessed_ago": "0m ago",
+      "dirty": true
+    }
+  ],
+  "log": {
+    "commits": [
+      {
+        "sha": "3290402",
+        "message": "Subject | keeps author intact",
+        "author": "Compatibility Test",
+        "date": "2026-09-26T13:52:51+01:00"
+      }
+    ]
+  },
+  "changes": {
+    "files": [
+      {
+        "path": "new name.txt",
+        "status": "R"
+      },
+      {
+        "path": "café.txt",
+        "status": "?"
+      },
+      {
+        "path": "literal -> arrow.txt",
+        "status": "?"
+      },
+      {
+        "path": "quote\"name.txt",
+        "status": "?"
+      },
+      {
+        "path": "space name.txt",
+        "status": "?"
+      },
+      {
+        "path": "untracked.env",
+        "status": "?"
+      }
+    ]
+  },
+  "prune": {
+    "repo": "empty",
+    "stale_refs_pruned": 0,
+    "merged_branches": [],
+    "summary": {
+      "branches_found": 0,
+      "branches_deleted": 0
+    }
+  },
+  "repair": {
+    "success": true,
+    "repo": "demo",
+    "issues_found": 0,
+    "issues_fixed": 0,
+    "message": "No issues found in demo"
+  },
+  "services-status": {
+    "supervisor_running": false,
+    "redis_running": true,
+    "apps": []
+  },
+  "empty-ls": [],
+  "empty-repos": [],
+  "missing-base-health": {
+    "repo": "demo",
+    "overall_grade": "A",
+    "overall_score": 95,
+    "worktree_count": 1,
+    "summary": {
+      "healthy": 1,
+      "warning": 0,
+      "critical": 0
+    },
+    "issues": [
+      {
+        "severity": "warning",
+        "worktree": "topic",
+        "message": "changes:1"
+      },
+      {
+        "severity": "warning",
+        "worktree": "topic",
+        "message": "merge-unknown"
+      }
+    ],
+    "worktrees": [
+      {
+        "branch": "topic",
+        "grade": "A",
+        "score": 95,
+        "issues": [
+          "changes:1",
+          "merge-unknown"
+        ]
+      }
+    ]
+  },
+  "missing-base-ls": [
+    {
+      "path": "/fixtures/root/demo-worktrees/topic",
+      "branch": "topic",
+      "sha": "3290402",
+      "url": "https://topic.test",
+      "dirty": true,
+      "ahead": null,
+      "behind": null,
+      "mismatch": false,
+      "health_grade": "A",
+      "health_score": 95,
+      "lastAccessed": "2026-09-26T12:52:51Z",
+      "merged": false,
+      "stale": false
+    }
+  ],
+  "threshold-ls": [
+    {
+      "path": "/fixtures/root/demo-worktrees/topic",
+      "branch": "topic",
+      "sha": "3290402",
+      "url": "https://topic.test",
+      "dirty": true,
+      "ahead": null,
+      "behind": null,
+      "mismatch": false,
+      "health_grade": "D",
+      "health_score": 65,
+      "lastAccessed": "2026-09-26T12:52:51Z",
+      "merged": true,
+      "stale": false
+    }
+  ],
+  "invalid-base-ls": [
+    {
+      "path": "/fixtures/root/demo-worktrees/topic",
+      "branch": "topic",
+      "sha": "3290402",
+      "url": "https://topic.test",
+      "dirty": true,
+      "ahead": null,
+      "behind": null,
+      "mismatch": false,
+      "health_grade": "D",
+      "health_score": 65,
+      "lastAccessed": "2026-09-26T12:52:51Z",
+      "merged": true,
+      "stale": true
+    }
+  ],
+  "pull-all": {
+    "repo": "empty",
+    "worktrees": [
+      {
+        "branch": "tracked",
+        "success": true,
+        "already_up_to_date": true,
+        "commits_pulled": 0,
+        "message": "Current branch tracked is up to date."
+      },
+      {
+        "branch": "untracked",
+        "success": false,
+        "already_up_to_date": false,
+        "commits_pulled": 0,
+        "message": "There is no tracking information for the current branch."
+      }
+    ],
+    "summary": {
+      "total": 2,
+      "succeeded": 1,
+      "failed": 1,
+      "up_to_date": 1
+    }
+  },
+  "damaged-repair": {
+    "success": false,
+    "repo": "demo",
+    "issues_found": 1,
+    "issues_fixed": 0,
+    "message": "Found 1 issue(s) in demo, fixed 0 - run repair with --recovery to attempt automatic recovery"
+  }
+}
