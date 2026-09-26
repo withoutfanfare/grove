@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.9] - 26 September 2026
+
+### Fixed
+
+- Show failed pulls as failures in bulk progress, resumed operations and the completion notification, preserving the CLI's error message.
+- Report unlock deletion failures even when the CLI exits successfully.
+- Bundle grove-cli PR #5 and add regression fixtures for unreachable remotes, invalid stale thresholds and lock deletion failures.
+
 ## [0.3.8] - 26 September 2026
 
 ### Fixed
