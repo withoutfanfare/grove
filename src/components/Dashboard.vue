@@ -1048,7 +1048,7 @@ async function handleTitlebarDrag(e: MouseEvent) {
           <!-- Header (Sticky & Glassmorphic) -->
           <header class="sticky top-0 border-b border-white/5"
             style="background-color: color-mix(in srgb, var(--color-surface-raised) 92%, transparent); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); z-index: 100;">
-            <div class="px-5 py-2.5 pt-7 flex items-center gap-3">
+            <div class="px-5 py-2.5 flex items-center gap-3" style="padding-top: 28px;">
               <!-- Left: repo info -->
               <div class="flex items-center gap-2.5 flex-shrink-0 min-w-0">
                 <h1 class="text-[17px] font-semibold text-text-primary tracking-tight truncate">
