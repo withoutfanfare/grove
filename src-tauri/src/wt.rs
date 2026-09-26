@@ -1023,6 +1023,15 @@ pub fn pull_worktree(
     execute_wt_json_result(app, &["pull", repo_name, branch, "--json"])
 }
 
+/// Batch progress must use the CLI's result, not merely successful JSON parsing.
+fn require_successful_pull(result: PullResult) -> WtResult<PullResult> {
+    if result.success {
+        Ok(result)
+    } else {
+        Err(WtError::command_failed(sanitise_error_message(&result.message)))
+    }
+}
+
 /// Sync (rebase) a worktree onto its base branch
 ///
 /// Executes `wt sync <repo> <branch> --json` and parses the result.
@@ -1335,7 +1344,7 @@ pub fn pull_selected_with_progress(
                 emit_progress(app, "pull_all", current, total, branch, "in_progress", None);
 
                 // Execute individual pull
-                let result = pull_worktree(app, &repo_name_owned, branch);
+                let result = pull_worktree(app, &repo_name_owned, branch).and_then(require_successful_pull);
 
                 match result {
                     Ok(pull_result) => {
@@ -1628,7 +1637,7 @@ pub fn pull_all_with_progress(repo_name: &str, app: &tauri::AppHandle) -> WtResu
                 emit_progress(app, "pull_all", current, total, branch, "in_progress", None);
 
                 // Execute individual pull
-                let result = pull_worktree(app, repo_name, branch);
+                let result = pull_worktree(app, repo_name, branch).and_then(require_successful_pull);
 
                 // L1: Removed unused _order tracking - completion order is not needed
                 // as progress events provide real-time status updates
@@ -1870,7 +1879,7 @@ pub fn resume_pull_all_operation(
 
                 emit_progress(app, "pull_all", current, total, branch, "in_progress", None);
 
-                let result = pull_worktree(app, &repo_name, branch);
+                let result = pull_worktree(app, &repo_name, branch).and_then(require_successful_pull);
 
                 match result {
                     Ok(pull_result) => {
@@ -1949,7 +1958,7 @@ fn build_pull_all_result_from_state(state: &OperationState) -> PullAllResult {
         .iter()
         .map(|item| {
             let success = item.status == crate::types::ItemStatus::Success;
-            let already_up_to_date = item
+            let already_up_to_date = success && item
                 .message
                 .as_ref()
                 .map(|m| m.contains("up to date"))
@@ -1957,6 +1966,7 @@ fn build_pull_all_result_from_state(state: &OperationState) -> PullAllResult {
             let commits_pulled = item
                 .message
                 .as_ref()
+                .filter(|_| success)
                 .and_then(|m| {
                     // Parse "+N commits" from message
                     if m.starts_with('+') {
@@ -2432,7 +2442,7 @@ pub fn unlock_repository(app: &tauri::AppHandle, repo_name: &str) -> WtResult<Un
 fn unlock_result(repo_name: &str, stdout: &str, stderr: &str) -> UnlockResult {
     let output = strip_ansi(&format!("{}\n{}", stdout, stderr));
     UnlockResult {
-        success: true,
+        success: !output.contains("Could not remove lock:"),
         repo: repo_name.to_string(),
         message: format!(
             "{}\nRecent locks (under five minutes old) and locks in use are left in place to protect running Git operations.",
@@ -2651,6 +2661,50 @@ mod tests {
         let error = structured_cli_error(r#"{"success":false,"error":{"code":"WORKTREE_NOT_FOUND","message":"missing\nbranch\tname\u0001"}}"#).unwrap();
         assert_eq!(error.code, "WORKTREE_NOT_FOUND");
         assert_eq!(error.message, "missing\nbranch\tname\u{0001}");
+    }
+
+    #[test]
+    fn cli_pr5_failures_and_config_warning_contract() {
+        let fixtures: serde_json::Value = serde_json::from_str(include_str!("../tests/fixtures/cli-pr5.json")).unwrap();
+        assert_eq!(fixtures["pull-all"]["exit_code"], 0);
+        let batch: PullAllResult = extract_json_object(&fixtures["pull-all"]["stdout"].to_string()).unwrap();
+        assert_eq!(batch.summary.failed, 1);
+        assert!(!batch.worktrees[0].success);
+        assert!(!batch.worktrees[0].already_up_to_date);
+        assert_eq!(batch.worktrees[0].commits_pulled, 0);
+        assert!(batch.worktrees[0].message.starts_with("Fetch failed, nothing was pulled:"));
+
+        // The app's progress paths use individual pulls, which return parsed JSON even on failure.
+        let pull: PullResult = extract_json_object(&fixtures["pull"]["stdout"].to_string()).unwrap();
+        let error = require_successful_pull(pull.clone()).unwrap_err();
+        assert!(error.message.contains("Could not read from remote repository"));
+        let mut state = OperationState::new(PersistentOperationType::PullAll, "demo", vec!["topic".into()]);
+        state.mark_item_failed("topic", error.message);
+        let resumed = build_pull_all_result_from_state(&state);
+        assert_eq!(resumed.summary.failed, 1);
+        assert_eq!(resumed.summary.succeeded, 0);
+        assert_eq!(resumed.worktrees[0].commits_pulled, 0);
+        state.mark_item_failed("topic", "Could not bring branch up to date".into());
+        assert!(!build_pull_all_result_from_state(&state).worktrees[0].already_up_to_date);
+        assert!(require_successful_pull(PullResult { success: true, ..pull }).is_ok());
+
+        assert_eq!(fixtures["ls"]["exit_code"], 0);
+        assert!(fixtures["ls"]["stderr"].as_str().unwrap().contains("Invalid GROVE_STALE_THRESHOLD"));
+        let worktrees: Vec<Worktree> = extract_json_array(&fixtures["ls"]["stdout"].to_string()).unwrap();
+        assert_eq!(worktrees.len(), 1);
+        let repair: RepairResult = extract_json_object(&fixtures["repair"]["stdout"].to_string()).unwrap();
+        assert!(repair.success);
+        assert_eq!(fixtures["unlock"]["exit_code"], 0);
+        let unlock = unlock_result("demo", fixtures["unlock"]["stdout"].as_str().unwrap(), fixtures["unlock"]["stderr"].as_str().unwrap());
+        assert!(!unlock.success);
+        assert!(unlock.message.contains("Could not remove lock:"));
+    }
+
+    #[test]
+    fn unlock_reports_failed_deletion_even_with_successful_exit() {
+        let result = unlock_result("demo", "", "Could not remove lock: topic\nNo lock files removed for demo");
+        assert!(!result.success);
+        assert!(result.message.contains("Could not remove lock: topic"));
     }
 
     #[test]

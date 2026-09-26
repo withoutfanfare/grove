@@ -563,8 +563,15 @@ async function handlePullAll() {
   pauseAutoRefresh()
   isPullingAll.value = true
   try {
-    await pullAllWorktrees(selectedRepoName.value)
-    toast.success('Pull all completed successfully')
+    const result = await pullAllWorktrees(selectedRepoName.value)
+    const failed = result?.worktrees.find(worktree => !worktree.success)
+    if (!result) {
+      toast.error('Failed to pull worktrees')
+    } else if (failed || result.summary.failed > 0) {
+      toast.error(failed?.message || 'Failed to pull worktrees. Check the remote and your network, then try again.')
+    } else {
+      toast.success('Pull all completed successfully')
+    }
   } catch {
     toast.error('Failed to pull worktrees')
   } finally {
