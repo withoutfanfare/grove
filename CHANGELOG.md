@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.8] - 26 September 2026
+
+### Fixed
+
+- Handle updated grove-cli health output, including unknown grades and merge status, and preserve separate health issues throughout the overview.
+- Display unlock results and explain why recent or active locks are retained.
+- Respect configurable stale thresholds in badge text and avoid claiming merged worktrees are always safe to remove.
+- Bundle the grove-cli fixes merged in PR #4, with captured-output regression coverage.
+
 ### Changed
 
 - **Deleting a worktree runs the removal gate, and the dialogue relays its answer** - `grove rm` now refuses when a worktree has uncommitted changes, commits no remote has, or a live agent session, and says exactly what would be lost. The delete dialogue shows that account line by line and offers no way past it: save the work, or wait for the session to end, then try again
