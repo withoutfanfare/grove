@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.10] - 5 October 2026
+
+### Fixed
+
+- Removing worktrees no longer fails with "cannot determine database" for worktrees Grove did not create (such as Codex worktrees with no `.env`). The bundled CLI now removes them and skips the database backup and drop rather than guessing a database.
+- Keep the top-right toolbar buttons below the window drag strip so they can be clicked.
+
 ## [0.3.9] - 26 September 2026
 
 ### Fixed
