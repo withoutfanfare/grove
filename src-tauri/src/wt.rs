@@ -870,7 +870,7 @@ pub fn get_version(app: &tauri::AppHandle) -> WtResult<String> {
 /// Git forbids branch names starting with '/', so the two cannot be confused.
 fn removal_target_arg(target: &str) -> WtResult<String> {
     if target.starts_with('/') {
-        if target.contains("..") || target.chars().any(|c| c.is_control()) {
+        if target.split('/').any(|c| c == "..") || target.chars().any(|c| c.is_control()) {
             return Err(WtError::new(
                 "INVALID_INPUT",
                 "Worktree path contains invalid characters",
@@ -2826,6 +2826,10 @@ mod tests {
             "--path=/Users/me/Herd/app-worktrees/parked"
         );
         assert!(removal_target_arg("/Users/me/../etc").is_err());
+        assert_eq!(
+            removal_target_arg("/Users/me/app..backup/parked").unwrap(),
+            "--path=/Users/me/app..backup/parked"
+        );
         assert!(removal_target_arg("/Users/me/a\nb").is_err());
         assert!(removal_target_arg("-rf").is_err());
     }
