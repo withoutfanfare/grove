@@ -160,7 +160,8 @@ async function handleDelete() {
   try {
     const response = await removeWorktree({
       repo: repoName,
-      branch: worktree.branch,
+      // A detached worktree has no branch, so it is removed by its path.
+      branch: worktree.branch || worktree.path,
       deleteBranch: deleteBranch.value,
       dropDb: dropDatabase.value,
       skipBackup: skipBackup.value,

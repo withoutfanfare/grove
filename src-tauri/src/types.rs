@@ -54,6 +54,8 @@ pub enum HealthGrade {
     C,
     D,
     F,
+    #[serde(rename = "?")]
+    Unknown,
 }
 
 impl std::fmt::Display for HealthGrade {
@@ -64,6 +66,7 @@ impl std::fmt::Display for HealthGrade {
             HealthGrade::C => write!(f, "C"),
             HealthGrade::D => write!(f, "D"),
             HealthGrade::F => write!(f, "F"),
+            HealthGrade::Unknown => write!(f, "?"),
         }
     }
 }
@@ -92,11 +95,11 @@ pub struct Worktree {
     /// Whether the worktree has uncommitted changes
     pub dirty: bool,
     /// Number of commits ahead of the tracking branch
-    /// (`None` when the CLI cannot resolve the base ref and emits `null`)
+    /// (`None` when there is no upstream and the CLI emits `null`)
     #[serde(default)]
     pub ahead: Option<u32>,
     /// Number of commits behind the tracking branch
-    /// (`None` when the CLI cannot resolve the base ref and emits `null`)
+    /// (`None` when there is no upstream and the CLI emits `null`)
     #[serde(default)]
     pub behind: Option<u32>,
     /// Whether there's a branch mismatch
@@ -114,7 +117,7 @@ pub struct Worktree {
     /// Whether the branch has been merged into the base branch
     #[serde(default)]
     pub merged: Option<bool>,
-    /// Whether the worktree is stale (>50 commits behind)
+    /// Whether the worktree is stale (beyond the configured threshold behind base)
     #[serde(default)]
     pub stale: Option<bool>,
 }
@@ -974,8 +977,6 @@ pub struct UnlockResult {
     pub success: bool,
     /// Repository name
     pub repo: String,
-    /// Number of locks removed
-    pub locks_removed: u32,
     /// Output message
     pub message: String,
 }
@@ -1237,6 +1238,15 @@ mod tests {
         assert_eq!(wt.branch, "feature/test");
         assert!(wt.dirty);
         assert_eq!(wt.health_grade, Some(HealthGrade::B));
+    }
+
+    #[test]
+    fn cli_unknown_health_grade() {
+        let wt: Worktree = serde_json::from_str(r#"{"path":"/repo/topic","branch":"topic","sha":"1234567","dirty":true,"ahead":null,"behind":null,"merged":false,"stale":true,"health_grade":"?","health_score":0}"#).unwrap();
+        assert_eq!(wt.health_grade.unwrap().to_string(), "?");
+        assert_eq!(wt.health_score, Some(0));
+        assert!(wt.dirty);
+        assert_eq!(wt.behind, None);
     }
 
     // The CLI emits `"ahead": null` / `"behind": null` when the base ref

@@ -295,11 +295,7 @@ async function handleUnlock(repoName: string) {
   try {
     const result = await unlockRepository(repoName)
     if (result.success) {
-      if (result.locks_removed > 0) {
-        toast.success(`${repoName}: Removed ${result.locks_removed} lock${result.locks_removed === 1 ? '' : 's'}`)
-      } else {
-        toast.info(`${repoName}: No locks found`)
-      }
+      toast.info(`${repoName}: ${result.message}`)
     } else {
       toast.error(`${repoName}: ${result.message || 'Unlock failed'}`)
     }

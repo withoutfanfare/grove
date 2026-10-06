@@ -835,7 +835,6 @@ pub fn get_worktrees(app: &tauri::AppHandle, repo_name: &str) -> WtResult<Vec<Wo
 /// Get status of worktrees in a repository
 ///
 /// Note: This runs `grove ls <repo> --json` as status is provided in the ls output.
-/// The grove status command doesn't currently support --json output.
 pub fn get_worktree_status(app: &tauri::AppHandle, repo_name: &str) -> WtResult<Vec<Worktree>> {
     // Status information is included in ls --json output
     get_worktrees(app, repo_name)
@@ -864,6 +863,23 @@ pub fn is_wt_available(app: &tauri::AppHandle) -> bool {
 pub fn get_version(app: &tauri::AppHandle) -> WtResult<String> {
     let output = execute_wt(app, &["--version"])?;
     Ok(output.trim().to_string())
+}
+
+/// The `grove rm` argument for a removal target: a branch name, or for a
+/// detached worktree (which has no branch) its absolute folder, as `--path=`.
+/// Git forbids branch names starting with '/', so the two cannot be confused.
+fn removal_target_arg(target: &str) -> WtResult<String> {
+    if target.starts_with('/') {
+        if target.contains("..") || target.chars().any(|c| c.is_control()) {
+            return Err(WtError::new(
+                "INVALID_INPUT",
+                "Worktree path contains invalid characters",
+            ));
+        }
+        return Ok(format!("--path={}", target));
+    }
+    validate_branch_name(target)?;
+    Ok(target.to_string())
 }
 
 /// Validate a branch name to prevent command injection.
@@ -973,7 +989,7 @@ pub fn remove_worktree(
     force: bool,
 ) -> WtResult<crate::types::RemoveWorktreeResponse> {
     validate_repo_name(repo_name)?;
-    validate_branch_name(branch)?;
+    let target = removal_target_arg(branch)?;
 
     let mut args = vec!["rm"];
 
@@ -991,7 +1007,7 @@ pub fn remove_worktree(
     }
 
     args.push(repo_name);
-    args.push(branch);
+    args.push(&target);
     args.push("--json");
 
     let (stdout, stderr) = execute_wt_with_stderr(app, &args)?;
@@ -1022,6 +1038,15 @@ pub fn pull_worktree(
     validate_branch_name(branch)?;
 
     execute_wt_json_result(app, &["pull", repo_name, branch, "--json"])
+}
+
+/// Batch progress must use the CLI's result, not merely successful JSON parsing.
+fn require_successful_pull(result: PullResult) -> WtResult<PullResult> {
+    if result.success {
+        Ok(result)
+    } else {
+        Err(WtError::command_failed(sanitise_error_message(&result.message)))
+    }
 }
 
 /// Sync (rebase) a worktree onto its base branch
@@ -1336,7 +1361,7 @@ pub fn pull_selected_with_progress(
                 emit_progress(app, "pull_all", current, total, branch, "in_progress", None);
 
                 // Execute individual pull
-                let result = pull_worktree(app, &repo_name_owned, branch);
+                let result = pull_worktree(app, &repo_name_owned, branch).and_then(require_successful_pull);
 
                 match result {
                     Ok(pull_result) => {
@@ -1444,7 +1469,7 @@ pub fn remove_selected_with_progress(
 ) -> WtResult<RemoveSelectedResult> {
     validate_repo_name(repo_name)?;
     for branch in &branches {
-        validate_branch_name(branch)?;
+        removal_target_arg(branch)?;
     }
 
     let total = branches.len() as u32;
@@ -1629,7 +1654,7 @@ pub fn pull_all_with_progress(repo_name: &str, app: &tauri::AppHandle) -> WtResu
                 emit_progress(app, "pull_all", current, total, branch, "in_progress", None);
 
                 // Execute individual pull
-                let result = pull_worktree(app, repo_name, branch);
+                let result = pull_worktree(app, repo_name, branch).and_then(require_successful_pull);
 
                 // L1: Removed unused _order tracking - completion order is not needed
                 // as progress events provide real-time status updates
@@ -1871,7 +1896,7 @@ pub fn resume_pull_all_operation(
 
                 emit_progress(app, "pull_all", current, total, branch, "in_progress", None);
 
-                let result = pull_worktree(app, &repo_name, branch);
+                let result = pull_worktree(app, &repo_name, branch).and_then(require_successful_pull);
 
                 match result {
                     Ok(pull_result) => {
@@ -1950,7 +1975,7 @@ fn build_pull_all_result_from_state(state: &OperationState) -> PullAllResult {
         .iter()
         .map(|item| {
             let success = item.status == crate::types::ItemStatus::Success;
-            let already_up_to_date = item
+            let already_up_to_date = success && item
                 .message
                 .as_ref()
                 .map(|m| m.contains("up to date"))
@@ -1958,6 +1983,7 @@ fn build_pull_all_result_from_state(state: &OperationState) -> PullAllResult {
             let commits_pulled = item
                 .message
                 .as_ref()
+                .filter(|_| success)
                 .and_then(|m| {
                     // Parse "+N commits" from message
                     if m.starts_with('+') {
@@ -2422,16 +2448,24 @@ pub fn repair_repository(app: &tauri::AppHandle, repo_name: &str) -> WtResult<Re
     extract_json_object(&output)
 }
 
-/// Unlock a repository (remove stale lock files)
-///
-/// Executes `wt unlock <repo> --json` and returns the result.
-/// Removes git lock files that may have been left behind after crashes.
+/// Unlock without forcing: preserve recent locks and locks held by running processes.
+/// The CLI reports this command on stderr, including when --json is supplied.
 pub fn unlock_repository(app: &tauri::AppHandle, repo_name: &str) -> WtResult<UnlockResult> {
     validate_repo_name(repo_name)?;
+    let (stdout, stderr) = execute_wt_with_stderr(app, &["unlock", repo_name])?;
+    Ok(unlock_result(repo_name, &stdout, &stderr))
+}
 
-    let output = execute_wt(app, &["unlock", repo_name, "--json"])?;
-
-    extract_json_object(&output)
+fn unlock_result(repo_name: &str, stdout: &str, stderr: &str) -> UnlockResult {
+    let output = strip_ansi(&format!("{}\n{}", stdout, stderr));
+    UnlockResult {
+        success: !output.contains("Could not remove lock:"),
+        repo: repo_name.to_string(),
+        message: format!(
+            "{}\nRecent locks (under five minutes old) and locks in use are left in place to protect running Git operations.",
+            output.trim()
+        ),
+    }
 }
 
 /// Get the path to the grove config file
@@ -2598,6 +2632,109 @@ mod tests {
     }
 
     #[test]
+    fn cli_pr4_output_contract() {
+        // Captured from main at 7538a34 using isolated local Git repositories.
+        let fixtures: serde_json::Value = serde_json::from_str(include_str!("../tests/fixtures/cli-pr4.json")).unwrap();
+        for key in ["ls", "status", "empty-ls", "missing-base-ls", "threshold-ls", "invalid-base-ls"] {
+            let rows: Vec<Worktree> = extract_json_array(&fixtures[key].to_string()).unwrap();
+            if key == "ls" {
+                assert!(rows[0].dirty);
+                assert_eq!(rows[0].stale, Some(true));
+                assert_eq!(rows[0].behind, Some(0));
+                assert_eq!(rows[0].sha.len(), 7);
+            }
+            if key == "missing-base-ls" { assert_eq!(rows[0].merged, Some(false)); }
+            if key == "threshold-ls" { assert_eq!(rows[0].stale, Some(false)); }
+        }
+        for key in ["health", "missing-base-health"] {
+            let health: HealthResult = extract_json_object(&fixtures[key].to_string()).unwrap();
+            if key == "missing-base-health" {
+                assert!(health.worktrees[0].issues.iter().any(|issue| issue == "merge-unknown"));
+            }
+        }
+        let _: BranchesResult = extract_json_object(&fixtures["branches"].to_string()).unwrap();
+        for key in ["repos", "empty-repos"] {
+            let _: Vec<Repository> = extract_json_array(&fixtures[key].to_string()).unwrap();
+        }
+        let _: Vec<RecentWorktree> = extract_json_array(&fixtures["recent"].to_string()).unwrap();
+        let log: crate::types::LogResult = extract_json_object(&fixtures["log"].to_string()).unwrap();
+        assert_eq!(log.commits[0].message, "Subject | keeps author intact");
+        assert_eq!(log.commits[0].author, "Compatibility Test");
+        let changes: crate::types::ChangesResult = extract_json_object(&fixtures["changes"].to_string()).unwrap();
+        assert!(changes.files.iter().any(|file| file.path == "new name.txt" && file.status == "R"));
+        for path in ["café.txt", "quote\"name.txt", "space name.txt", "literal -> arrow.txt"] {
+            assert!(changes.files.iter().any(|file| file.path == path));
+        }
+        let _: PruneResult = extract_json_object(&fixtures["prune"].to_string()).unwrap();
+        let pulls: PullAllResult = extract_json_object(&fixtures["pull-all"].to_string()).unwrap();
+        assert_eq!(pulls.summary.failed, 1);
+        assert!(pulls.worktrees[0].already_up_to_date);
+        assert!(!pulls.worktrees[1].success);
+        let _: ServicesStatusResult = extract_json_object(&fixtures["services-status"].to_string()).unwrap();
+        let repair: RepairResult = extract_json_object(&fixtures["damaged-repair"].to_string()).unwrap();
+        assert!(!repair.success);
+        assert_eq!(repair.issues_fixed, 0);
+        assert!(repair.message.contains("--recovery"));
+        let error = structured_cli_error(r#"{"success":false,"error":{"code":"WORKTREE_NOT_FOUND","message":"missing\nbranch\tname\u0001"}}"#).unwrap();
+        assert_eq!(error.code, "WORKTREE_NOT_FOUND");
+        assert_eq!(error.message, "missing\nbranch\tname\u{0001}");
+    }
+
+    #[test]
+    fn cli_pr5_failures_and_config_warning_contract() {
+        let fixtures: serde_json::Value = serde_json::from_str(include_str!("../tests/fixtures/cli-pr5.json")).unwrap();
+        assert_eq!(fixtures["pull-all"]["exit_code"], 0);
+        let batch: PullAllResult = extract_json_object(&fixtures["pull-all"]["stdout"].to_string()).unwrap();
+        assert_eq!(batch.summary.failed, 1);
+        assert!(!batch.worktrees[0].success);
+        assert!(!batch.worktrees[0].already_up_to_date);
+        assert_eq!(batch.worktrees[0].commits_pulled, 0);
+        assert!(batch.worktrees[0].message.starts_with("Fetch failed, nothing was pulled:"));
+
+        // The app's progress paths use individual pulls, which return parsed JSON even on failure.
+        let pull: PullResult = extract_json_object(&fixtures["pull"]["stdout"].to_string()).unwrap();
+        let error = require_successful_pull(pull.clone()).unwrap_err();
+        assert!(error.message.contains("Could not read from remote repository"));
+        let mut state = OperationState::new(PersistentOperationType::PullAll, "demo", vec!["topic".into()]);
+        state.mark_item_failed("topic", error.message);
+        let resumed = build_pull_all_result_from_state(&state);
+        assert_eq!(resumed.summary.failed, 1);
+        assert_eq!(resumed.summary.succeeded, 0);
+        assert_eq!(resumed.worktrees[0].commits_pulled, 0);
+        state.mark_item_failed("topic", "Could not bring branch up to date".into());
+        assert!(!build_pull_all_result_from_state(&state).worktrees[0].already_up_to_date);
+        assert!(require_successful_pull(PullResult { success: true, ..pull }).is_ok());
+
+        assert_eq!(fixtures["ls"]["exit_code"], 0);
+        assert!(fixtures["ls"]["stderr"].as_str().unwrap().contains("Invalid GROVE_STALE_THRESHOLD"));
+        let worktrees: Vec<Worktree> = extract_json_array(&fixtures["ls"]["stdout"].to_string()).unwrap();
+        assert_eq!(worktrees.len(), 1);
+        let repair: RepairResult = extract_json_object(&fixtures["repair"]["stdout"].to_string()).unwrap();
+        assert!(repair.success);
+        assert_eq!(fixtures["unlock"]["exit_code"], 0);
+        let unlock = unlock_result("demo", fixtures["unlock"]["stdout"].as_str().unwrap(), fixtures["unlock"]["stderr"].as_str().unwrap());
+        assert!(!unlock.success);
+        assert!(unlock.message.contains("Could not remove lock:"));
+    }
+
+    #[test]
+    fn unlock_reports_failed_deletion_even_with_successful_exit() {
+        let result = unlock_result("demo", "", "Could not remove lock: topic\nNo lock files removed for demo");
+        assert!(!result.success);
+        assert!(result.message.contains("Could not remove lock: topic"));
+    }
+
+    #[test]
+    fn unlock_preserves_cli_explanation_and_does_not_claim_no_locks_exist() {
+        let result = unlock_result("demo", "", "\u{1b}[33mLock is under 5 minutes old, not removing: topic\u{1b}[0m\nNo lock files removed for demo");
+        assert!(result.success);
+        assert!(result.message.contains("not removing: topic"));
+        assert!(result.message.contains("protect running Git operations"));
+        assert!(!result.message.contains('\u{1b}'));
+        assert!(!result.message.contains("No locks found"));
+    }
+
+    #[test]
     fn test_parse_repos_json() {
         let json = r#"[{"name": "test", "worktrees": 3}]"#;
         let repos: Vec<Repository> = serde_json::from_str(json).unwrap();
@@ -2679,6 +2816,18 @@ mod tests {
         assert!(validate_repo_name("../etc").is_err());
         assert!(validate_repo_name(".hidden").is_err());
         assert!(validate_repo_name("foo/../bar").is_err());
+    }
+
+    #[test]
+    fn test_removal_target_arg_maps_detached_paths_to_path_flag() {
+        assert_eq!(removal_target_arg("feature/x").unwrap(), "feature/x");
+        assert_eq!(
+            removal_target_arg("/Users/me/Herd/app-worktrees/parked").unwrap(),
+            "--path=/Users/me/Herd/app-worktrees/parked"
+        );
+        assert!(removal_target_arg("/Users/me/../etc").is_err());
+        assert!(removal_target_arg("/Users/me/a\nb").is_err());
+        assert!(removal_target_arg("-rf").is_err());
     }
 
     #[test]

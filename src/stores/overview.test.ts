@@ -108,7 +108,8 @@ describe('useOverviewStore', () => {
         issues: [
           { severity: 'warning', worktree: 'feature', message: 'behind:22' },
           { severity: 'critical', worktree: 'feature', message: 'changes:1' },
-          { severity: 'warning', worktree: 'feature', message: 'unmerged,behind:22' },
+          { severity: 'warning', worktree: 'feature', message: 'unmerged' },
+          { severity: 'warning', worktree: 'feature', message: 'behind:22' },
         ],
       }))
 
@@ -118,7 +119,7 @@ describe('useOverviewStore', () => {
         issue: {
           severity: 'critical',
           worktree: 'feature',
-          message: 'behind:22,changes:1,unmerged',
+          messages: ['behind:22', 'changes:1', 'unmerged'],
         },
       })
     })

@@ -12,12 +12,14 @@ const healthFixture: HealthResult = {
   worktree_count: 2,
   summary: { healthy: 0, warning: 0, critical: 2 },
   issues: [
-    { severity: 'critical', worktree: 'enneagram-assessment', message: 'behind:12,changes:37' },
-    { severity: 'critical', worktree: 'enneagram-assessment-fixup', message: 'changes:88,age:105d' },
+    { severity: 'critical', worktree: 'enneagram-assessment', message: 'behind:12' },
+    { severity: 'critical', worktree: 'enneagram-assessment', message: 'changes:37' },
+    { severity: 'critical', worktree: 'enneagram-assessment-fixup', message: 'changes:88' },
+    { severity: 'critical', worktree: 'enneagram-assessment-fixup', message: 'age:105d' },
   ],
   worktrees: [
-    { branch: 'enneagram-assessment', grade: 'F', score: 55, issues: ['behind:12,changes:37'] },
-    { branch: 'enneagram-assessment-fixup', grade: 'F', score: 55, issues: ['changes:88,age:105d'] },
+    { branch: 'enneagram-assessment', grade: 'F', score: 55, issues: ['behind:12', 'changes:37'] },
+    { branch: 'enneagram-assessment-fixup', grade: 'F', score: 55, issues: ['changes:88', 'age:105d'] },
   ],
 }
 

@@ -348,7 +348,7 @@ function hasError(item: ProgressItem): boolean {
       </div>
 
       <!-- Items list -->
-      <div v-else class="space-y-2 max-h-[400px] overflow-y-auto">
+      <div v-else class="space-y-2">
         <TransitionGroup name="list">
           <div
             v-for="item in filteredItems"

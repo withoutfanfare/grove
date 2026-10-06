@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.11] - 6 October 2026
+
+### Added
+
+- Detached worktrees (ones with no branch) can now be selected and deleted. The bundled CLI removes them by folder with the new `grove rm --path=`, which only accepts a genuinely detached worktree, and the removal safety check still runs.
+
+### Fixed
+
+- The operation results list now fills the side panel instead of stopping at 400px and leaving the rest of the panel empty.
+
+## [0.3.10] - 5 October 2026
+
+### Fixed
+
+- Removing worktrees no longer fails with "cannot determine database" for worktrees Grove did not create (such as Codex worktrees with no `.env`). The bundled CLI now removes them and skips the database backup and drop rather than guessing a database.
+- Keep the top-right toolbar buttons below the window drag strip so they can be clicked.
+
+## [0.3.9] - 26 September 2026
+
+### Fixed
+
+- Show failed pulls as failures in bulk progress, resumed operations and the completion notification, preserving the CLI's error message.
+- Report unlock deletion failures even when the CLI exits successfully.
+- Bundle grove-cli PR #5 and add regression fixtures for unreachable remotes, invalid stale thresholds and lock deletion failures.
+
+## [0.3.8] - 26 September 2026
+
+### Fixed
+
+- Handle updated grove-cli health output, including unknown grades and merge status, and preserve separate health issues throughout the overview.
+- Display unlock results and explain why recent or active locks are retained.
+- Respect configurable stale thresholds in badge text and avoid claiming merged worktrees are always safe to remove.
+- Bundle the grove-cli fixes merged in PR #4, with captured-output regression coverage.
+
 ### Changed
 
 - **Deleting a worktree runs the removal gate, and the dialogue relays its answer** - `grove rm` now refuses when a worktree has uncommitted changes, commits no remote has, or a live agent session, and says exactly what would be lost. The delete dialogue shows that account line by line and offers no way past it: save the work, or wait for the session to end, then try again

@@ -29,7 +29,6 @@ export function useWorktreeSelection() {
 
   /** Reason a worktree cannot be batch-selected, or null if it can. */
   function unselectableReason(wt: Worktree): string | null {
-    if (!wt.branch) return 'Detached HEAD — not selectable'
     const patterns = repoConfig.effectiveConfig?.protected_branches ?? []
     if (matchesProtected(wt.branch, patterns)) return 'Protected — delete individually'
     return null
@@ -89,6 +88,14 @@ export function useWorktreeSelection() {
       .filter((b): b is string => Boolean(b))
   }
 
+  /**
+   * What to remove for each selected worktree: its branch, or for a detached
+   * worktree its absolute path (git forbids branch names starting with '/').
+   */
+  function selectedRemovalTargets(all: Worktree[]): string[] {
+    return selectedWorktrees(all).map((w) => w.branch || w.path)
+  }
+
   function selectedDirty(all: Worktree[]): Worktree[] {
     return selectedWorktrees(all).filter((w) => w.dirty)
   }
@@ -108,6 +115,7 @@ export function useWorktreeSelection() {
     toggleSelectAll,
     selectedWorktrees,
     selectedBranches,
+    selectedRemovalTargets,
     selectedDirty,
     clear,
   }

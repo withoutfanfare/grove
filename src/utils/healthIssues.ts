@@ -4,9 +4,7 @@
 // changes:N, age:Nd, unmerged, untracked:N) designed for one-line ls
 // output. This module is the single source of truth for turning those
 // tokens into human findings: what's wrong, why it matters, the exact
-// score impact, and which actions fix it. It tolerates both single
-// tokens and comma-joined messages (a zsh splitting bug in older CLI
-// builds joins all of a worktree's tokens into one issue message).
+// score impact, and which actions fix it. Each CLI issue is one token.
 import type { Severity, HealthGrade } from '../types';
 
 export type HealthFindingKind =
@@ -14,6 +12,7 @@ export type HealthFindingKind =
   | 'changes'
   | 'age'
   | 'unmerged'
+  | 'merge-unknown'
   | 'untracked'
   | 'unknown';
 
@@ -129,6 +128,17 @@ function parseToken(token: string): HealthFinding {
     };
   }
 
+  if (token === 'merge-unknown') {
+    return {
+      kind: 'merge-unknown',
+      raw: token,
+      title: 'Merge status unknown',
+      explanation: 'The base branch could not be found, so merge status cannot be checked.',
+      scoreImpact: 0,
+      actions: [ACTIONS['view-worktree']],
+    };
+  }
+
   if (token === 'unmerged') {
     return {
       kind: 'unmerged',
@@ -158,16 +168,10 @@ function parseToken(token: string): HealthFinding {
   return unknownFinding(token);
 }
 
-/**
- * Parse a health issue message into structured findings.
- * Splits comma-joined messages (older CLI builds) and single tokens alike.
- */
+/** Parse one CLI health issue into a finding, preserving unknown tokens. */
 export function parseHealthIssueMessage(message: string): HealthFinding[] {
-  return message
-    .split(',')
-    .map((token) => token.trim())
-    .filter((token) => token.length > 0)
-    .map(parseToken);
+  const token = message.trim();
+  return token ? [parseToken(token)] : [];
 }
 
 /** Severity is a worktree score bracket, not a per-issue property. */

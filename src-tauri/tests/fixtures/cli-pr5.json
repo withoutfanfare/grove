@@ -1,0 +1,72 @@
+{
+  "pull-all": {
+    "exit_code": 0,
+    "stdout": {
+      "repo": "demo",
+      "worktrees": [
+        {
+          "branch": "topic",
+          "success": false,
+          "already_up_to_date": false,
+          "commits_pulled": 0,
+          "message": "Fetch failed, nothing was pulled: fatal: '/fixtures/unreachable.git' does not appear to be a git repository\nfatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists."
+        }
+      ],
+      "summary": {
+        "total": 1,
+        "succeeded": 0,
+        "failed": 1,
+        "up_to_date": 0
+      }
+    },
+    "stderr": ""
+  },
+  "pull": {
+    "exit_code": 4,
+    "stdout": {
+      "success": false,
+      "already_up_to_date": false,
+      "conflicts": false,
+      "commits_pulled": 0,
+      "message": "fatal: '/fixtures/unreachable.git' does not appear to be a git repository\nfatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists."
+    },
+    "stderr": "⚠ Invalid GROVE_STALE_THRESHOLD 'abc' in /fixtures/repos/demo.git/.groveconfig; using 50.\n"
+  },
+  "ls": {
+    "exit_code": 0,
+    "stdout": [
+      {
+        "path": "/fixtures/repos/demo-worktrees/topic",
+        "branch": "topic",
+        "sha": "729f160",
+        "url": "https://topic.test",
+        "dirty": false,
+        "ahead": 0,
+        "behind": 0,
+        "mismatch": false,
+        "health_grade": "A",
+        "health_score": 100,
+        "lastAccessed": "2026-09-26T13:28:24Z",
+        "merged": true,
+        "stale": false
+      }
+    ],
+    "stderr": "⚠ Invalid GROVE_STALE_THRESHOLD 'abc' in /fixtures/repos/demo.git/.groveconfig; using 50.\n"
+  },
+  "repair": {
+    "exit_code": 0,
+    "stdout": {
+      "success": true,
+      "repo": "demo",
+      "issues_found": 0,
+      "issues_fixed": 0,
+      "message": "No issues found in demo"
+    },
+    "stderr": ""
+  },
+  "unlock": {
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "⚠ Could not remove lock: topic\n✔ No lock files removed for demo\n"
+  }
+}

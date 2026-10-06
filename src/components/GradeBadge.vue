@@ -20,6 +20,7 @@ const gradeStyles: Record<HealthGrade, { bg: string; text: string }> = {
   C: { bg: 'bg-warning-muted', text: 'text-warning' },
   D: { bg: 'bg-danger-muted', text: 'text-danger' },
   F: { bg: 'bg-danger-muted', text: 'text-danger' },
+  '?': { bg: 'bg-surface-overlay', text: 'text-text-muted' },
 }
 
 const gradeClass = computed(() => {

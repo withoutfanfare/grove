@@ -37,7 +37,7 @@ export interface AttentionWorktreeItem {
 /** A health issue needing attention, tagged with its repository */
 export interface AttentionHealthItem {
   repo: string;
-  issue: HealthIssue;
+  issue: Omit<HealthIssue, 'message'> & { messages: string[] };
 }
 
 /** A repository that failed to load */
@@ -164,17 +164,13 @@ export const useOverviewStore = defineStore('overview', () => {
         const key = `${snap.repo}\0${issue.worktree}`;
         const existing = items.get(key);
         if (!existing) {
-          items.set(key, { repo: snap.repo, issue: { ...issue } });
+          items.set(key, { repo: snap.repo, issue: { worktree: issue.worktree, severity: issue.severity, messages: [issue.message] } });
           continue;
         }
 
-        const messages = new Set(
-          `${existing.issue.message},${issue.message}`
-            .split(',')
-            .map((message) => message.trim())
-            .filter(Boolean)
-        );
-        existing.issue.message = [...messages].join(',');
+        if (!existing.issue.messages.includes(issue.message)) {
+          existing.issue.messages.push(issue.message);
+        }
         if (issue.severity === 'critical') {
           existing.issue.severity = 'critical';
         }

@@ -71,9 +71,9 @@ function cleanupLabel(worktree: Worktree): string {
 }
 
 /** Translate a raw CLI issue message into joined human titles */
-function healthSummary(message: string): string {
-  const titles = parseHealthIssueMessage(message).map((finding) => finding.title)
-  return titles.length > 0 ? titles.join(' · ') : message
+function healthSummary(messages: string[]): string {
+  const titles = messages.flatMap(parseHealthIssueMessage).map((finding) => finding.title)
+  return titles.length > 0 ? titles.join(' · ') : messages.join(' · ')
 }
 </script>
 
@@ -121,7 +121,7 @@ function healthSummary(message: string): string {
         </div>
         <ul class="attention-items">
           <li v-for="item in healthAttention"
-            :key="`${item.repo}-${item.issue.worktree}-${item.issue.severity}-${item.issue.message}`"
+            :key="`${item.repo}-${item.issue.worktree}-${item.issue.severity}-${item.issue.messages.join(',')}`"
             class="attention-item">
             <button class="attention-item-body" @click="emit('navigate', item.repo, item.issue.worktree)">
               <span class="attention-item-title">
@@ -131,7 +131,7 @@ function healthSummary(message: string): string {
                 <span class="text-text-muted">·</span>
                 <span class="truncate">{{ item.issue.worktree }}</span>
               </span>
-              <span class="attention-item-sub">{{ healthSummary(item.issue.message) }}</span>
+              <span class="attention-item-sub">{{ healthSummary(item.issue.messages) }}</span>
             </button>
             <button class="attention-action" @click="emit('openHealth', item.repo)">View</button>
           </li>

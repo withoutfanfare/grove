@@ -3,6 +3,8 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
 import Dashboard from './Dashboard.vue'
+import { useToast } from '@/composables/useToast'
+import pr5 from '../../src-tauri/tests/fixtures/cli-pr5.json'
 import { useWorktreeStore } from '@/stores'
 import { mockTauriInvoke, mockTauriListen, resetTauriMocks } from '@/test/setup'
 
@@ -135,6 +137,27 @@ describe('Dashboard batch selection', () => {
       },
     })
   }
+
+  it('shows failed pull-all JSON as an error with the remote failure reason', async () => {
+    const store = useWorktreeStore()
+    store.wtAvailable = true
+    store.setRepositories([{ name: 'demo', worktrees: 1 }])
+    store.selectRepository('demo')
+    const { toasts } = useToast()
+    toasts.value = []
+    mockTauriInvoke.mockImplementation((command: string) => {
+      if (command === 'pull_all_worktrees') return Promise.resolve(pr5['pull-all'].stdout)
+      if (command === 'list_worktrees' || command === 'get_worktree_status') return Promise.resolve(pr5.ls.stdout)
+      return Promise.resolve(undefined)
+    })
+    const wrapper = mountWithList()
+    await flushPromises()
+    await wrapper.find('[title="Pull all worktrees"]').trigger('click')
+    await flushPromises()
+    expect(toasts.value.some(t => t.variant === 'success' && t.message.includes('Pull all'))).toBe(false)
+    expect(toasts.value.some(t => t.variant === 'error' && t.message.includes('Fetch failed, nothing was pulled:'))).toBe(true)
+    wrapper.unmount()
+  })
 
   it('shows the action bar when worktrees are selected and opens the delete dialog', async () => {
     const store = useWorktreeStore()
