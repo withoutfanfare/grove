@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.12] - 6 October 2026
+
+### Fixed
+
+- Detached worktrees whose folder name contains two dots in a row (for example `app..backup`) can now be deleted. Previously they were rejected, and one such folder stopped a whole batch removal.
+
 ## [0.3.11] - 6 October 2026
 
 ### Added
