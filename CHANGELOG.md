@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.11] - 6 October 2026
+
+### Added
+
+- Detached worktrees (ones with no branch) can now be selected and deleted. The bundled CLI removes them by folder with the new `grove rm --path=`, which only accepts a genuinely detached worktree, and the removal safety check still runs.
+
+### Fixed
+
+- The operation results list now fills the side panel instead of stopping at 400px and leaving the rest of the panel empty.
+
 ## [0.3.10] - 5 October 2026
 
 ### Fixed
