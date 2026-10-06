@@ -615,14 +615,15 @@ function openBatchDeleteDialog() {
 async function handleBatchDeleteConfirm(options: { deleteBranch: boolean; dropDb: boolean; skipBackup: boolean }) {
   showBatchDeleteDialog.value = false
   if (!selectedRepoName.value) return
-  const branches = selection.selectedBranches(worktrees.value)
+  // Detached worktrees have no branch, so they are removed by their path.
+  const branches = selection.selectedRemovalTargets(worktrees.value)
   if (branches.length === 0) return
 
   lastBatchDeleteOptions.value = options
 
   const worktreePathMap = new Map<string, string>()
   for (const wt of worktrees.value) {
-    if (wt.branch) worktreePathMap.set(wt.branch, wt.path)
+    worktreePathMap.set(wt.branch || wt.path, wt.path)
   }
 
   closeAllPanels()
@@ -687,8 +688,9 @@ async function handleRetryFailed() {
   // Phase 5: Build a map of branch names to worktree paths for conflict resolution actions
   const worktreePathMap = new Map<string, string>()
   for (const wt of worktrees.value) {
-    if (wt.branch && failedBranches.includes(wt.branch)) {
-      worktreePathMap.set(wt.branch, wt.path)
+    const key = wt.branch || wt.path
+    if (failedBranches.includes(key)) {
+      worktreePathMap.set(key, wt.path)
     }
   }
 

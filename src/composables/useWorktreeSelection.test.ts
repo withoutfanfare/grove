@@ -25,13 +25,12 @@ describe('useWorktreeSelection', () => {
     } as any
   })
 
-  it('marks protected and detached worktrees unselectable', () => {
+  it('marks protected worktrees unselectable but lets detached ones be selected', () => {
     const sel = useWorktreeSelection()
     expect(sel.isSelectable(list[0])).toBe(true)
     expect(sel.isSelectable(list[1])).toBe(false)
     expect(sel.unselectableReason(list[1])).toMatch(/Protected/)
-    expect(sel.isSelectable(list[3])).toBe(false)
-    expect(sel.unselectableReason(list[3])).toMatch(/Detached/)
+    expect(sel.isSelectable(list[3])).toBe(true)
   })
 
   it('ignores toggle on unselectable worktrees', () => {
@@ -51,7 +50,7 @@ describe('useWorktreeSelection', () => {
     const sel = useWorktreeSelection()
     expect(sel.selectAllState(list)).toBe('none')
     sel.toggleSelectAll(list)
-    expect([...useWorktreeStore().selectedPaths].sort()).toEqual(['/r/a', '/r/c'])
+    expect([...useWorktreeStore().selectedPaths].sort()).toEqual(['/r/a', '/r/c', '/r/d'])
     expect(sel.selectAllState(list)).toBe('all')
     sel.toggleSelectAll(list)
     expect(sel.selectAllState(list)).toBe('none')
@@ -68,5 +67,11 @@ describe('useWorktreeSelection', () => {
     sel.toggleSelectAll(list)
     expect(sel.selectedBranches(list).sort()).toEqual(['feature/a', 'feature/c'])
     expect(sel.selectedDirty(list).map((w) => w.path)).toEqual(['/r/c'])
+  })
+
+  it('targets detached worktrees for removal by their path', () => {
+    const sel = useWorktreeSelection()
+    sel.toggleSelectAll(list)
+    expect(sel.selectedRemovalTargets(list).sort()).toEqual(['/r/d', 'feature/a', 'feature/c'])
   })
 })

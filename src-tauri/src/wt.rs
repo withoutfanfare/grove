@@ -865,6 +865,23 @@ pub fn get_version(app: &tauri::AppHandle) -> WtResult<String> {
     Ok(output.trim().to_string())
 }
 
+/// The `grove rm` argument for a removal target: a branch name, or for a
+/// detached worktree (which has no branch) its absolute folder, as `--path=`.
+/// Git forbids branch names starting with '/', so the two cannot be confused.
+fn removal_target_arg(target: &str) -> WtResult<String> {
+    if target.starts_with('/') {
+        if target.contains("..") || target.chars().any(|c| c.is_control()) {
+            return Err(WtError::new(
+                "INVALID_INPUT",
+                "Worktree path contains invalid characters",
+            ));
+        }
+        return Ok(format!("--path={}", target));
+    }
+    validate_branch_name(target)?;
+    Ok(target.to_string())
+}
+
 /// Validate a branch name to prevent command injection.
 ///
 /// Similar to repo name validation but also allows forward slashes for
@@ -972,7 +989,7 @@ pub fn remove_worktree(
     force: bool,
 ) -> WtResult<crate::types::RemoveWorktreeResponse> {
     validate_repo_name(repo_name)?;
-    validate_branch_name(branch)?;
+    let target = removal_target_arg(branch)?;
 
     let mut args = vec!["rm"];
 
@@ -990,7 +1007,7 @@ pub fn remove_worktree(
     }
 
     args.push(repo_name);
-    args.push(branch);
+    args.push(&target);
     args.push("--json");
 
     let (stdout, stderr) = execute_wt_with_stderr(app, &args)?;
@@ -1452,7 +1469,7 @@ pub fn remove_selected_with_progress(
 ) -> WtResult<RemoveSelectedResult> {
     validate_repo_name(repo_name)?;
     for branch in &branches {
-        validate_branch_name(branch)?;
+        removal_target_arg(branch)?;
     }
 
     let total = branches.len() as u32;
@@ -2799,6 +2816,18 @@ mod tests {
         assert!(validate_repo_name("../etc").is_err());
         assert!(validate_repo_name(".hidden").is_err());
         assert!(validate_repo_name("foo/../bar").is_err());
+    }
+
+    #[test]
+    fn test_removal_target_arg_maps_detached_paths_to_path_flag() {
+        assert_eq!(removal_target_arg("feature/x").unwrap(), "feature/x");
+        assert_eq!(
+            removal_target_arg("/Users/me/Herd/app-worktrees/parked").unwrap(),
+            "--path=/Users/me/Herd/app-worktrees/parked"
+        );
+        assert!(removal_target_arg("/Users/me/../etc").is_err());
+        assert!(removal_target_arg("/Users/me/a\nb").is_err());
+        assert!(removal_target_arg("-rf").is_err());
     }
 
     #[test]
