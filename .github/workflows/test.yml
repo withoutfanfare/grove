@@ -34,21 +34,31 @@ jobs:
 
   rust-tests:
     name: Rust Tests
-    runs-on: ubuntu-latest
+    # macOS avoids installing the Linux WebKit libraries Tauri needs.
+    runs-on: macos-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Rust
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
+          components: rustfmt, clippy
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: 'src-tauri'
+
+      # The app bundles the grove CLI as a sidecar binary; the build only
+      # checks the file exists, so a placeholder is enough for tests.
+      - name: Add placeholder sidecar
+        working-directory: src-tauri
+        run: |
+          mkdir -p binaries
+          printf '#!/bin/sh\n' > "binaries/grove-$(rustc -vV | sed -n 's/host: //p')"
+          chmod +x binaries/grove-*
 
       - name: Run Rust tests
         working-directory: src-tauri
@@ -84,7 +94,7 @@ jobs:
         run: npm run test:coverage
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           files: ./coverage/lcov.info
           flags: unittests
