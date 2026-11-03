@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.0] - 3 November 2026
+
+### Added
+
+- Authoritative read-only deletion checks and exact branch-cleanup previews, with checked commits, comparison bases and per-target outcomes.
+- Session Activity receipts, health explanations, per-repository observation times and visible failed checks.
+- Runtime CLI digest and compatibility diagnostics, a pinned CLI input and a clean macOS build lane.
+
+### Fixed
+
+- Missing cached worktrees reconcile without repeated deletion failures. Routine deletion keeps safety checks enabled and keeps branches by default.
+- Failed merge, stale, diff and sync checks remain unknown; background errors, updater failures and effective configuration retain their actual meaning.
+- Commands own bounded process groups, batch progress and cancellation have identities, and recovery checkpoints use ordered atomic writes.
+- Updated dependencies and verified compatible test tooling to resolve the reported npm advisories.
+
+
 ## [0.3.12] - 6 October 2026
 
 ### Fixed
