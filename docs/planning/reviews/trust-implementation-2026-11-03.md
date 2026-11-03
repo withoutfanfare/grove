@@ -169,14 +169,17 @@ is claimed. That service follow-up is tracked separately from this local install
 The new diagnostic command is saved in SnippetsLab as **Grove: verify the app's
 bundled CLI**, UUID `5FC2D000-712A-42D1-98E2-B841671F7E1E`.
 
-## 0.4.3 pull correction — verification and release pending
+## Installed 0.4.3 pull correction — 3 November 2026, 11:24 GMT
 
 The user reported `DATABASE_UNKNOWN` when pulling review worktrees with no
 database or a shared database, plus `Branch name cannot be empty` for branchless
 targets. The CLI required database resolution before starting the Git pull,
 making database identity an unnecessary prerequisite for that Git operation.
-Opus is implementing safe handling for database-less and shared-database
-worktrees.
+Pull and Sync now permit database-less worktrees. When no database is known,
+their post-operation hooks are skipped with a warning. Explicit shared database
+settings remain unchanged, and hooks for a known database retain their existing
+behaviour. Neither a missing database nor a hook-skip warning turns a successful
+Git pull into a failure; real Git failures remain failures.
 
 Branchless app targets also shared an empty progress key, causing distinct
 results to collide and leaving progress at **94%**. The current app changes use
@@ -185,9 +188,32 @@ Single and selected pulls accept path identities where needed. Ordinary branch
 pulls retain direct branch handling; the proposed repository rescan for every
 branch pull was removed to avoid repeated scans as the batch grows.
 
-The intended app release is **0.4.3**. CLI and app regression checks, final CLI
-pinning, packaged checks and installation remain pending. These implementation
-changes do not yet establish a successful pull or an installed correction.
+- App **0.4.3**, tag `v0.4.3`, built from clean `develop` release commit
+  `05c09e343d40d8183bbf04d3c992cbfc14ab3e72`. No main merge was made.
+- Bundled CLI **4.2.1**, commit `5ca291f2570dc3ee93ba6236c4845175f1beed70`,
+  SHA-256 `518687fe5bfb30acaf44428bfc6ff4c9a0e45654957412a6d779a87cab5ed2ea`.
+- `npm test -- --run`: **434 passed**. Rust suite: **124 passed**.
+  Full CLI suite: **721 cases, 713 passed, 8 skipped, no failures**.
+  After the CLI patch-version bump and rebuild, `./run-tests.sh review-regressions.bats`
+  again passed **31 cases**. The new no-database fixtures failed against the old
+  build and passed against the fix; shared/dedicated cases preserve their settings.
+- Release build passed in **1m 39s**, including frontend type checking. The local
+  ad hoc signature passes strict deep verification. Installed version and both
+  executable byte comparisons match the verified bundle; the CLI matches its pin.
+- `python3 scripts/check-packaged-cli.py` passed against both the release bundle
+  and installed app: minimal-PATH success with zero fixture repositories, then
+  `BUNDLED_CLI_MISSING` and exit 1 for a temporary copy missing its CLI, with no
+  PATH fallback. The installed normal-environment `--check-bundled-cli` returned
+  `success: true`, app **0.4.3**, CLI **4.2.1**, **10 repositories**, exit 0.
+- Installed at **11:24:43 GMT**; old 0.4.2 retained in Trash. A fresh installed
+  process started at **11:24:44 GMT** and is left running. No development server
+  or background service was started. Test runs have finished.
+
+Native click-through remains unverified because of the previously observed
+computer-use bridge failure. Real upstream pulls were exercised only in disposable
+regression repositories. Detached worktrees still require a checked-out branch to
+pull; the fix identifies and explains them rather than reporting a blank failure.
+The previously recorded hosted-CI and update-feed follow-ups remain separate.
 
 ## Created or newly tracked files
 
