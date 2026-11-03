@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.1] - 3 November 2026
+
+### Fixed
+
+- Restored bundled CLI startup on macOS: completed commands no longer fail when their process group contains only zombies. Grove includes its CLI and needs no separate CLI installation.
+- Startup errors retain their real reason and offer Retry and Copy diagnostics. Removed the placeholder installation link and corrected the help links.
+- Added a read-only packaged CLI startup check and a minimal-PATH release gate to catch this failure before installation.
+
 ## [0.4.0] - 3 November 2026
 
 ### Added
