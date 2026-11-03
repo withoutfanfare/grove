@@ -1,6 +1,6 @@
 {
   "repository": "https://github.com/withoutfanfare/grove-cli.git",
-  "revision": "5697e5467a56b92c8e9bbb89e844e4a0c776c0bd",
-  "sha256": "a0b2c7146b311d34937ff89ff2352ea81dc52433cb921be227594f2fc55c704a",
-  "version": "4.2.0"
+  "revision": "5ca291f2570dc3ee93ba6236c4845175f1beed70",
+  "sha256": "518687fe5bfb30acaf44428bfc6ff4c9a0e45654957412a6d779a87cab5ed2ea",
+  "version": "4.2.1"
 }
