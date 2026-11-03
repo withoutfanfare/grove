@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.3] - 3 November 2026
+
+### Fixed
+
+- Bundled CLI 4.2.1 permits Pull and Sync without a database. Explicit shared database settings are preserved; hooks are skipped when the database is unknown.
+- Detached worktrees retain distinct path-based progress identities, avoiding blank failures and incomplete batch progress. Pull reports that a checked-out branch is required.
+
 ## [0.4.2] - 3 November 2026
 
 ### Fixed
