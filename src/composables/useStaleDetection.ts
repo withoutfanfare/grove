@@ -10,7 +10,7 @@ export interface StaleWorktreeInfo {
   worktree: Worktree;
   repoName: string;
   daysSinceAccess: number;
-  isSafeToDelete: boolean;
+  isCleanupCandidate: boolean;
 }
 
 /**
@@ -18,7 +18,7 @@ export interface StaleWorktreeInfo {
  *
  * A worktree is considered stale if it hasn't been accessed within
  * the configured threshold (default: 14 days). Worktrees that are
- * fully merged with no uncommitted changes are flagged as safe to delete.
+ * fully merged with no uncommitted changes are flagged as a cleanup candidate.
  */
 export function useStaleDetection() {
   const store = useWorktreeStore();
@@ -49,10 +49,11 @@ export function useStaleDetection() {
   }
 
   /**
-   * Check if a stale worktree is safe to delete
-   * (merged into base and no uncommitted changes)
+   * Check if a stale worktree is a cleanup candidate
+   * (merged into base and no uncommitted changes). Only a hint: the removal
+   * checks decide whether deletion is actually safe.
    */
-  function isSafeToDelete(worktree: Worktree): boolean {
+  function isCleanupCandidate(worktree: Worktree): boolean {
     return worktree.merged === true && !worktree.dirty;
   }
 
@@ -69,7 +70,7 @@ export function useStaleDetection() {
         worktree: wt,
         repoName,
         daysSinceAccess: daysSinceAccess(wt),
-        isSafeToDelete: isSafeToDelete(wt),
+        isCleanupCandidate: isCleanupCandidate(wt),
       }))
       .sort((a, b) => b.daysSinceAccess - a.daysSinceAccess);
   });
@@ -80,18 +81,18 @@ export function useStaleDetection() {
   const staleCount = computed(() => staleWorktrees.value.length);
 
   /**
-   * Count of worktrees safe to batch-delete
+   * Count of worktrees worth reviewing for cleanup (not a safety verdict)
    */
-  const safeToDeleteCount = computed(() =>
-    staleWorktrees.value.filter((s) => s.isSafeToDelete).length
+  const cleanupCandidateCount = computed(() =>
+    staleWorktrees.value.filter((s) => s.isCleanupCandidate).length
   );
 
   return {
     isStale,
     daysSinceAccess,
-    isSafeToDelete,
+    isCleanupCandidate,
     staleWorktrees,
     staleCount,
-    safeToDeleteCount,
+    cleanupCandidateCount,
   };
 }

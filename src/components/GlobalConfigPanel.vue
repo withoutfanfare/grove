@@ -2,13 +2,15 @@
 /**
  * GlobalConfigPanel Component
  *
- * Form-based editor for the global grove configuration file (~/.groverc).
+ * Form-based editor for the global grove configuration file (the file the CLI
+ * actually reads: ~/.groverc, or GROVE_CONFIG when set).
  * Reads config entries and presents them as structured form fields,
  * saving changes back via per-key updates to avoid user error.
  */
 import { ref, computed, watch } from 'vue'
 import { useWt, useToast } from '../composables'
 import type { ConfigEntry, ConfigKeyUpdate } from '../types'
+import { useRepoConfigStore } from '../stores/repoConfig'
 import { SPanel, SButton } from '@stuntrocket/ui'
 
 const props = defineProps<{
@@ -21,6 +23,13 @@ const emit = defineEmits<{
 
 const { readConfigFile, updateConfigKeys } = useWt()
 const { toast } = useToast()
+const repoConfigStore = useRepoConfigStore()
+
+// The exact file being edited, and the CLI's effective values with their sources
+const filePath = ref<string | null>(null)
+const herdRoot = computed(() => repoConfigStore.effectiveConfig?.herd_root)
+const herdRootSource = computed(() => repoConfigStore.effectiveConfig?.config_sources?.HERD_ROOT)
+const sources = computed(() => Object.entries(repoConfigStore.effectiveConfig?.config_sources ?? {}))
 
 // State
 const loading = ref(false)
@@ -104,7 +113,10 @@ async function loadConfig() {
   loading.value = true
   try {
     const result = await readConfigFile('global')
+    filePath.value = result.meta.path
     entries.value = result.entries
+    // Effective (CLI-resolved) values; failure leaves the sources section hidden
+    await repoConfigStore.loadEffectiveConfig().catch(() => undefined)
 
     // Populate form from entries
     const vals: Record<string, string> = {}
@@ -228,7 +240,7 @@ function handleClose() {
   <SPanel
     :open="isOpen"
     title="Global Configuration"
-    subtitle="~/.groverc"
+    :subtitle="filePath ?? 'Global configuration file'"
     size="md"
     @close="handleClose"
   >
@@ -253,6 +265,20 @@ function handleClose() {
 
     <!-- Form -->
     <form v-else class="space-y-6" @submit.prevent="save">
+      <section class="p-3 rounded-lg bg-surface-overlay/50 space-y-1 text-xs" data-testid="config-provenance">
+        <p class="text-text-muted">Editing <code class="font-mono text-text-secondary break-all">{{ filePath ?? 'unknown file' }}</code></p>
+        <p v-if="herdRoot" class="text-text-muted">
+          Effective HERD_ROOT: <code class="font-mono text-text-secondary">{{ herdRoot }}</code>
+          <template v-if="herdRootSource"> (from {{ herdRootSource }})</template>
+        </p>
+        <p class="text-text-muted">An exported HERD_ROOT environment variable still wins over any value saved in this file.</p>
+        <details v-if="sources.length" class="text-text-muted">
+          <summary class="cursor-pointer">Where each effective setting comes from</summary>
+          <ul class="mt-1 space-y-0.5 font-mono">
+            <li v-for="[key, source] in sources" :key="key">{{ key }}: {{ source }}</li>
+          </ul>
+        </details>
+      </section>
       <!-- Known key groups -->
       <section v-for="group in knownKeys" :key="group.group">
         <div class="flex items-center gap-2 mb-3">

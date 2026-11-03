@@ -33,7 +33,7 @@ const { fetchWorktrees, openInEditor, openInTerminal, openInBrowser } = useWorkt
 const { fetchRecentWorktrees } = useRecent()
 const { tooltipWithShortcut: _tooltipWithShortcut } = useShortcutTooltip()
 const { toast } = useToast()
-const { repairRepository, unlockRepository, saveReportToDesktop } = useWt()
+const { repairRepository, unlockRepository, saveReportToDesktop, toWtError } = useWt()
 
 // Clone modal state
 const showCloneModal = ref(false)
@@ -172,11 +172,6 @@ useKeyboardShortcuts({
   onQuickSelect: handleQuickSelect,
 })
 
-/** Loading timeout in milliseconds. Only the first-ever load of a repo runs
- * uncached; a large repo's listing can legitimately take tens of seconds, so
- * this is a safety net, not an expectation. */
-const LOADING_TIMEOUT_MS = 60000
-
 async function handleSelectRepo(name: string) {
   // Skip if already loading this repo
   if (loadingRepoName.value === name) return
@@ -188,26 +183,17 @@ async function handleSelectRepo(name: string) {
   selectRepository(name)
   const wasCached = store.isRepoLoaded(name)
 
-  // Create a timeout promise that rejects after LOADING_TIMEOUT_MS
-  let timeoutId: ReturnType<typeof setTimeout> | null = null
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error('Request timed out')), LOADING_TIMEOUT_MS)
-  })
-
   try {
-    // Race between fetch and timeout
-    await Promise.race([fetchWorktrees({ silent: wasCached }), timeoutPromise])
+    // The backend owns the command deadline; keep this request pending until it settles.
+    await fetchWorktrees({ silent: wasCached })
   } catch (e) {
-    const errorMessage = e instanceof Error ? e.message : 'Failed to load worktrees'
+    const errorMessage = toWtError(e).message
     // Show error toast on timeout or fetch failure
     toast.error(errorMessage)
     console.warn('[RepoList] handleSelectRepo failed:', errorMessage)
   } finally {
-    if (timeoutId) {
-      clearTimeout(timeoutId)
-    }
     // Ensure loading state is always cleared
-    loadingRepoName.value = null
+    if (loadingRepoName.value === name) loadingRepoName.value = null
   }
 }
 
@@ -281,7 +267,7 @@ async function handleRepair(repoName: string) {
       toast.error(`${repoName}: ${result.message || 'Repair failed'}`)
     }
   } catch (e) {
-    const errorMessage = e instanceof Error ? e.message : 'Repair failed'
+    const errorMessage = toWtError(e).message
     toast.error(`${repoName}: ${errorMessage}`)
   } finally {
     repairingRepo.value = null
@@ -300,7 +286,7 @@ async function handleUnlock(repoName: string) {
       toast.error(`${repoName}: ${result.message || 'Unlock failed'}`)
     }
   } catch (e) {
-    const errorMessage = e instanceof Error ? e.message : 'Unlock failed'
+    const errorMessage = toWtError(e).message
     toast.error(`${repoName}: ${errorMessage}`)
   } finally {
     unlockingRepo.value = null
@@ -317,7 +303,7 @@ async function handleGenerateReport(repoName: string) {
     const filename = filePath.split('/').pop() || 'report.md'
     toast.success(`Report saved to Desktop: ${filename}`)
   } catch (e) {
-    const errorMessage = e instanceof Error ? e.message : 'Failed to generate report'
+    const errorMessage = toWtError(e).message
     toast.error(`${repoName}: ${errorMessage}`)
   } finally {
     generatingReport.value = null
@@ -333,7 +319,7 @@ async function handleRefreshRepo(repoName: string) {
     await fetchWorktrees()
     toast.success(`${repoName}: Refreshed`)
   } catch (e) {
-    const errorMessage = e instanceof Error ? e.message : 'Failed to refresh'
+    const errorMessage = toWtError(e).message
     toast.error(`${repoName}: ${errorMessage}`)
   } finally {
     refreshingRepo.value = null

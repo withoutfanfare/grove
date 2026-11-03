@@ -18,7 +18,7 @@ const emit = defineEmits<{
   cloned: []
 }>()
 
-const { cloneRepository, deriveRepoName } = useWt()
+const { cloneRepository, deriveRepoName, toWtError } = useWt()
 const { toast } = useToast()
 
 const gitUrl = ref('')
@@ -99,7 +99,7 @@ async function handleSubmit() {
       toast.error(error.value)
     }
   } catch (e) {
-    const errorMessage = e instanceof Error ? e.message : 'Failed to clone repository'
+    const errorMessage = toWtError(e).message
     error.value = errorMessage
     toast.error(errorMessage)
   } finally {

@@ -17,8 +17,8 @@ beforeEach(() => setActivePinia(createPinia()))
 it('counts untracked-only work as dirty and never suggests it is safe to remove', () => {
   const worktrees = fixtures.ls as Worktree[]
   expect(useWorktreeFilters().countWorktrees(worktrees).dirty).toBe(1)
-  expect(useStaleDetection().isSafeToDelete(worktrees[0])).toBe(false)
-  expect(useOrphanedDetection().isSafeToDelete(worktrees[0])).toBe(false)
+  expect(useStaleDetection().isCleanupCandidate(worktrees[0])).toBe(false)
+  expect(useOrphanedDetection().isCleanupCandidate(worktrees[0])).toBe(false)
   const badge = mount(WorktreeStatusBadges, { props: { merged: true } })
   expect(badge.html()).not.toContain('safely removed')
 })
@@ -33,9 +33,9 @@ it('shows base-branch staleness even when upstream is synced, without hard-codin
 })
 
 it('handles an empty worktree list and unknown merge status conservatively', () => {
-  expect(useWorktreeFilters().countWorktrees(fixtures['empty-ls'])).toEqual({ all: 0, dirty: 0, stale: 0, unmerged: 0 })
+  expect(useWorktreeFilters().countWorktrees(fixtures['empty-ls'])).toEqual({ all: 0, dirty: 0, stale: 0, merged: 0, unmerged: 0 })
   const worktree = fixtures['missing-base-ls'][0] as Worktree
-  expect(useStaleDetection().isSafeToDelete(worktree)).toBe(false)
+  expect(useStaleDetection().isCleanupCandidate(worktree)).toBe(false)
   const issue = fixtures['missing-base-health'].worktrees[0].issues.find(i => i === 'merge-unknown')!
   expect(parseHealthIssueMessage(issue)[0].scoreImpact).toBe(0)
 })
@@ -43,7 +43,9 @@ it('handles an empty worktree list and unknown merge status conservatively', () 
 it('renders an unknown grade with score zero using a neutral colour', () => {
   const badge = mount(GradeBadge, { props: { grade: '?', score: 0 } })
   expect(badge.text()).toContain('?')
-  expect(badge.attributes('title')).toBe('Health score: 0/100')
+  // The CLI's placeholder 0 is not a real score
+  expect(badge.attributes('title')).toBe('Health unknown: the CLI could not score this worktree')
+  expect(badge.text()).not.toContain('0')
   expect(badge.classes()).toContain('text-text-muted')
 })
 

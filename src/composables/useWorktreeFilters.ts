@@ -5,7 +5,7 @@ import type { Worktree } from '../types'
 /**
  * Filter preset for worktree lists
  */
-export type WorktreeFilter = 'all' | 'dirty' | 'stale' | 'unmerged'
+export type WorktreeFilter = 'all' | 'dirty' | 'stale' | 'merged' | 'unmerged'
 
 /**
  * Sort option for worktree lists
@@ -28,7 +28,8 @@ export function useWorktreeFilters() {
   const filterOptions: { value: WorktreeFilter; label: string }[] = [
     { value: 'all', label: 'All' },
     { value: 'dirty', label: 'Dirty' },
-    { value: 'stale', label: 'Stale' },
+    { value: 'stale', label: 'Behind base' },
+    { value: 'merged', label: 'Merged' },
     { value: 'unmerged', label: 'Unmerged' },
   ]
 
@@ -37,7 +38,7 @@ export function useWorktreeFilters() {
    */
   const sortOptions: { value: WorktreeSort; label: string }[] = [
     { value: 'name', label: 'Name' },
-    { value: 'last-accessed', label: 'Last accessed' },
+    { value: 'last-accessed', label: 'Folder last modified' },
     { value: 'branch-age', label: 'Branch age' },
   ]
 
@@ -65,6 +66,7 @@ export function useWorktreeFilters() {
       all: worktrees.length,
       dirty: worktrees.filter(wt => wt.dirty).length,
       stale: worktrees.filter(wt => wt.stale === true).length,
+      merged: worktrees.filter(wt => wt.merged === true).length,
       unmerged: worktrees.filter(wt => wt.merged === false).length,
     }
   }
@@ -78,6 +80,8 @@ export function useWorktreeFilters() {
         return worktrees.filter(wt => wt.dirty)
       case 'stale':
         return worktrees.filter(wt => wt.stale === true)
+      case 'merged':
+        return worktrees.filter(wt => wt.merged === true)
       case 'unmerged':
         return worktrees.filter(wt => wt.merged === false)
       default:

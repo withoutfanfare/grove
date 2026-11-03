@@ -7,6 +7,7 @@
  */
 const props = defineProps<{
   count: number
+  busy?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -29,7 +30,7 @@ void props
 
       <div class="flex-1" />
 
-      <button class="bar-action" data-testid="bar-pull" title="Pull selected worktrees" @click="emit('pull')">
+      <button class="bar-action" :disabled="busy" data-testid="bar-pull" title="Pull selected worktrees" @click="emit('pull')">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -37,7 +38,7 @@ void props
         Pull
       </button>
 
-      <button class="bar-action bar-action-danger" data-testid="bar-delete" title="Delete selected worktrees" @click="emit('delete')">
+      <button class="bar-action bar-action-danger" :disabled="busy" data-testid="bar-delete" title="Delete selected worktrees" @click="emit('delete')">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -72,6 +73,11 @@ void props
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.bar-action:disabled {
+  opacity: 0.45;
+  cursor: wait;
 }
 
 .selection-count {

@@ -50,16 +50,10 @@ async function fetchHealth() {
   error.value = null
 
   try {
-    const result = await getRepoHealth(props.repoName)
-    if (result) {
-      health.value = result
-    } else {
-      // M16: Display more helpful error message
-      error.value = 'Unable to fetch health report. The repository may not have any worktrees.'
-    }
+    // Call the API directly so the real reason survives (the store wrapper swallows it)
+    health.value = await wtApi.getRepoHealth(props.repoName)
   } catch (e) {
-    // M16: Display actual error message from backend
-    error.value = e instanceof Error ? e.message : 'An unexpected error occurred while fetching health report'
+    error.value = wtApi.toWtError(e).message
   }
 
   loading.value = false

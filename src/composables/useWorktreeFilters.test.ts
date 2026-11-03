@@ -55,6 +55,7 @@ describe('useWorktreeFilters', () => {
         all: 4,
         dirty: 2,
         stale: 1,
+        merged: 1,
         unmerged: 2,
       })
     })
@@ -76,6 +77,19 @@ describe('useWorktreeFilters', () => {
       const counts = countWorktrees(allUndefined)
       expect(counts.stale).toBe(0)
       expect(counts.unmerged).toBe(0)
+      expect(counts.merged).toBe(0)
+    })
+
+    it('never counts an unknown (null) merge result as merged or unmerged', () => {
+      const { countWorktrees, setFilter, filterWorktrees } = useWorktreeFilters()
+      const unknown: Worktree[] = [
+        { path: '/wt/x', branch: 'x', dirty: false, ahead: null, behind: null, sha: 'a', merged: null, stale: null },
+        { path: '/wt/y', branch: 'y', dirty: false, ahead: 0, behind: 0, sha: 'b', merged: true },
+      ]
+      expect(countWorktrees(unknown)).toMatchObject({ merged: 1, unmerged: 0, stale: 0 })
+      setFilter('merged')
+      expect(filterWorktrees(unknown).map(w => w.branch)).toEqual(['y'])
+      setFilter('all')
     })
 
     it('is independent of the active filter', () => {
@@ -85,13 +99,14 @@ describe('useWorktreeFilters', () => {
         all: 4,
         dirty: 2,
         stale: 1,
+        merged: 1,
         unmerged: 2,
       })
     })
 
     it('returns all zeros for an empty list', () => {
       const { countWorktrees } = useWorktreeFilters()
-      expect(countWorktrees([])).toEqual({ all: 0, dirty: 0, stale: 0, unmerged: 0 })
+      expect(countWorktrees([])).toEqual({ all: 0, dirty: 0, stale: 0, merged: 0, unmerged: 0 })
     })
   })
 

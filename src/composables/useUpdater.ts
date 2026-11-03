@@ -15,15 +15,19 @@ export interface UpdateInfo {
   date: string | null
 }
 
-export type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error'
+/** 'up-to-date' needs a successful check; 'check-failed' is never shown as up to date */
+export type UpdateStatus = 'idle' | 'checking' | 'up-to-date' | 'check-failed' | 'available' | 'downloading' | 'ready' | 'error'
 
 // Module-level state so all component instances share update status
 const status = ref<UpdateStatus>('idle')
 const availableUpdate = ref<UpdateInfo | null>(null)
 const downloadProgress = ref(0)
 const errorMessage = ref('')
+// '' until the backend answers; shown as "Unknown", never a made-up number
 const currentVersion = ref('')
 const dismissed = ref(false)
+/** Unix ms of the last successful update check */
+const lastCheckedAt = ref<number | null>(null)
 
 let initialCheckDone = false
 
@@ -34,8 +38,9 @@ export function useUpdater() {
   async function fetchVersion(): Promise<void> {
     try {
       currentVersion.value = await invoke<string>('get_app_version')
-    } catch {
-      currentVersion.value = '0.0.0'
+    } catch (e) {
+      console.warn('[updater] Version lookup failed:', e)
+      currentVersion.value = ''
     }
   }
 
@@ -62,12 +67,14 @@ export function useUpdater() {
         status.value = 'available'
       } else {
         availableUpdate.value = null
-        status.value = 'idle'
+        status.value = 'up-to-date'
       }
+      lastCheckedAt.value = Date.now()
     } catch (e) {
-      // Network errors or unreachable endpoints are non-fatal
+      // Non-fatal and not interruptive: Settings shows the failure with a retry.
       console.warn('[updater] Update check failed:', e)
-      status.value = 'idle'
+      errorMessage.value = e instanceof Error ? e.message : typeof e === 'string' ? e : JSON.stringify(e)
+      status.value = 'check-failed'
     }
   }
 
@@ -147,6 +154,7 @@ export function useUpdater() {
     errorMessage,
     currentVersion,
     dismissed,
+    lastCheckedAt,
     checkForUpdate,
     downloadAndInstall,
     dismissUpdate,

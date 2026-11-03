@@ -69,7 +69,7 @@ const releaseNotes = computed(() => {
               Grove {{ availableUpdate?.version }} is available
             </template>
             <span class="ml-1.5 text-xs text-text-muted">
-              (current: {{ currentVersion }})
+              (current: {{ currentVersion || 'unknown' }})
             </span>
           </p>
 

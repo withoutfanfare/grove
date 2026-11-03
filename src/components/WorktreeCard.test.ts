@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import WorktreeCard from './WorktreeCard.vue'
@@ -238,3 +238,58 @@ function mountCardWithWorktree(wt: Worktree) {
 function diffStatCalls(): number {
   return mockTauriInvoke.mock.calls.filter(([command]) => command === 'get_diff_stats').length
 }
+
+describe('WorktreeCard diagnostics freshness', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    resetWorktreeDiagnosticsForTests()
+    resetTauriMocks()
+  })
+  afterEach(() => vi.useRealTimers())
+
+  it('re-checks after a new commit instead of showing the old diff', async () => {
+    const results = [diffStats, { ...diffStats, files_changed: 1, file_list: ['x'] }]
+    mockTauriInvoke.mockImplementation((command: string) =>
+      command === 'get_diff_stats' ? Promise.resolve(results.shift()) : Promise.resolve(undefined)
+    )
+    const wrapper = mountCardWithWorktree({ ...worktree, dirty: false })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="diff-stats"]').text()).toContain('5 files')
+
+    await wrapper.setProps({ worktree: { ...worktree, dirty: false, sha: 'def5678' } })
+    await flushPromises()
+    expect(diffStatCalls()).toBe(2)
+    expect(wrapper.get('[data-testid="diff-stats"]').text()).toContain('1 file')
+    wrapper.unmount()
+  })
+
+  it('reuses a fresh result but re-checks once it has expired', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    mockTauriInvoke.mockImplementation((command: string) =>
+      command === 'get_diff_stats' ? Promise.resolve(diffStats) : Promise.resolve(undefined)
+    )
+    const wrapper = mountCardWithWorktree({ ...worktree, dirty: false })
+    await flushPromises()
+    await wrapper.setProps({ worktree: { ...worktree, dirty: false } })
+    await flushPromises()
+    expect(diffStatCalls()).toBe(1)
+
+    vi.setSystemTime(Date.now() + 61_000)
+    await wrapper.setProps({ worktree: { ...worktree, dirty: false } })
+    await flushPromises()
+    expect(diffStatCalls()).toBe(2)
+    wrapper.unmount()
+  })
+
+  it('shows a failed comparison as unknown, never as no changes', async () => {
+    mockTauriInvoke.mockImplementation((command: string) =>
+      command === 'get_diff_stats' ? Promise.reject({ code: 'GIT_ERROR', message: 'bad revision origin/main' }) : Promise.resolve(undefined)
+    )
+    const wrapper = mountCardWithWorktree({ ...worktree, dirty: false })
+    await flushPromises()
+    const badge = wrapper.get('[data-testid="diff-stats-unknown"]')
+    expect(badge.text()).toBe('Diff unknown')
+    expect(badge.attributes('title')).toContain('bad revision origin/main')
+    wrapper.unmount()
+  })
+})

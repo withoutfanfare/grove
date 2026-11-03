@@ -128,8 +128,8 @@ grove setup</code></pre>
           <h3>Status Badges</h3>
           <p>Worktree cards may show coloured badges indicating special states:</p>
           <ul>
-            <li><strong class="text-success">Merged</strong> — Branch has been merged into the base branch and can be safely removed</li>
-            <li><strong class="text-warning">Stale</strong> — Worktree is more than 50 commits behind the base branch</li>
+            <li><strong class="text-success">Merged</strong> — Git ancestry: the worktree's commit is contained in the base branch. It is a cleanup candidate, not proof that removal is safe; the delete checks decide that.</li>
+            <li><strong class="text-warning">Stale</strong> — Behind the base branch by more than the configured threshold. Sync it; staleness alone is not a reason to remove it.</li>
             <li><strong class="text-accent">Mismatch</strong> — Directory name doesn't match the branch name, which may cause confusion</li>
           </ul>
 

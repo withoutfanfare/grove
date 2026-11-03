@@ -289,13 +289,13 @@ describe('useWt', () => {
   })
 
   describe('cancelOperation', () => {
-    it('should call cancel_operation', async () => {
+    it('cancels only the operation with the given ID', async () => {
       mockTauriInvoke.mockResolvedValue(undefined)
-      
+
       const wt = useWt()
-      await wt.cancelOperation()
-      
-      expect(mockTauriInvoke).toHaveBeenCalledWith('cancel_operation')
+      await wt.cancelOperation('op-123')
+
+      expect(mockTauriInvoke).toHaveBeenCalledWith('cancel_operation', { operationId: 'op-123' })
     })
   })
 

@@ -11,8 +11,10 @@
  * parent (OverviewDashboard) to perform. Clicking an item body navigates;
  * the trailing button performs the inline action.
  */
+import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useOverviewStore } from '../../stores'
+import { formatRelativeTime } from '../../composables/useRelativeTime'
 import type { Worktree } from '../../types'
 import { parseHealthIssueMessage, severityExplanation } from '../../utils/healthIssues'
 
@@ -52,9 +54,23 @@ const {
   dirtyAttention,
   behindAttention,
   cleanupAttention,
+  staleAttention,
   repoErrors,
   hasAttentionItems,
+  snapshots,
 } = storeToRefs(overviewStore)
+
+/** Repositories whose latest health or disk check failed; older results stay on screen */
+const checkFailures = computed(() =>
+  Object.values(snapshots.value)
+    .filter((snap) => snap.healthError || snap.diskError)
+    .map((snap) => ({
+      repo: snap.repo,
+      message: [snap.healthError && `Health: ${snap.healthError}`, snap.diskError && `Disk: ${snap.diskError}`].filter(Boolean).join(' · '),
+      lastGood: snap.healthCheckedAt ? formatRelativeTime(new Date(snap.healthCheckedAt).toISOString()).full : 'never',
+    }))
+    .sort((a, b) => a.repo.localeCompare(b.repo))
+)
 
 function isBusy(key: string): boolean {
   return props.busyKeys.includes(key)
@@ -65,9 +81,8 @@ function errorFor(repo: string, branch: string): string | undefined {
 }
 
 function cleanupLabel(worktree: Worktree): string {
-  if (worktree.merged && worktree.stale) return 'merged · stale'
-  if (worktree.merged) return 'merged'
-  return 'stale'
+  const base = worktree.base_ref ? ` into ${worktree.base_ref}` : ''
+  return `merged${base} (Git ancestry) · review before removing`
 }
 
 /** Translate a raw CLI issue message into joined human titles */
@@ -109,6 +124,23 @@ function healthSummary(messages: string[]): string {
             <button class="attention-action" :disabled="isBusy(item.repo)" @click="emit('repair', item.repo)">
               {{ isBusy(item.repo) ? 'Repairing…' : 'Repair' }}
             </button>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Checks that failed (last-known results are still shown elsewhere) -->
+      <div v-if="checkFailures.length > 0" class="attention-group" data-testid="check-failures">
+        <div class="attention-group-header">
+          <span class="attention-group-label text-warning">Checks failed</span>
+          <span class="attention-count">{{ checkFailures.length }}</span>
+        </div>
+        <ul class="attention-items">
+          <li v-for="item in checkFailures" :key="item.repo" class="attention-item">
+            <div class="attention-item-body">
+              <span class="attention-item-title font-mono">{{ item.repo }}</span>
+              <span class="attention-item-sub text-warning">{{ item.message }}</span>
+              <span class="attention-item-sub">Showing the last successful health check ({{ item.lastGood }}).</span>
+            </div>
           </li>
         </ul>
       </div>
@@ -163,7 +195,7 @@ function healthSummary(messages: string[]): string {
       <!-- Behind remote -->
       <div v-if="behindAttention.length > 0" class="attention-group">
         <div class="attention-group-header">
-          <span class="attention-group-label">Behind remote</span>
+          <span class="attention-group-label" title="Commits behind the upstream, using remote refs from the last fetch">Behind upstream</span>
           <span class="attention-count">{{ behindAttention.length }}</span>
           <span class="flex-1" />
           <button class="attention-bulk-action" :disabled="bulkPulling" @click="emit('pullAllBehind')">
@@ -197,14 +229,36 @@ function healthSummary(messages: string[]): string {
         </ul>
       </div>
 
+      <!-- Far behind base, not merged: sync it, don't remove it -->
+      <div v-if="staleAttention.length > 0" class="attention-group">
+        <div class="attention-group-header">
+          <span class="attention-group-label" title="More commits behind the base branch than the configured stale threshold">Far behind base</span>
+          <span class="attention-count">{{ staleAttention.length }}</span>
+        </div>
+        <ul class="attention-items">
+          <li v-for="item in staleAttention" :key="item.worktree.path" class="attention-item">
+            <button class="attention-item-body" @click="emit('navigate', item.repo, item.worktree.branch)">
+              <span class="attention-item-title">
+                <span class="severity-dot bg-warning" />
+                <span class="font-mono">{{ item.repo }}</span>
+                <span class="text-text-muted">·</span>
+                <span class="truncate">{{ item.worktree.branch }}</span>
+              </span>
+              <span class="attention-item-sub">Behind {{ item.worktree.base_ref || 'base' }} beyond the stale threshold · sync it</span>
+            </button>
+            <button class="attention-action" @click="emit('navigate', item.repo, item.worktree.branch)">Go to</button>
+          </li>
+        </ul>
+      </div>
+
       <!-- Cleanup candidates -->
       <div v-if="cleanupAttention.length > 0" class="attention-group">
         <div class="attention-group-header">
-          <span class="attention-group-label">Cleanup candidates</span>
+          <span class="attention-group-label" title="Merged by Git ancestry. Not a safety verdict: removal runs its own checks.">Cleanup candidates</span>
           <span class="attention-count">{{ cleanupAttention.length }}</span>
           <span class="flex-1" />
           <button class="attention-bulk-action" :disabled="pruning" @click="emit('pruneAll')">
-            {{ pruning ? 'Pruning…' : 'Prune all' }}
+            {{ pruning ? 'Pruning…' : 'Review branch clean-up…' }}
           </button>
         </div>
         <ul class="attention-items">

@@ -29,6 +29,8 @@ interface OperationProgressProp {
   total: number
   items: readonly ProgressItem[] | ProgressItem[]
   isComplete: boolean
+  stopping?: boolean
+  warnings?: readonly string[]
 }
 
 const props = defineProps<{
@@ -52,8 +54,8 @@ const { toast } = useToast()
 // Phase 5: Active filter for categorised results
 const activeFilter = ref<ResultFilter>('all')
 
-// Phase 5: Track which items have expanded error details
-const expandedErrors = ref<Set<string>>(new Set())
+// Error details start open (a failure needs its reason); track the ones the user hid
+const collapsedErrors = ref<Set<string>>(new Set())
 
 // Computed properties
 const percentage = computed(() => {
@@ -178,7 +180,7 @@ function getStatusConfig(status: ProgressStatus) {
 function handleClose() {
   // Reset filter on close
   activeFilter.value = 'all'
-  expandedErrors.value.clear()
+  collapsedErrors.value.clear()
   emit('close')
 }
 
@@ -192,15 +194,15 @@ function handleRetry() {
 
 // Phase 5: Toggle error details expansion
 function toggleErrorDetails(itemKey: string) {
-  if (expandedErrors.value.has(itemKey)) {
-    expandedErrors.value.delete(itemKey)
+  if (collapsedErrors.value.has(itemKey)) {
+    collapsedErrors.value.delete(itemKey)
   } else {
-    expandedErrors.value.add(itemKey)
+    collapsedErrors.value.add(itemKey)
   }
 }
 
 function isErrorExpanded(itemKey: string): boolean {
-  return expandedErrors.value.has(itemKey)
+  return !collapsedErrors.value.has(itemKey)
 }
 
 // Phase 5: Copy error to clipboard
@@ -277,6 +279,13 @@ function hasError(item: ProgressItem): boolean {
           />
         </div>
       </div>
+
+      <p v-if="progress?.stopping && !isComplete" class="text-xs text-warning" role="status">
+        Stopping after current item. Items already running will finish; nothing is rolled back.
+      </p>
+      <p v-for="warning in progress?.warnings ?? []" :key="warning" class="text-xs text-warning" role="status">
+        {{ warning }}
+      </p>
 
       <!-- Phase 5: Summary counts when complete -->
       <div v-if="isComplete && progress" class="flex flex-wrap gap-2">
@@ -500,11 +509,11 @@ function hasError(item: ProgressItem): boolean {
 
     <!-- Cancel button when in progress -->
     <template v-if="!isComplete && progress" #footer>
-      <SButton variant="ghost" class="w-full" @click="handleCancel">
+      <SButton variant="ghost" class="w-full" :disabled="progress.stopping" @click="handleCancel">
         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
         </svg>
-        Cancel Operation
+        {{ progress.stopping ? 'Stopping after current item…' : 'Cancel Operation' }}
       </SButton>
     </template>
 

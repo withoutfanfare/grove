@@ -8,9 +8,9 @@
  * 3. Results - summary of deletion with hook execution details
  */
 import { ref, computed, watch, nextTick } from 'vue'
-import type { Worktree, RemoveWorktreeResponse } from '../types'
+import type { Worktree, RemoveWorktreeResponse, RemovalPreflight } from '../types'
 import { isWtError } from '../types'
-import { useWorktrees, useToast } from '../composables'
+import { useWorktrees, useToast, useWt } from '../composables'
 import { useRepoConfigStore } from '../stores/repoConfig'
 import { useWorktreeStore } from '../stores'
 import { SButton, SModal, SCheckbox, SBadge, SInput } from '@stuntrocket/ui'
@@ -28,7 +28,8 @@ const emit = defineEmits<{
   deleted: []
 }>()
 
-const { removeWorktree } = useWorktrees()
+const { removeWorktree, reconcileRemovedTargets } = useWorktrees()
+const wtApi = useWt()
 const { toast } = useToast()
 const repoConfigStore = useRepoConfigStore()
 const worktreeStore = useWorktreeStore()
@@ -69,6 +70,55 @@ const protectionOverridden = computed(() => {
   if (!isProtectedBranch.value) return true
   return protectionConfirmText.value === props.worktree?.branch
 })
+
+// Read-only preflight: the same gate rm re-runs immediately before deleting.
+// Anything but an explicit "clear" (including a failed or missing check) blocks.
+const preflight = ref<RemovalPreflight | null>(null)
+const preflightError = ref<string | null>(null)
+const preflightLoading = ref(false)
+let preflightRun = 0
+
+const removalTarget = computed(() => props.worktree?.branch || props.worktree?.path || '')
+const preflightClear = computed(() => !preflightLoading.value && preflight.value?.verdict === 'clear')
+
+async function runPreflight() {
+  if (!props.isOpen || !props.worktree || !props.repoName) return
+  const run = ++preflightRun
+  preflightLoading.value = true
+  preflightError.value = null
+  try {
+    const result = await wtApi.getRemovalPreflight(
+      props.repoName,
+      removalTarget.value,
+      deleteBranch.value,
+      dropDatabase.value,
+      isProtectedBranch.value && protectionOverridden.value ? true : undefined
+    )
+    if (run !== preflightRun) return
+    preflight.value = result ?? null
+    if (!result) preflightError.value = 'The safety check returned no result.'
+  } catch (e) {
+    if (run !== preflightRun) return
+    preflight.value = null
+    const failure = wtApi.toWtError(e)
+    preflightError.value = failure.message
+    if (failure.code === 'WORKTREE_NOT_FOUND') {
+      reconcileRemovedTargets(props.repoName, [removalTarget.value])
+      toast.info('This worktree is no longer registered. Its cached entry was removed; no files were deleted.')
+      emit('close')
+    }
+  } finally {
+    if (run === preflightRun) preflightLoading.value = false
+  }
+}
+
+watch([deleteBranch, dropDatabase, protectionOverridden], () => {
+  if (phase.value === 'confirm') void runPreflight()
+})
+
+function checkStateClass(state: string) {
+  return state === 'clear' ? 'text-success' : state === 'blocked' ? 'text-danger' : 'text-warning'
+}
 
 // Computed helpers for results phase
 const hasHooks = computed(() => (deletionResult.value?.hooks.length ?? 0) > 0)
@@ -115,8 +165,11 @@ function stopElapsedTimer() {
 // Reset options when dialog opens
 watch(() => props.isOpen, async (open) => {
   if (open) {
-    deleteBranch.value = true
+    // Keep the branch unless the user asks: deleting it is a separate, unrecoverable choice.
+    deleteBranch.value = false
     dropDatabase.value = false
+    preflight.value = null
+    preflightError.value = null
     skipBackup.value = false
     error.value = null
     errorCode.value = null
@@ -131,6 +184,7 @@ watch(() => props.isOpen, async (open) => {
     } catch {
       // Non-fatal: protection check defaults to empty (no protection)
     }
+    await runPreflight()
 
     // M9: Focus cancel button when dialog opens for safer default
     await nextTick()
@@ -139,7 +193,7 @@ watch(() => props.isOpen, async (open) => {
   } else {
     stopElapsedTimer()
   }
-})
+}, { immediate: true })
 
 async function handleDelete() {
   // Store worktree and repoName in local variables at function start
@@ -148,7 +202,7 @@ async function handleDelete() {
   const repoName = props.repoName
 
   if (!worktree || !repoName) return
-  if (isSubmitting.value) return
+  if (isSubmitting.value || !preflightClear.value || !protectionOverridden.value) return
 
   isSubmitting.value = true
   error.value = null
@@ -165,13 +219,18 @@ async function handleDelete() {
       deleteBranch: deleteBranch.value,
       dropDb: dropDatabase.value,
       skipBackup: skipBackup.value,
-      force: true, // Always force in GUI to avoid prompts
+      // The backend maps this confirmation to the narrow protected-branch option.
+      force: isProtectedBranch.value && protectionOverridden.value,
     })
 
-    if (response) {
+    if (response?.result.success) {
       deletionResult.value = response
       phase.value = 'results'
       emit('deleted')
+    } else if (response) {
+      errorCode.value = null
+      error.value = 'The CLI reported that the removal failed. Refresh to see what remains.'
+      phase.value = 'confirm'
     } else {
       // useWorktrees().removeWorktree() catches internally and resolves null on
       // failure, setting the typed WtError on the worktrees store rather than
@@ -194,7 +253,7 @@ async function handleDelete() {
       toast.error(e.message)
     } else {
       errorCode.value = null
-      const errorMessage = e instanceof Error ? e.message : 'Failed to delete worktree'
+      const errorMessage = wtApi.toWtError(e).message
       error.value = errorMessage
       toast.error(errorMessage)
     }
@@ -247,10 +306,20 @@ function handleClose() {
     <!-- Phase 1: Confirm -->
     <!-- ============================================================ -->
     <div v-if="phase === 'confirm'" class="space-y-5">
-      <!-- Warning text -->
-      <p class="text-text-secondary text-sm leading-relaxed">
-        Are you sure you want to delete this worktree? This action cannot be undone.
-      </p>
+      <!-- Exact target and consequences -->
+      <div class="space-y-1 text-sm" data-testid="delete-consequences">
+        <p class="text-text-secondary">Deletes this worktree folder. This cannot be undone.</p>
+        <p class="text-xs text-text-muted">Folder: <code class="font-mono text-text-secondary break-all">{{ worktree?.path }}</code></p>
+        <p v-if="worktree?.branch" class="text-xs text-text-muted">
+          Branch <code class="font-mono text-text-secondary">{{ worktree.branch }}</code>:
+          <span v-if="deleteBranch" class="text-danger">will also be deleted (Git refuses if it holds unmerged work)</span>
+          <span v-else>kept in the repository</span>
+        </p>
+        <p v-else class="text-xs text-text-muted">Detached HEAD at {{ worktree?.sha }}: no branch is affected.</p>
+        <p v-if="dropDatabase" class="text-xs text-danger">
+          Database {{ preflight?.database?.name ? `"${preflight.database.name}"` : '(name not confirmed by the check)' }}: a drop is requested from the removal hooks{{ skipBackup ? ', without a backup' : '' }}.
+        </p>
+      </div>
 
       <!-- Dirty warning -->
       <Transition
@@ -270,7 +339,7 @@ function handleClose() {
             <div>
               <p class="text-warning text-sm font-medium">Uncommitted changes</p>
               <p class="text-warning/80 text-xs mt-0.5">
-                This worktree has uncommitted changes that will be lost.
+                Uncommitted changes block removal. Grove will refuse to delete this worktree until they are committed and pushed, or cleaned up.
               </p>
             </div>
           </div>
@@ -296,6 +365,7 @@ function handleClose() {
               <p class="text-danger text-sm font-medium">Protected branch</p>
               <p class="text-danger/80 text-xs mt-0.5">
                 This branch is protected. Type the branch name to confirm deletion.
+                Current-site, database and unsaved-work safeguards still apply.
               </p>
               <div class="mt-2">
                 <SInput
@@ -315,15 +385,15 @@ function handleClose() {
       <div class="space-y-3 pt-2">
         <SCheckbox
           v-model="deleteBranch"
-          label="Delete branch from repository"
-          description="Removes the branch from the git repository"
+          label="Also delete the branch"
+          description="Off by default. The branch is removed from the repository; Git refuses if it is not merged"
           :disabled="isSubmitting"
         />
 
         <SCheckbox
           v-model="dropDatabase"
           label="Drop associated database"
-          description="Deletes the database for this worktree"
+          description="Asks the removal hooks to drop this worktree's database"
           :disabled="isSubmitting"
         />
 
@@ -345,6 +415,30 @@ function handleClose() {
             />
           </div>
         </Transition>
+      </div>
+
+      <!-- Read-only safety checks (re-run by the CLI when you press Delete) -->
+      <div class="p-3 rounded-lg bg-surface-overlay/50 space-y-1.5" data-testid="removal-preflight" role="status">
+        <p class="text-xs font-medium text-text-secondary">
+          Safety checks
+          <span v-if="preflight?.checked_at" class="font-normal text-text-muted">· checked {{ new Date(preflight.checked_at).toLocaleTimeString() }}</span>
+        </p>
+        <p v-if="preflightLoading" class="text-xs text-text-muted">Checking unsaved work, live sessions, locks and the current site…</p>
+        <p v-else-if="preflightError" class="text-xs text-warning">
+          Safety check unavailable, so deletion is blocked: {{ preflightError }}
+        </p>
+        <template v-else-if="preflight">
+          <ul class="space-y-1">
+            <li v-for="check in preflight.checks" :key="check.id" class="text-xs flex gap-2">
+              <span class="font-medium uppercase w-16 flex-shrink-0" :class="checkStateClass(check.state)">{{ check.state }}</span>
+              <span class="text-text-muted"><span class="text-text-secondary">{{ check.label || check.id }}</span> — {{ check.message }}</span>
+            </li>
+          </ul>
+          <p v-if="preflight.verdict === 'blocked'" class="text-xs text-danger">Removal is blocked by the checks above.</p>
+          <p v-else-if="preflight.verdict === 'unknown'" class="text-xs text-warning">A check could not finish, so removal is blocked. Fix the cause or refresh and try again.</p>
+          <p v-else class="text-xs text-text-muted">All checks passed just now. They run again when you press Delete.</p>
+        </template>
+        <button v-if="!preflightLoading" class="text-2xs text-accent hover:underline" @click="runPreflight">Check again</button>
       </div>
 
       <!-- Removal gate refusal: shown as-is, with no bypass control -->
@@ -378,7 +472,7 @@ function handleClose() {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            {{ error }}
+            <span class="whitespace-pre-wrap">{{ error }}</span>
           </p>
         </div>
       </Transition>
@@ -519,7 +613,7 @@ function handleClose() {
         <SButton
           variant="danger"
           :loading="isSubmitting"
-          :disabled="!protectionOverridden"
+          :disabled="!protectionOverridden || !preflightClear"
           @click="handleDelete"
         >
           Delete Worktree

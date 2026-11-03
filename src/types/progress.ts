@@ -48,6 +48,12 @@ export interface OperationProgress {
   items: ProgressItem[];
   /** Whether the operation has completed */
   isComplete: boolean;
+  /** ID the frontend gave this run; only events carrying it are applied */
+  operationId?: string;
+  /** Cancellation requested: the backend stops scheduling after the current item(s) */
+  stopping?: boolean;
+  /** Non-fatal warnings, e.g. "recovery is unavailable" (the operation itself continued) */
+  warnings?: string[];
 }
 
 /**
@@ -63,10 +69,12 @@ export interface OperationProgressEvent {
   total: number;
   /** Item identifier (branch name) */
   item: string;
-  /** Status: "pending", "in_progress", "success", "failed", "skipped" */
-  status: ProgressStatus;
+  /** Status: an item status, or 'recovery_unavailable' (a warning, not an item result) */
+  status: ProgressStatus | 'recovery_unavailable';
   /** Optional details (commits pulled, error message, etc.) */
   details?: string;
+  /** The operation run this event belongs to */
+  operation_id?: string;
 }
 
 /**

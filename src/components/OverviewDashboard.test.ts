@@ -31,7 +31,8 @@ const recentFixture: RecentWorktree = {
 /** Mock the Tauri commands the overview triggers on mount */
 function mockWtCommands(
   worktreesByRepo: Record<string, Worktree[] | { error: string }>,
-  recent: RecentWorktree[] = []
+  recent: RecentWorktree[] = [],
+  checksFail = true
 ) {
   mockTauriInvoke.mockImplementation((command: string, args?: Record<string, unknown>) => {
     if (command === 'list_worktrees') {
@@ -42,8 +43,17 @@ function mockWtCommands(
       return Promise.resolve(entry ?? [])
     }
     if (command === 'get_recent_worktrees') return Promise.resolve(recent)
-    if (command === 'get_repo_health') return Promise.reject({ code: 'COMMAND_FAILED', message: 'unavailable in test' })
-    if (command === 'get_repo_disk_usage') return Promise.reject({ code: 'COMMAND_FAILED', message: 'unavailable in test' })
+    const repo = (args?.repoName as string) ?? ''
+    if (command === 'get_repo_health') {
+      return checksFail
+        ? Promise.reject({ code: 'COMMAND_FAILED', message: 'unavailable in test' })
+        : Promise.resolve({ repo, overall_grade: 'A', overall_score: 100, worktree_count: 1, summary: { healthy: 1, warning: 0, critical: 0 }, issues: [], worktrees: [] })
+    }
+    if (command === 'get_repo_disk_usage') {
+      return checksFail
+        ? Promise.reject({ code: 'COMMAND_FAILED', message: 'unavailable in test' })
+        : Promise.resolve({ repo, total_bytes: 1024, total_display: '1 KB', worktrees: [] })
+    }
     return Promise.resolve(undefined)
   })
 }
@@ -118,7 +128,7 @@ describe('OverviewDashboard', () => {
     const text = wrapper.text()
     expect(text).toContain('Needs Attention')
     expect(text).toContain('Dirty')
-    expect(text).toContain('Behind remote')
+    expect(text).toContain('Behind upstream')
     expect(text).toContain('Cleanup candidates')
     expect(text).toContain('2 repos')
     expect(text).toContain('3 worktrees')
@@ -130,12 +140,40 @@ describe('OverviewDashboard', () => {
   it('shows the all-clear state when nothing needs attention', async () => {
     const store = useWorktreeStore()
     store.setRepositories([{ name: 'demo', worktrees: 1 }])
-    mockWtCommands({ demo: [makeWorktree()] })
+    mockWtCommands({ demo: [makeWorktree()] }, [], false)
 
     const wrapper = mountOverview()
     await flushPromises()
 
     expect(wrapper.text()).toContain("Everything's tidy")
+    wrapper.unmount()
+  })
+
+  it('never claims all-clear when health or disk checks failed', async () => {
+    const store = useWorktreeStore()
+    store.setRepositories([{ name: 'demo', worktrees: 1 }])
+    mockWtCommands({ demo: [makeWorktree()] })
+
+    const wrapper = mountOverview()
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain("Everything's tidy")
+    expect(wrapper.get('[data-testid="check-failures"]').text()).toContain('unavailable in test')
+    expect(useOverviewStore().snapshots['demo'].expensiveRefreshedAt).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('lists stale-but-unmerged work under "Far behind base", not as a cleanup candidate', async () => {
+    const store = useWorktreeStore()
+    store.setRepositories([{ name: 'demo', worktrees: 1 }])
+    mockWtCommands({ demo: [makeWorktree({ branch: 'old-work', stale: true, merged: false, base_ref: 'origin/main' })] }, [], false)
+
+    const wrapper = mountOverview()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Far behind base')
+    expect(wrapper.text()).toContain('Behind origin/main beyond the stale threshold')
+    expect(wrapper.text()).not.toContain('Cleanup candidates')
     wrapper.unmount()
   })
 

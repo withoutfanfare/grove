@@ -11,6 +11,7 @@ import {
   isTerminalStatus,
   determineEnhancedStatus,
 } from '../types/progress';
+import { recordActivity } from './useActivity';
 
 /**
  * Composable for managing operation progress state and Tauri event subscriptions.
@@ -47,12 +48,16 @@ export function useOperationProgress() {
     operation: string,
     expectedItems: string[],
     worktreePaths?: Map<string, string>
-  ): Promise<void> {
+  ): Promise<string> {
     // Clean up any existing subscription
     await stopListening();
 
+    const operationId = crypto.randomUUID();
+
     // Initialise progress state
     progress.value = {
+      operationId,
+      warnings: [],
       operation,
       current: 0,
       total: expectedItems.length,
@@ -66,23 +71,32 @@ export function useOperationProgress() {
 
     // Subscribe to progress events
     unlisten = await listen<OperationProgressEvent>('operation_progress', (event) => {
-      // Filter events for this operation only
-      if (event.payload.operation !== operation) return;
+      // Only this run's events: two runs of the same type must never mix
+      if (event.payload.operation_id !== operationId) return;
 
       const p = progress.value;
       if (!p) return;
+
+      if (event.payload.status === 'recovery_unavailable') {
+        const warning = event.payload.details || 'Operation continues, recovery is unavailable';
+        p.warnings = [...(p.warnings ?? []), warning];
+        // Kept after the panel closes; the operation itself carried on.
+        recordActivity({ action: `${operation}: recovery checkpoint`, repo: 'n/a', target: operationId, status: 'warning', warnings: [warning] });
+        return;
+      }
+      const status = event.payload.status;
 
       // Update total from event (this should be consistent)
       p.total = event.payload.total;
 
       // Phase 5: Enhance status detection based on output content
       // Detect conflicts in failure messages, and already-up-to-date in success messages
-      let enhancedStatus = event.payload.status;
+      let enhancedStatus = status;
       let hasConflict = false;
       const details = event.payload.details || '';
 
-      if (isTerminalStatus(event.payload.status)) {
-        const enhanced = determineEnhancedStatus(event.payload.status, details);
+      if (operation === 'pull_all' && isTerminalStatus(status)) {
+        const enhanced = determineEnhancedStatus(status, details);
         enhancedStatus = enhanced.status;
         hasConflict = enhanced.hasConflict;
       }
@@ -126,6 +140,13 @@ export function useOperationProgress() {
       const allTerminal = p.items.every((i) => isTerminalStatus(i.status));
       p.isComplete = allTerminal && p.items.length === p.total;
     });
+
+    return operationId;
+  }
+
+  /** Record that cancellation was requested (shown as "Stopping after current item") */
+  function markStopping(): void {
+    if (progress.value) progress.value.stopping = true;
   }
 
   /**
@@ -273,6 +294,8 @@ export function useOperationProgress() {
     startListening,
     /** Stop listening to progress events */
     stopListening,
+    /** Record a cancellation request */
+    markStopping,
     /** Reset progress state and stop listening */
     reset,
     /** Get percentage complete (0-100) */

@@ -31,6 +31,7 @@ Active roadmaps, design proposals, and code quality reviews for Grove.
 | Document | Description |
 |---|---|
 | [Quality-of-Life Review — February 2026](reviews/qol-review-2026-02-16.md) | Quality-of-life audit conducted in February 2026 |
+| [Trust and Quality-of-Life Review — November 2026](reviews/trust-and-qol-review-2026-11-03.md) | Codex/Claude findings on action safety, truthful state, recovery and useful insight |
 
 ---
 

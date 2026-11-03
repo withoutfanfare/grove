@@ -26,6 +26,13 @@ export const useWorktreeStore = defineStore('worktrees', () => {
   const loadedRepos = ref<Set<string>>(new Set());
   // Cache of worktrees per repo for lazy loading
   const worktreeCache = ref<Record<string, Worktree[]>>({});
+  const refreshErrors = ref<Record<string, string>>({});
+  // Per repo: when the worktree list last loaded successfully, and when a refresh last failed (Unix ms)
+  const observedAt = ref<Record<string, number>>({});
+  const remoteFetchedAt = ref<Record<string, number>>({});
+  const remoteFetchErrors = ref<Record<string, string>>({});
+  const refreshFailedAt = ref<Record<string, number>>({});
+  const removalGenerations = ref<Record<string, number>>({});
   // Multi-selection: set of selected worktree paths (per-repo, cleared on switch)
   const selectedPaths = ref<Set<string>>(new Set());
   // Anchor for shift-click range selection
@@ -72,8 +79,32 @@ export const useWorktreeStore = defineStore('worktrees', () => {
     }
     // Cache for lazy loading
     if (selectedRepoName.value) {
+      delete refreshErrors.value[selectedRepoName.value];
       loadedRepos.value.add(selectedRepoName.value);
       worktreeCache.value[selectedRepoName.value] = wts;
+    }
+  }
+
+  function removeWorktreeTargets(repo: string, targets: string[]) {
+    removalGenerations.value[repo] = (removalGenerations.value[repo] ?? 0) + 1;
+    const removed = new Set(targets);
+    const retained = (rows: Worktree[]) => rows.filter(wt => !removed.has(wt.branch || wt.path) && !removed.has(wt.path));
+    if (worktreeCache.value[repo]) {
+      worktreeCache.value[repo] = retained(worktreeCache.value[repo]);
+    }
+    const refreshError = refreshErrors.value[repo];
+    if (selectedRepoName.value === repo) setWorktrees(retained(worktrees.value));
+    if (refreshError) refreshErrors.value[repo] = refreshError;
+    const overview = useOverviewStore();
+    const snapshot = overview.snapshots[repo];
+    if (snapshot) {
+      overview.snapshots[repo] = {
+        ...snapshot,
+        worktrees: retained(snapshot.worktrees),
+        health: undefined,
+        diskUsage: undefined,
+        expensiveRefreshedAt: undefined,
+      };
     }
   }
 
@@ -149,6 +180,8 @@ export const useWorktreeStore = defineStore('worktrees', () => {
         if (snapshot && Array.isArray(snapshot.worktrees)) {
           worktreeCache.value[name] = snapshot.worktrees;
           loadedRepos.value.add(name);
+          // The cached rows are as old as the snapshot, not "now"
+          if (snapshot.refreshedAt) observedAt.value[name] = snapshot.refreshedAt;
         }
       }
       // Stale-while-revalidate: paint cached worktrees instantly for previously
@@ -235,6 +268,11 @@ export const useWorktreeStore = defineStore('worktrees', () => {
     loadingRecent.value = false;
     error.value = null;
     focusedBranch.value = null;
+    refreshErrors.value = {};
+    observedAt.value = {};
+    remoteFetchedAt.value = {};
+    remoteFetchErrors.value = {};
+    refreshFailedAt.value = {};
     focusTransient.value = false;
     clearSelection();
   }
@@ -244,6 +282,12 @@ export const useWorktreeStore = defineStore('worktrees', () => {
     repositories,
     selectedRepoName,
     worktrees,
+    refreshErrors,
+    observedAt,
+    remoteFetchedAt,
+    remoteFetchErrors,
+    refreshFailedAt,
+    removalGenerations,
     recentWorktrees,
     loading,
     loadingWorktrees,
@@ -266,6 +310,7 @@ export const useWorktreeStore = defineStore('worktrees', () => {
     // Actions
     setRepositories,
     setWorktrees,
+    removeWorktreeTargets,
     setRecentWorktrees,
     selectRepository,
     deselectRepository,

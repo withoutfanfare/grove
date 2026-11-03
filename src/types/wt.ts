@@ -64,9 +64,9 @@ export interface Worktree {
   url?: string;
   /** Whether the worktree has uncommitted changes */
   dirty: boolean;
-  /** Number of commits ahead of the tracking branch (null when there is no upstream) */
+  /** Commits ahead of the upstream (null = unknown: no upstream, or the comparison failed) */
   ahead: number | null;
-  /** Number of commits behind the tracking branch (null when there is no upstream) */
+  /** Commits behind the upstream (null = unknown: no upstream, or the comparison failed) */
   behind: number | null;
   /** Whether there's a branch mismatch */
   mismatch?: boolean;
@@ -76,10 +76,19 @@ export interface Worktree {
   health_score?: number;
   /** ISO timestamp of last access (e.g., "2026-01-09T17:06:08Z") */
   lastAccessed?: string;
-  /** Whether the branch has been merged into the base branch */
-  merged?: boolean;
-  /** Whether the worktree is stale (beyond the configured threshold behind base) */
-  stale?: boolean;
+  /** Git ancestry: HEAD is contained in the base branch. null = the check failed (unknown) */
+  merged?: boolean | null;
+  /** Behind base by more than the configured threshold. null = the check failed (unknown) */
+  stale?: boolean | null;
+  /** Comparison evidence: the exact base and commits these results were computed from */
+  base_ref?: string;
+  base_sha?: string;
+  head_sha?: string;
+  /** Commits behind base_ref (null = the count failed) */
+  behind_base?: number | null;
+  behind_threshold?: number;
+  /** When the local Git comparison ran (ISO). Not a remote fetch time. */
+  checked_at?: string;
 }
 
 /**
@@ -225,6 +234,7 @@ export interface RemoveSelectedItem {
   success: boolean;
   branch_deleted: boolean;
   message: string;
+  error_code?: string;
 }
 
 /** Summary of a batch remove (mirrors Rust RemoveSelectedSummary) */
@@ -476,6 +486,8 @@ export interface PullAllWorktree {
  * Summary of pull-all operation
  */
 export interface PullAllSummary {
+  /** Items not started because cancellation was requested */
+  cancelled?: number;
   /** Total number of worktrees */
   total: number;
   /** Number that succeeded */
@@ -947,6 +959,8 @@ export interface Config {
   database?: ConfigDatabase;
   /** URL subdomain prefix (e.g., "api" turns feature.test into api.feature.test) */
   url_subdomain?: string;
+  /** Where each effective setting came from (CLI-resolved), e.g. { HERD_ROOT: "environment" } */
+  config_sources?: Record<string, string>;
 }
 
 /**
@@ -1195,4 +1209,65 @@ export interface PrBranchInfo {
   headRefName: string;
   /** PR title */
   title: string;
+}
+
+// ============================================================================
+// Exact prune plan and removal preflight (parent integration contract)
+// ============================================================================
+
+/** Read-only plan from `get_prune_plan`; the backend keeps it immutable under plan_id */
+export interface PrunePlan {
+  plan_id: string;
+  repo: string;
+  /** Comparison ref used, e.g. "origin/main" */
+  base: string;
+  base_sha?: string;
+  planned_at?: string;
+  /** Local branches that would be deleted: merged into base, no worktree */
+  branches: { name: string; sha?: string; reason?: string }[];
+  /** Branches deliberately left alone (checked out, protected, current) */
+  skipped?: { name: string; reason: string }[];
+  /** Informational only: branch clean-up never changes worktree records */
+  stale_registrations: { path: string; reason?: string }[];
+}
+
+/** Per-branch outcome from `prune_repo_confirmed` */
+export interface PruneBranchResult {
+  name: string;
+  status: 'deleted' | 'refused' | 'skipped' | 'unknown';
+  reason?: string;
+}
+
+export interface PruneExecution {
+  repo: string;
+  base: string;
+  branches: PruneBranchResult[];
+  stale_refs_pruned: number;
+}
+
+export type CheckState = 'clear' | 'blocked' | 'unknown';
+
+/** Read-only removal preflight; rm re-runs the same gate before deleting */
+export interface RemovalPreflight {
+  repo: string;
+  branch: string;
+  path: string;
+  /** unknown is treated as blocked */
+  verdict: CheckState;
+  checked_at?: string;
+  checks: { id: string; label?: string; state: CheckState; message: string }[];
+  branch_info?: { exists: boolean; merged_into_base?: boolean | null; base?: string };
+  database?: { name?: string; will_drop: boolean };
+}
+
+/** App and bundled CLI provenance from `get_build_info` (any field may be null) */
+export interface BuildInfo {
+  appVersion: string | null;
+  appRevision: string | null;
+  cliRevision: string | null;
+  cliSha256: string | null;
+  compatibility?: string;
+  builtAt: string | null;
+  target: string | null;
+  protocol: string | null;
 }

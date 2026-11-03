@@ -106,6 +106,23 @@ describe('useOverview', () => {
     expect(overviewStore.snapshots['demo'].error).toBeUndefined()
   })
 
+  it('does not restore removed rows from an overview capture started before removal', async () => {
+    const worktrees = useWorktreeStore()
+    worktrees.setRepositories([{ name: 'demo', worktrees: 1 }])
+    worktrees.selectRepository('demo')
+    const removed = makeWorktree()
+    worktrees.setWorktrees([removed])
+    const overview = useOverviewStore()
+    overview.setWorktreeSnapshot('demo', [removed], 1)
+    let finish!: (rows: Worktree[]) => void
+    mockTauriInvoke.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    const refresh = useOverview().refreshRepos(['demo'])
+    worktrees.removeWorktreeTargets('demo', [removed.branch])
+    finish([removed])
+    await refresh
+    expect(overview.snapshots.demo.worktrees).toEqual([])
+  })
+
   it('runs the expensive tier after the cheap tier and stores health + disk usage', async () => {
     const worktreeStore = useWorktreeStore()
     worktreeStore.setRepositories([{ name: 'demo', worktrees: 1 }])

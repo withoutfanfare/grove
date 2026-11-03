@@ -11,7 +11,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useWindowFocus } from '@vueuse/core'
 import { useWorktreeStore, useOverviewStore } from '../stores'
-import { useOverview, useRepos, useWorktrees, useWt, useToast } from '../composables'
+import { useOverview, useRepos, useWorktrees, useWt, useToast, recordActivity } from '../composables'
 import type { Worktree, OperationProgress, ProgressStatus } from '../types'
 import AttentionPanel from './overview/AttentionPanel.vue'
 import RecentPanel from './overview/RecentPanel.vue'
@@ -29,7 +29,7 @@ interface BulkPullItem {
 const store = useWorktreeStore()
 const overviewStore = useOverviewStore()
 const { repositories } = storeToRefs(store)
-const { refreshing, stats, behindAttention, cleanupAttention } = storeToRefs(overviewStore)
+const { refreshing, stats, behindAttention } = storeToRefs(overviewStore)
 const { refreshAll, refreshRepos } = useOverview()
 const { selectRepository } = useRepos()
 const { fetchWorktrees, openInEditor, openInTerminal } = useWorktrees()
@@ -95,6 +95,7 @@ async function handlePull(repo: string, branch: string) {
   setBusy(key, true)
   try {
     const result = await wtApi.pullWorktree(repo, branch)
+    recordActivity({ action: 'Pull', repo, target: branch, status: result.success && !result.conflicts ? 'succeeded' : 'failed', details: result.message })
     if (result.conflicts || !result.success) {
       itemErrors.value[key] = result.message
     } else {
@@ -103,6 +104,7 @@ async function handlePull(repo: string, branch: string) {
     }
   } catch (error) {
     itemErrors.value[key] = wtApi.toWtError(error).message
+    recordActivity({ action: 'Pull', repo, target: branch, status: 'failed', details: itemErrors.value[key] })
   } finally {
     setBusy(key, false)
     await refreshRepos([repo])
@@ -114,6 +116,7 @@ async function handleRepair(repo: string) {
   setBusy(repo, true)
   try {
     const result = await wtApi.repairRepository(repo)
+    recordActivity({ action: 'Repair repository', repo, target: repo, status: result.success ? 'succeeded' : 'failed', details: result.message })
     if (result.success) {
       toast.success(`${repo}: Fixed ${result.issues_fixed} issue${result.issues_fixed === 1 ? '' : 's'}`)
     } else {
@@ -121,6 +124,7 @@ async function handleRepair(repo: string) {
     }
   } catch (error) {
     toast.error(`${repo}: ${wtApi.toWtError(error).message}`)
+    recordActivity({ action: 'Repair repository', repo, target: repo, status: 'failed', details: wtApi.toWtError(error).message })
   } finally {
     setBusy(repo, false)
     await refreshRepos([repo])
@@ -232,6 +236,15 @@ async function runBulkPull(items: BulkPullItem[]): Promise<void> {
       live.current = index + 1
     }
     live.isComplete = true
+    const notStarted = live.items.filter((i) => i.status === 'skipped' && bulkCancelled.value && !i.details)
+    recordActivity({
+      action: 'Pull behind worktrees',
+      repo: [...new Set(items.map((i) => i.repo))].join(', '),
+      target: `${items.length} worktree(s)`,
+      status: bulkCancelled.value ? 'cancelled' : live.items.some((i) => i.status === 'failed' || i.status === 'conflict') ? 'partial' : 'succeeded',
+      warnings: notStarted.length ? [`${notStarted.length} not started: ${notStarted.map((i) => i.item).join(', ')}`] : [],
+      details: live.items.map((i) => `${i.status.toUpperCase()}  ${i.item}${i.error ? `: ${i.error}` : ''}`).join('\n'),
+    })
   } finally {
     isBulkPulling.value = false
     if (affectedRepos.size > 0) {
@@ -254,6 +267,7 @@ function handlePullAllBehind() {
 
 function handleBulkCancel() {
   bulkCancelled.value = true
+  if (bulkProgress.value) bulkProgress.value.stopping = true
 }
 
 function handleBulkRetry() {
@@ -276,54 +290,18 @@ function handleProgressClose() {
   bulkProgress.value = null
 }
 
-// ── Bulk: prune all cleanup candidates (mandatory confirmation) ─────────
+// ── Bulk: branch clean-up from an exact read-only plan per repository ─
 
 const showPruneDialog = ref(false)
-const isPruning = ref(false)
-
-const pruneGroups = computed(() => {
-  const byRepo = new Map<string, string[]>()
-  for (const item of cleanupAttention.value) {
-    const branches = byRepo.get(item.repo) ?? []
-    branches.push(item.worktree.branch)
-    byRepo.set(item.repo, branches)
-  }
-  return [...byRepo.entries()].map(([repo, branches]) => ({ repo, branches }))
-})
+// Every registered repo: merged branches without a worktree never appear as cards
+const pruneRepos = computed(() => repositories.value.map((repo) => repo.name))
 
 function handlePruneAll() {
-  if (pruneGroups.value.length === 0) return
   showPruneDialog.value = true
 }
 
-async function handlePruneConfirmed() {
-  if (isPruning.value) return
-  isPruning.value = true
-  const repos = pruneGroups.value.map((group) => group.repo)
-  let deleted = 0
-  let failures = 0
-  try {
-    for (const repo of repos) {
-      try {
-        const result = await wtApi.pruneRepo(repo, true)
-        deleted += result.summary.branches_deleted
-      } catch (error) {
-        failures++
-        toast.error(`${repo}: ${wtApi.toWtError(error).message}`)
-      }
-    }
-    if (failures === 0) {
-      toast.success(
-        deleted > 0
-          ? `Pruned ${deleted} merged branch${deleted === 1 ? '' : 'es'}`
-          : 'Nothing to prune — everything was already tidy'
-      )
-    }
-  } finally {
-    isPruning.value = false
-    showPruneDialog.value = false
-    await refreshRepos(repos)
-  }
+async function handlePruneDone(repos: string[]) {
+  if (repos.length > 0) await refreshRepos(repos)
 }
 </script>
 
@@ -354,14 +332,22 @@ async function handlePruneConfirmed() {
           <strong>{{ stats.dirtyCount }}</strong> dirty</span>
         <span class="overview-chip" :class="{ 'overview-chip-warn': stats.behindCount > 0 }">
           <strong>{{ stats.behindCount }}</strong> behind</span>
-        <span v-if="stats.diskDisplay" class="overview-chip">
-          <strong>{{ stats.diskDisplay }}</strong> on disk</span>
+        <span v-if="stats.aheadCount > 0" class="overview-chip" title="Known commits ahead of the upstream, as of the last fetch">
+          <strong>{{ stats.aheadCount }}</strong> ahead</span>
+        <span v-if="stats.unknownSyncCount > 0" class="overview-chip" title="No upstream, or the comparison failed. Not counted as up to date.">
+          <strong>{{ stats.unknownSyncCount }}</strong> sync unknown</span>
+        <span v-if="stats.failedCheckRepos > 0" class="overview-chip overview-chip-warn" title="Repositories whose latest list, health or disk check failed; older results are shown">
+          <strong>{{ stats.failedCheckRepos }}</strong> checks failed</span>
+        <span v-if="stats.diskDisplay" class="overview-chip" title="Estimated total size of worktree folders. Not a promise of reclaimable space.">
+          <strong>~{{ stats.diskDisplay }}</strong> on disk</span>
 
         <span class="flex-1" />
 
         <Transition name="fade">
           <span v-if="refreshing" class="overview-refreshing">Refreshing…</span>
         </Transition>
+        <button class="overview-chip hover:text-text-primary" title="Plan deletion of merged branches that have no worktree, repository by repository" @click="handlePruneAll">
+          Clean up branches…</button>
         <button class="overview-refresh-btn" title="Refresh overview" @click="handleManualRefresh">
           <svg class="w-3.5 h-3.5" :class="{ 'animate-spin': refreshing }" fill="none" stroke="currentColor"
             viewBox="0 0 24 24">
@@ -378,7 +364,7 @@ async function handlePruneConfirmed() {
             :item-errors="itemErrors"
             :busy-keys="busyKeys"
             :bulk-pulling="isBulkPulling"
-            :pruning="isPruning"
+            :pruning="showPruneDialog"
             @navigate="handleNavigate"
             @open-health="handleOpenHealth"
             @repair="handleRepair"
@@ -405,8 +391,8 @@ async function handlePruneConfirmed() {
     <DeleteWorktreeDialog :is-open="showDeleteDialog" :worktree="worktreeToDelete" :repo-name="deleteRepo"
       @close="handleDeleteClosed" />
 
-    <PruneConfirmDialog :is-open="showPruneDialog" :groups="pruneGroups" :is-pruning="isPruning"
-      @close="showPruneDialog = false" @confirm="handlePruneConfirmed" />
+    <PruneConfirmDialog :is-open="showPruneDialog" :repos="pruneRepos"
+      @close="showPruneDialog = false" @done="handlePruneDone" />
 
     <OperationProgressPanel :is-open="showProgressPanel" title="Pulling Behind Worktrees" :progress="bulkProgress"
       :has-failures="progressHasFailures" :has-conflicts="progressHasConflicts" @close="handleProgressClose"

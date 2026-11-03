@@ -15,21 +15,24 @@ import { SBadge } from '@stuntrocket/ui'
 
 const props = defineProps<{
   /** Whether the branch has been merged into the base branch */
-  merged?: boolean
+  merged?: boolean | null
   /** Whether the worktree is stale (beyond the configured threshold behind base) */
-  stale?: boolean
+  stale?: boolean | null
   /** Whether there's a mismatch between directory name and branch slug */
   mismatch?: boolean
 }>()
 
 const showMerged = computed(() => props.merged === true)
 const showUnmerged = computed(() => props.merged === false)
+// null is a failed ancestry check: say unknown, never merged or unmerged
+const showMergeUnknown = computed(() => props.merged === null)
 const showStale = computed(() => props.stale === true)
 const showMismatch = computed(() => props.mismatch === true)
 const hasAnyBadge = computed(
   () =>
     showMerged.value ||
     showUnmerged.value ||
+    showMergeUnknown.value ||
     showStale.value ||
     showMismatch.value
 )
@@ -47,7 +50,7 @@ const hasAnyBadge = computed(
       v-if="showMerged"
       variant="success"
       class="!border-transparent gap-1 compact-badge"
-      title="This branch has been merged into the base branch"
+      title="Git ancestry check: this worktree's commit is contained in the base branch. It does not check the pull request, squash or rebase merges, or whether removal is safe."
       role="status"
       aria-label="Branch merged into base"
     >
@@ -74,7 +77,7 @@ const hasAnyBadge = computed(
       v-if="showUnmerged"
       variant="warning"
       class="!border-transparent gap-1 compact-badge"
-      title="This branch is not confirmed as merged into the base branch"
+      title="Git ancestry check: this worktree's commit is not contained in the base branch. Squash or rebase merges also show as unmerged."
       role="status"
       aria-label="Branch not merged"
     >
@@ -96,12 +99,23 @@ const hasAnyBadge = computed(
       Unmerged
     </SBadge>
 
+    <SBadge
+      v-if="showMergeUnknown"
+      variant="default"
+      class="!border-transparent compact-badge text-text-muted"
+      title="The Git ancestry check against the base branch failed (missing ref or Git error), so merge status is unknown."
+      role="status"
+      aria-label="Merge status unknown"
+    >
+      Merge unknown
+    </SBadge>
+
     <!-- STALE badge -->
     <SBadge
       v-if="showStale"
       variant="warning"
       class="!border-transparent gap-1 compact-badge"
-      title="This worktree is behind the base branch beyond the repository’s configured stale threshold. Consider syncing it."
+      title="Behind base: more commits behind the base branch than the repository’s configured stale threshold. Consider syncing it. This is not a reason to remove it."
       role="status"
       aria-label="Worktree is stale"
     >

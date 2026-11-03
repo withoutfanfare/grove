@@ -15,7 +15,10 @@ import type {
   RecentWorktree,
   BranchesResult,
   HealthResult,
-  PruneResult,
+  PrunePlan,
+  PruneExecution,
+  RemovalPreflight,
+  BuildInfo,
   PullAllResult,
   ResumableOperationSummary,
   CloneResult,
@@ -32,6 +35,7 @@ import type {
   ServicesStatusResult,
 } from '../types';
 import { isWtError } from '../types';
+import { useWorktreeStore } from '../stores/worktrees';
 
 /**
  * Low-level wrapper for Tauri invoke calls to the grove backend.
@@ -52,6 +56,11 @@ export function useWt() {
   /**
    * Get the grove CLI version string
    */
+  /** Exact app and bundled-CLI build identity */
+  async function getBuildInfo(): Promise<BuildInfo> {
+    return await invoke<BuildInfo>('get_build_info');
+  }
+
   async function getWtVersion(): Promise<string | null> {
     try {
       return await invoke<string>('get_wt_version');
@@ -265,28 +274,39 @@ export function useWt() {
     });
   }
 
-  /**
-   * Prune stale worktree refs and merged branches
-   */
-  async function pruneRepo(repoName: string, force?: boolean): Promise<PruneResult> {
-    return await invoke<PruneResult>('prune_repo', {
-      repoName,
-      force: force ?? false,
-    });
+  /** Read-only exact branch clean-up plan; the backend keeps it under plan_id */
+  async function getPrunePlan(repoName: string): Promise<PrunePlan> {
+    return await invoke<PrunePlan>('get_prune_plan', { repoName });
+  }
+
+  /** Delete only the confirmed branches of that plan; the CLI re-checks each one */
+  async function pruneRepoConfirmed(repoName: string, branches: string[], planId: string): Promise<PruneExecution> {
+    return await invoke<PruneExecution>('prune_repo_confirmed', { repoName, branches, planId });
+  }
+
+  /** Read-only removal checks (same gate rm re-runs); unknown means blocked */
+  async function getRemovalPreflight(
+    repoName: string,
+    branch: string,
+    deleteBranch: boolean,
+    dropDb: boolean,
+    allowProtected?: boolean
+  ): Promise<RemovalPreflight> {
+    return await invoke<RemovalPreflight>('get_removal_preflight', { repoName, branch, deleteBranch, dropDb, allowProtected });
   }
 
   /**
    * Pull all worktrees in a repository
    */
-  async function pullAllWorktrees(repoName: string): Promise<PullAllResult> {
-    return await invoke<PullAllResult>('pull_all_worktrees', { repoName });
+  async function pullAllWorktrees(repoName: string, operationId?: string): Promise<PullAllResult> {
+    return await invoke<PullAllResult>('pull_all_worktrees', { repoName, operationId });
   }
 
   /**
    * Pull selected worktrees in a repository (for retry functionality)
    */
-  async function pullSelectedWorktrees(repoName: string, branches: string[]): Promise<PullAllResult> {
-    return await invoke<PullAllResult>('pull_selected_worktrees', { repoName, branches });
+  async function pullSelectedWorktrees(repoName: string, branches: string[], operationId?: string): Promise<PullAllResult> {
+    return await invoke<PullAllResult>('pull_selected_worktrees', { repoName, branches, operationId });
   }
 
   /**
@@ -295,7 +315,8 @@ export function useWt() {
   async function removeSelectedWorktrees(
     repoName: string,
     branches: string[],
-    options: { deleteBranch: boolean; dropDb: boolean; skipBackup: boolean }
+    options: { deleteBranch: boolean; dropDb: boolean; skipBackup: boolean },
+    operationId?: string
   ): Promise<RemoveSelectedResult> {
     return await invoke<RemoveSelectedResult>('remove_selected_worktrees', {
       repoName,
@@ -303,14 +324,15 @@ export function useWt() {
       deleteBranch: options.deleteBranch,
       dropDb: options.dropDb,
       skipBackup: options.skipBackup,
+      operationId,
     });
   }
 
   /**
-   * Cancel the current long-running operation
+   * Cancel one long-running operation by the ID the frontend gave it
    */
-  async function cancelOperation(): Promise<void> {
-    await invoke<void>('cancel_operation');
+  async function cancelOperation(operationId: string): Promise<void> {
+    await invoke<void>('cancel_operation', { operationId });
   }
 
   // ============================================================================
@@ -509,7 +531,15 @@ export function useWt() {
    * Run git fetch for a repository
    */
   async function fetchRepo(repoName: string): Promise<void> {
-    await invoke<void>('fetch_repo', { repoName });
+    const store = useWorktreeStore();
+    try {
+      await invoke<void>('fetch_repo', { repoName });
+      store.remoteFetchedAt[repoName] = Date.now();
+      delete store.remoteFetchErrors[repoName];
+    } catch (error) {
+      store.remoteFetchErrors[repoName] = toWtError(error).message;
+      throw error;
+    }
   }
 
   // ============================================================================
@@ -577,6 +607,7 @@ export function useWt() {
   return {
     checkWtAvailable,
     getWtVersion,
+    getBuildInfo,
     listRepositories,
     listWorktrees,
     getWorktreeStatus,
@@ -598,7 +629,9 @@ export function useWt() {
     switchServiceWorktree,
     getRecentCommits,
     getUncommittedFiles,
-    pruneRepo,
+    getPrunePlan,
+    pruneRepoConfirmed,
+    getRemovalPreflight,
     pullAllWorktrees,
     pullSelectedWorktrees,
     removeSelectedWorktrees,

@@ -25,11 +25,9 @@ export interface DirtyDetails {
 
 const props = defineProps<{
   dirty: boolean
-  /** null when the CLI cannot resolve the base ref */
+  /** Commits ahead of/behind the upstream; null or absent means the comparison is unknown */
   ahead?: number | null
   behind?: number | null
-  /** Base branch name for tooltip context (e.g., "origin/main") */
-  baseBranch?: string
   /** Optional detailed file counts for dirty state tooltip */
   dirtyDetails?: DirtyDetails
 }>()
@@ -37,7 +35,9 @@ const props = defineProps<{
 const hasAhead = computed(() => (props.ahead ?? 0) > 0)
 const hasBehind = computed(() => (props.behind ?? 0) > 0)
 const hasCommitStatus = computed(() => hasAhead.value || hasBehind.value)
-const isUpToDate = computed(() => !hasAhead.value && !hasBehind.value)
+// Only two successful zero counts mean "level"; a missing count is unknown, never zero.
+const isKnown = computed(() => typeof props.ahead === 'number' && typeof props.behind === 'number')
+const isUpToDate = computed(() => isKnown.value && !hasAhead.value && !hasBehind.value)
 
 // Sync state determines the colour of the ahead/behind badge
 type SyncState = 'ahead' | 'behind' | 'diverged' | 'synced'
@@ -65,7 +65,7 @@ const syncBadgeClasses = computed(() => {
 // Tooltip for commit status
 const commitStatusTooltip = computed(() => {
   const parts: string[] = []
-  const base = props.baseBranch || 'remote'
+  const base = 'its upstream'
 
   if (hasAhead.value) {
     parts.push(`${props.ahead} commit${props.ahead === 1 ? '' : 's'} ahead`)
@@ -74,8 +74,8 @@ const commitStatusTooltip = computed(() => {
     parts.push(`${props.behind} commit${props.behind === 1 ? '' : 's'} behind`)
   }
 
-  if (parts.length === 0) return `Up to date with ${base}`
-  return `${parts.join(', ')} of ${base}`
+  if (parts.length === 0) return `Level with ${base} as of the last fetch (cached remote refs, not a live check)`
+  return `${parts.join(', ')} of ${base} as of the last fetch`
 })
 
 // Dirty badge tooltip
@@ -156,12 +156,23 @@ const dirtyShortLabel = computed(() => {
       class="!border-transparent gap-1 compact-badge"
       :title="commitStatusTooltip"
       role="status"
-      aria-label="Up to date with remote"
+      :aria-label="commitStatusTooltip"
     >
       <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
       </svg>
       Synced
+    </SBadge>
+
+    <SBadge
+      v-else
+      variant="default"
+      class="compact-badge text-text-muted"
+      title="Grove could not compare this branch with an upstream (none configured, or the check failed). Treat it as unknown, not as up to date; it does not mean the work was never pushed."
+      role="status"
+      aria-label="Sync status unknown"
+    >
+      Sync unknown
     </SBadge>
   </div>
 </template>

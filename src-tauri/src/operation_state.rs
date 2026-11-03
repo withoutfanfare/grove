@@ -71,6 +71,7 @@ pub fn get_operations_dir() -> WtResult<PathBuf> {
 
 /// Get the file path for a specific operation's state file.
 fn get_state_file_path(operation_id: &str) -> WtResult<PathBuf> {
+    uuid::Uuid::parse_str(operation_id).map_err(|_| WtError::new("INVALID_OPERATION_ID", "Operation ID must be a UUID"))?;
     let ops_dir = get_operations_dir()?;
     Ok(ops_dir.join(format!("{}.json", operation_id)))
 }
@@ -86,32 +87,32 @@ fn get_state_file_path(operation_id: &str) -> WtResult<PathBuf> {
 pub fn save_state(state: &OperationState) -> WtResult<()> {
     let file_path = get_state_file_path(&state.id)?;
 
-    let json = serde_json::to_string_pretty(state).map_err(|e| {
-        WtError::new(
-            "IO_ERROR",
-            format!("Failed to serialise operation state: {}", e),
-        )
-    })?;
+    save_at(state, &file_path)
+}
 
-    fs::write(&file_path, json).map_err(|e| {
-        WtError::new(
-            "IO_ERROR",
-            format!("Failed to write operation state file: {}", e),
-        )
-    })?;
-
-    // Update cache (recover from poisoned mutex)
-    match STATE_CACHE.lock() {
-        Ok(mut cache) => {
-            cache.insert(state.id.clone(), state.clone());
-            evict_cache_if_needed(&mut cache);
-        }
-        Err(e) => {
-            let mut cache = e.into_inner();
-            cache.insert(state.id.clone(), state.clone());
-            evict_cache_if_needed(&mut cache);
-        }
+fn save_at(state: &OperationState, file_path: &std::path::Path) -> WtResult<()> {
+    use std::io::Write;
+    let mut cache = STATE_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    let disk = fs::read(file_path).ok().and_then(|bytes| serde_json::from_slice::<OperationState>(&bytes).ok());
+    if cache.get(&state.id).into_iter().chain(disk.as_ref()).any(|old| old.revision > state.revision) {
+        return Err(WtError::new("STALE_CHECKPOINT", "Rejected older operation checkpoint"));
     }
+    let temporary = file_path.with_extension(format!("{}.tmp", uuid::Uuid::new_v4()));
+    let result = (|| -> std::io::Result<()> {
+        let mut file = fs::OpenOptions::new().write(true).create_new(true).open(&temporary)?;
+        serde_json::to_writer(&mut file, state)?;
+        file.flush()?;
+        file.sync_all()?;
+        fs::rename(&temporary, file_path)?;
+        fs::File::open(file_path.parent().unwrap())?.sync_all()?;
+        Ok(())
+    })();
+    if let Err(error) = result {
+        let _ = fs::remove_file(&temporary);
+        return Err(WtError::new("RECOVERY_UNAVAILABLE", format!("Operation continues, recovery is unavailable: {}", error)));
+    }
+    cache.insert(state.id.clone(), state.clone());
+    evict_cache_if_needed(&mut cache);
 
     Ok(())
 }
@@ -257,12 +258,8 @@ pub fn mark_running_as_interrupted() -> WtResult<u32> {
                 if state.status == OperationStatus::Running {
                     state.mark_interrupted();
 
-                    // Save the updated state
-                    if let Ok(updated_json) = serde_json::to_string_pretty(&state) {
-                        if fs::write(&path, updated_json).is_ok() {
-                            count += 1;
-                        }
-                    }
+                    save_at(&state, &path)?;
+                    count += 1;
                 }
             }
         }
@@ -493,5 +490,30 @@ mod tests {
         assert_eq!(summary.failed_items, 1);
         assert_eq!(summary.pending_items, 1);
         assert_eq!(summary.status, OperationStatus::Interrupted);
+    }
+}
+
+#[cfg(test)]
+mod durability_tests {
+    use super::*;
+    use crate::types::PersistentOperationType;
+    #[test]
+    fn delayed_older_snapshot_cannot_replace_newer() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("state.json");
+        let old = OperationState::new(PersistentOperationType::PullAll, "fixture", vec!["branch".into()]);
+        let mut new = old.clone(); new.mark_item_success("branch", None);
+        save_at(&new, &path).unwrap();
+        assert_eq!(save_at(&old, &path).unwrap_err().code, "STALE_CHECKPOINT");
+        let loaded: OperationState = serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
+        assert_eq!(loaded.completed_items, 1);
+    }
+    #[test]
+    fn failed_write_reports_recovery_unavailable() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = OperationState::new(PersistentOperationType::PullAll, "fixture", vec![]);
+        let error = save_at(&state, &dir.path().join("missing/state.json")).unwrap_err();
+        assert_eq!(error.code, "RECOVERY_UNAVAILABLE");
+        assert!(error.message.contains("Operation continues"));
     }
 }

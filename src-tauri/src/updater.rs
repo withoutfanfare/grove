@@ -32,10 +32,9 @@ pub async fn check_for_update(app: tauri::AppHandle) -> Result<Option<UpdateInfo
         Ok(None) => Ok(None),
         Err(e) => {
             let msg = e.to_string();
-            // Network errors or unreachable endpoints are not fatal —
-            // log and return None so the frontend treats it as "no update"
+            // A failed check must remain distinct from a successful no-update result.
             log::warn!("[updater] Update check failed: {}", msg);
-            Ok(None)
+            Err(msg)
         }
     }
 }
@@ -43,5 +42,5 @@ pub async fn check_for_update(app: tauri::AppHandle) -> Result<Option<UpdateInfo
 /// Return the current app version from tauri.conf.json.
 #[tauri::command]
 pub fn get_app_version(app: tauri::AppHandle) -> String {
-    app.config().version.clone().unwrap_or_else(|| "0.0.0".to_string())
+    app.config().version.clone().unwrap_or_else(|| "Unknown".to_string())
 }

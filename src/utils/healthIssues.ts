@@ -122,7 +122,7 @@ function parseToken(token: string): HealthFinding {
       value,
       raw: token,
       title: `No commits for ${value} day${value === 1 ? '' : 's'}`,
-      explanation: "This branch looks dormant. Resume it, or remove the worktree if it's done.",
+      explanation: "No recent commits. That alone does not mean the work is finished or safe to remove.",
       scoreImpact: ageImpact(value),
       actions: [ACTIONS['view-worktree'], ACTIONS.remove],
     };
@@ -145,7 +145,7 @@ function parseToken(token: string): HealthFinding {
       raw: token,
       title: 'Not merged into base',
       explanation:
-        "Work here hasn't landed in the base branch yet — expected for in-progress branches.",
+        "Git ancestry: this commit isn't contained in the base branch yet — expected for in-progress work. Squash or rebase merges also show here.",
       scoreImpact: -10,
       actions: [ACTIONS['view-worktree']],
     };

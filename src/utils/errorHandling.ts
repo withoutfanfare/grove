@@ -63,7 +63,7 @@ export function getErrorAction(code: WtErrorCode | string): string | null {
     REPO_NOT_FOUND: 'Check the repository name and try again',
     BRANCH_NOT_FOUND: 'Fetch the latest branches and try again',
     WORKTREE_NOT_FOUND: 'The worktree may have been removed. Refresh the list.',
-    PROTECTED_BRANCH: 'Use the force option to operate on this branch',
+    PROTECTED_BRANCH: 'Delete this branch individually and complete the protected-branch confirmation',
     WORKTREE_EXISTS: 'A worktree already exists for this branch',
     CONFIG_NOT_FOUND: 'Run grove setup to configure the tool',
     INVALID_BRANCH: 'Branch names must not start with - or contain special characters',

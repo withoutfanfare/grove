@@ -39,10 +39,13 @@ export function useOverview() {
   /** Cheap tier: refresh worktree lists, updating the store per repo */
   async function refreshCheap(repoNames: string[]): Promise<void> {
     await runWithConcurrency(repoNames, CHEAP_TIER_CONCURRENCY, async (repo) => {
+      const generation = worktreeStore.removalGenerations[repo] ?? 0;
       try {
         const worktrees = await wt.listWorktrees(repo);
+        if (generation !== (worktreeStore.removalGenerations[repo] ?? 0)) return;
         overviewStore.setWorktreeSnapshot(repo, worktrees, Date.now());
       } catch (error) {
+        if (generation !== (worktreeStore.removalGenerations[repo] ?? 0)) return;
         // Per-repo failure isolation: record the error, keep stale data
         overviewStore.setSnapshotError(repo, wt.toWtError(error).message, Date.now());
       }
@@ -52,23 +55,32 @@ export function useOverview() {
   /** Expensive tier: health + disk usage, staggered and throttled */
   async function refreshExpensive(repoNames: string[], force = false): Promise<void> {
     for (const repo of repoNames) {
+      const generation = worktreeStore.removalGenerations[repo] ?? 0;
       const now = Date.now();
       if (!force && !overviewStore.shouldRefreshExpensive(repo, now)) continue;
       // Skip repos whose cheap tier failed — health would fail the same way
       if (overviewStore.snapshots[repo]?.error) continue;
+      let failed = false;
       try {
         const health = await wt.getRepoHealth(repo);
+        if (generation !== (worktreeStore.removalGenerations[repo] ?? 0)) continue;
         overviewStore.setHealth(repo, health);
       } catch (error) {
+        failed = true;
         console.warn(`[useOverview] Health refresh failed for ${repo}:`, error);
+        overviewStore.setCheckError(repo, 'health', wt.toWtError(error).message);
       }
       try {
         const diskUsage = await wt.getRepoDiskUsage(repo);
+        if (generation !== (worktreeStore.removalGenerations[repo] ?? 0)) continue;
         overviewStore.setDiskUsage(repo, diskUsage);
       } catch (error) {
+        failed = true;
         console.warn(`[useOverview] Disk usage refresh failed for ${repo}:`, error);
+        overviewStore.setCheckError(repo, 'disk', wt.toWtError(error).message);
       }
-      overviewStore.markExpensiveRefreshed(repo, now);
+      // A failed check must not count as fresh: let the next refresh retry it.
+      if (!failed) overviewStore.markExpensiveRefreshed(repo, now);
     }
   }
 

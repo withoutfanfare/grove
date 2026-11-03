@@ -12,7 +12,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { useWorktreeStore, useSettingsStore } from '../stores'
 import { useRepos, useWorktrees, useWt, useOperationProgress, useAutoRefresh, useSearch, useKeyboardShortcuts, useListNavigation, useShortcutTooltip, useToast, useWorktreeWatcher, useCommandRegistry, useWorktreeFilters, useWorktreeSelection, useBackgroundFetch, useStaleDetection, useTrayBadge, useRecentSwitches, useUpdater, useOverview } from '../composables'
-import type { Worktree } from '../types'
+import type { Worktree, RemoveSelectedResult } from '../types'
 import type { WorktreeFilter, WorktreeSort } from '../composables'
 
 // Components
@@ -27,6 +27,8 @@ import HelpModal from './HelpModal.vue'
 import RepoManagementPanel from './RepoManagementPanel.vue'
 import HealthPanel from './HealthPanel.vue'
 import ServicesPanel from './ServicesPanel.vue'
+import ActivityPanel from './ActivityPanel.vue'
+import PruneConfirmDialog from './overview/PruneConfirmDialog.vue'
 import OperationProgressPanel from './OperationProgressPanel.vue'
 import ErrorBoundary from './ErrorBoundary.vue'
 import SearchInput from './SearchInput.vue'
@@ -62,7 +64,6 @@ const {
 const { fetchRepositories } = useRepos()
 const {
   fetchWorktrees,
-  pruneRepo,
   pullAllWorktrees,
   pullSelectedWorktrees,
   removeSelectedWorktrees,
@@ -84,6 +85,17 @@ const {
   pause: pauseAutoRefresh,
   resume: resumeAutoRefresh,
 } = useAutoRefresh()
+
+// Toolbar freshness: the selected repo's own last successful load, plus a failed latest attempt
+const selectedRefreshError = computed(() => store.refreshErrors[selectedRepoName.value ?? ''])
+const freshnessText = computed(() =>
+  selectedRefreshError.value ? `Cached (${lastUpdatedText.value.toLowerCase()}) · refresh failed` : lastUpdatedText.value
+)
+const freshnessTitle = computed(() =>
+  selectedRefreshError.value
+    ? `Showing cached data. Latest refresh failed: ${selectedRefreshError.value}`
+    : `${lastUpdatedText.value}: local worktree status. Ahead/behind uses remote refs from the last fetch.`
+)
 
 // Overview refresh (used by ⌘R when no repository is selected)
 const { refreshAll: refreshOverview } = useOverview()
@@ -403,6 +415,7 @@ const repoManagementInitialTab = ref<'config' | 'hooks'>('config')
 const showHelpModal = ref(false)
 const showHealthPanel = ref(false)
 const showServicesPanel = ref(false)
+const showActivityPanel = ref(false)
 const worktreeToDelete = ref<Worktree | null>(null)
 
 // Batch operations
@@ -418,16 +431,29 @@ const lastBatchDeleteOptions = ref<{ deleteBranch: boolean; dropDb: boolean; ski
 const batchDeleteWorktrees = computed(() => selection.selectedWorktrees(worktrees.value))
 
 // Operation state
-const isPruning = ref(false)
-const isPullingAll = ref(false)
+const showPruneDialog = ref(false)
+const isBatchRunning = ref(false)
 
 // Progress panel state
-const { progress, startListening, reset: resetProgress, getFailedItems, hasFailures, hasConflicts } = useOperationProgress()
+const { progress, startListening, markStopping, reset: resetProgress, getFailedItems, hasFailures, hasConflicts } = useOperationProgress()
 const showProgressPanel = ref(false)
 const progressTitle = ref('')
 const progressValue = computed(() => progress.value)
 const progressHasFailures = computed(() => hasFailures())
 const progressHasConflicts = computed(() => hasConflicts())
+
+async function beginBatch(operation: string, items: string[], paths?: Map<string, string>): Promise<string | null> {
+  if (isBatchRunning.value) return null
+  isBatchRunning.value = true
+  try {
+    return await startListening(operation, items, paths)
+  } catch {
+    isBatchRunning.value = false
+    toast.error('Could not subscribe to operation progress; no action was started')
+    return null
+  }
+}
+
 
 function openCreateModal() {
   showCreateModal.value = true
@@ -456,6 +482,7 @@ function closeAllPanels() {
   showRepoManagementPanel.value = false
   showHealthPanel.value = false
   showServicesPanel.value = false
+  showActivityPanel.value = false
   if (showProgressPanel.value) {
     handleProgressPanelClose()
   }
@@ -494,6 +521,12 @@ function openHealthPanel() {
   showHealthPanel.value = true
 }
 
+function openActivityPanel() {
+  const wasOpen = showActivityPanel.value
+  closeAllPanels()
+  showActivityPanel.value = !wasOpen
+}
+
 function openServicesPanel() {
   if (showServicesPanel.value) {
     showServicesPanel.value = false
@@ -503,44 +536,19 @@ function openServicesPanel() {
   showServicesPanel.value = true
 }
 
-async function handlePrune() {
-  if (!selectedRepoName.value || isPruning.value) return
-
+// Branch clean-up always goes through the exact read-only plan and its confirmation
+function handlePrune() {
+  if (!selectedRepoName.value) return
   closeAllPanels()
-  progressTitle.value = 'Pruning Branches'
-  await startListening('prune', [])
-  showProgressPanel.value = true
+  showPruneDialog.value = true
+}
 
-  // Pause auto-refresh during operation
-  pauseAutoRefresh()
-  isPruning.value = true
-  try {
-    const result = await pruneRepo(selectedRepoName.value, false)
-    // Close the progress panel — prune doesn't emit granular progress events
-    handleProgressPanelClose()
-    if (result) {
-      const refs = result.stale_refs_pruned
-      const merged = result.merged_branches?.length ?? 0
-      if (refs === 0 && merged === 0) {
-        toast.info('Nothing to clean up — repository is already tidy')
-      } else {
-        const parts: string[] = []
-        if (refs > 0) parts.push(`${refs} stale ref${refs === 1 ? '' : 's'} pruned`)
-        if (merged > 0) parts.push(`${merged} merged branch${merged === 1 ? '' : 'es'} found`)
-        toast.success(parts.join(', '))
-      }
-    }
-  } catch {
-    handleProgressPanelClose()
-    toast.error('Failed to clean up branches')
-  } finally {
-    isPruning.value = false
-    resumeAutoRefresh()
-  }
+async function handlePruneDone() {
+  await fetchWorktrees({ silent: true })
 }
 
 async function handlePullAll() {
-  if (!selectedRepoName.value || isPullingAll.value) return
+  if (!selectedRepoName.value || isBatchRunning.value) return
 
   activeBatchOp.value = 'pull_all'
 
@@ -556,14 +564,14 @@ async function handlePullAll() {
   // tell us what's being processed (ensures we show the correct repo's worktrees)
   closeAllPanels()
   progressTitle.value = 'Pulling All Worktrees'
-  await startListening('pull_all', [], worktreePathMap)
+  const operationId = await beginBatch('pull_all', [], worktreePathMap)
+  if (!operationId) return
   showProgressPanel.value = true
 
   // Pause auto-refresh during operation
   pauseAutoRefresh()
-  isPullingAll.value = true
   try {
-    const result = await pullAllWorktrees(selectedRepoName.value)
+    const result = await pullAllWorktrees(selectedRepoName.value, operationId)
     const failed = result?.worktrees.find(worktree => !worktree.success)
     if (!result) {
       toast.error('Failed to pull worktrees')
@@ -575,12 +583,13 @@ async function handlePullAll() {
   } catch {
     toast.error('Failed to pull worktrees')
   } finally {
-    isPullingAll.value = false
+    isBatchRunning.value = false
     resumeAutoRefresh()
   }
 }
 
 async function handleBatchPull() {
+  if (isBatchRunning.value) return
   if (!selectedRepoName.value) return
   const branches = selection.selectedBranches(worktrees.value)
   if (branches.length === 0) return
@@ -593,26 +602,32 @@ async function handleBatchPull() {
   closeAllPanels()
   activeBatchOp.value = 'pull_all'
   progressTitle.value = `Pulling ${branches.length} Worktree${branches.length === 1 ? '' : 's'}`
-  await startListening('pull_all', branches, worktreePathMap)
+  const operationId = await beginBatch('pull_all', branches, worktreePathMap)
+  if (!operationId) return
   showProgressPanel.value = true
 
   pauseAutoRefresh()
   try {
-    await pullSelectedWorktrees(selectedRepoName.value, branches)
-    selection.clear()
+    const result = await pullSelectedWorktrees(selectedRepoName.value, branches, operationId)
+    if (!result) toast.error(error.value?.message || 'Failed to pull selected worktrees')
+    else if (result.summary.failed || result.summary.cancelled) toast.warning('Some worktrees were not pulled; review the results')
+    else selection.clear()
   } catch {
     toast.error('Failed to pull selected worktrees')
   } finally {
+    isBatchRunning.value = false
     resumeAutoRefresh()
   }
 }
 
 function openBatchDeleteDialog() {
+  if (isBatchRunning.value) return
   if (selectionCount.value === 0) return
   showBatchDeleteDialog.value = true
 }
 
 async function handleBatchDeleteConfirm(options: { deleteBranch: boolean; dropDb: boolean; skipBackup: boolean }) {
+  if (isBatchRunning.value) return
   showBatchDeleteDialog.value = false
   if (!selectedRepoName.value) return
   // Detached worktrees have no branch, so they are removed by their path.
@@ -629,27 +644,36 @@ async function handleBatchDeleteConfirm(options: { deleteBranch: boolean; dropDb
   closeAllPanels()
   activeBatchOp.value = 'remove_all'
   progressTitle.value = `Deleting ${branches.length} Worktree${branches.length === 1 ? '' : 's'}`
-  await startListening('remove_all', branches, worktreePathMap)
+  const operationId = await beginBatch('remove_all', branches, worktreePathMap)
+  if (!operationId) return
   showProgressPanel.value = true
 
   pauseAutoRefresh()
   try {
-    const result = await removeSelectedWorktrees(selectedRepoName.value, branches, options)
-    if (result) {
-      const { succeeded, failed } = result.summary
-      if (failed > 0) {
-        toast.warning(`Deleted ${succeeded}, ${failed} failed`)
-        // Keep the selection: the progress panel shows the failures for retry,
-        // and the store prunes the successfully-deleted paths on the next refresh.
-      } else {
-        toast.success(`Deleted ${succeeded} worktree${succeeded === 1 ? '' : 's'}`)
-        selection.clear()
-      }
-    }
+    reportBatchRemoval(await removeSelectedWorktrees(selectedRepoName.value, branches, options, operationId))
   } catch {
     toast.error('Failed to delete selected worktrees')
   } finally {
+    isBatchRunning.value = false
     resumeAutoRefresh()
+  }
+}
+
+function reportBatchRemoval(result: RemoveSelectedResult | null) {
+  if (!result) {
+    // The batch never ran, so no item will ever leave "pending": close the panel and say why.
+    handleProgressPanelClose()
+    toast.error(error.value?.message || 'Failed to delete selected worktrees')
+    return
+  }
+  const { succeeded, failed } = result.summary
+  if (failed > 0) {
+    toast.warning(`Deleted ${succeeded}, ${failed} failed`)
+    // Keep the selection: the progress panel shows the failures for retry,
+    // and the store prunes the successfully-deleted paths on the next refresh.
+  } else {
+    toast.success(`Deleted ${succeeded} worktree${succeeded === 1 ? '' : 's'}`)
+    selection.clear()
   }
 }
 
@@ -676,7 +700,10 @@ watch(progressValue, (val) => {
 })
 
 async function handleCancelOperation() {
-  await cancelOperation()
+  const operationId = progress.value?.operationId
+  if (!operationId) return
+  markStopping()
+  await cancelOperation(operationId)
   // The operation will complete with remaining items marked as 'skipped'
   // We don't close the panel - user can see the final state
 }
@@ -698,11 +725,13 @@ async function handleRetryFailed() {
 
   if (activeBatchOp.value === 'remove_all') {
     progressTitle.value = `Retrying ${failedBranches.length} Failed`
-    await startListening('remove_all', failedBranches, worktreePathMap)
+    const operationId = await beginBatch('remove_all', failedBranches, worktreePathMap)
+    if (!operationId) return
     pauseAutoRefresh()
     try {
-      await removeSelectedWorktrees(selectedRepoName.value, failedBranches, lastBatchDeleteOptions.value)
+      reportBatchRemoval(await removeSelectedWorktrees(selectedRepoName.value, failedBranches, lastBatchDeleteOptions.value, operationId))
     } finally {
+      isBatchRunning.value = false
       resumeAutoRefresh()
     }
     return
@@ -710,11 +739,13 @@ async function handleRetryFailed() {
 
   // Default: pull retry
   progressTitle.value = `Retrying ${failedBranches.length} Failed`
-  await startListening('pull_all', failedBranches, worktreePathMap)
+  const operationId = await beginBatch('pull_all', failedBranches, worktreePathMap)
+  if (!operationId) return
   pauseAutoRefresh()
   try {
-    await pullSelectedWorktrees(selectedRepoName.value, failedBranches)
+    await pullSelectedWorktrees(selectedRepoName.value, failedBranches, operationId)
   } finally {
+    isBatchRunning.value = false
     resumeAutoRefresh()
   }
 }
@@ -1064,8 +1095,8 @@ async function handleTitlebarDrag(e: MouseEvent) {
                     <span class="topbar-live-dot" />
                     <span class="text-success">Live</span>
                   </span>
-                  <span class="topbar-updated" :title="lastUpdatedText">
-                    {{ isAutoRefreshing ? 'Refreshing...' : lastUpdatedText }}
+                  <span class="topbar-updated" :title="freshnessTitle">
+                    {{ isAutoRefreshing && !selectedRefreshError ? 'Refreshing...' : freshnessText }}
                   </span>
                 </span>
               </div>
@@ -1076,11 +1107,11 @@ async function handleTitlebarDrag(e: MouseEvent) {
               <div v-if="selectedRepo" class="topbar-actions">
                 <button
                   class="topbar-action"
-                  :disabled="isPullingAll"
+                  :disabled="isBatchRunning"
                   title="Pull all worktrees"
                   @click="handlePullAll"
                 >
-                  <svg class="w-3.5 h-3.5" :class="{ 'animate-pulse': isPullingAll }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-3.5 h-3.5" :class="{ 'animate-pulse': isBatchRunning }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
@@ -1095,11 +1126,11 @@ async function handleTitlebarDrag(e: MouseEvent) {
                 </button>
                 <button
                   class="topbar-action"
-                  :disabled="isPruning"
-                  title="Clean up stale references and find merged branches that can be safely removed"
+                  :disabled="showPruneDialog"
+                  title="Review and delete merged branches that have no worktree"
                   @click="handlePrune"
                 >
-                  <svg class="w-3.5 h-3.5" :class="{ 'animate-pulse': isPruning }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
@@ -1141,6 +1172,18 @@ async function handleTitlebarDrag(e: MouseEvent) {
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+                  </svg>
+                </button>
+                <button
+                  class="topbar-icon"
+                  :class="{ 'topbar-icon-active': showActivityPanel }"
+                  title="Activity (this session)"
+                  aria-label="Activity"
+                  @click="openActivityPanel"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                   </svg>
                 </button>
                 <button
@@ -1339,7 +1382,7 @@ async function handleTitlebarDrag(e: MouseEvent) {
             </ErrorBoundary>
           </div>
 
-          <SelectionActionBar
+          <SelectionActionBar :busy="isBatchRunning"
             :count="selectionCount"
             @pull="handleBatchPull"
             @delete="openBatchDeleteDialog"
@@ -1359,6 +1402,7 @@ async function handleTitlebarDrag(e: MouseEvent) {
     <BatchDeleteDialog
       :is-open="showBatchDeleteDialog"
       :worktrees="batchDeleteWorktrees"
+      :repo-name="selectedRepoName || ''"
       @close="showBatchDeleteDialog = false"
       @confirm="handleBatchDeleteConfirm"
     />
@@ -1376,6 +1420,11 @@ async function handleTitlebarDrag(e: MouseEvent) {
     <HealthPanel :is-open="showHealthPanel" :repo-name="selectedRepoName || ''" @close="showHealthPanel = false" />
 
     <ServicesPanel :is-open="showServicesPanel" @close="showServicesPanel = false" />
+
+    <ActivityPanel :is-open="showActivityPanel" @close="showActivityPanel = false" />
+
+    <PruneConfirmDialog :is-open="showPruneDialog" :repos="selectedRepoName ? [selectedRepoName] : []"
+      @close="showPruneDialog = false" @done="handlePruneDone" />
 
     <!-- M6: ErrorBoundary around progress panel to prevent malformed data crashing app -->
     <ErrorBoundary>

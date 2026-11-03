@@ -75,6 +75,10 @@ describe('isRetryableError', () => {
 })
 
 describe('getErrorAction', () => {
+  it('directs protected branch deletion to its explicit confirmation', () => {
+    expect(getErrorAction('PROTECTED_BRANCH')).toContain('confirmation')
+    expect(getErrorAction('PROTECTED_BRANCH')).not.toContain('force')
+  })
   it('should return action for known error codes', () => {
     expect(getErrorAction('CLI_NOT_FOUND')).toContain('grove CLI')
     expect(getErrorAction('REPO_NOT_FOUND')).toContain('repository name')

@@ -76,15 +76,48 @@ describe('useOverviewStore', () => {
       expect(store.behindAttention[0].worktree.branch).toBe('a')
     })
 
-    it('classifies merged or stale worktrees as cleanup candidates', () => {
+    it('keeps stale-but-unmerged work out of cleanup candidates', () => {
       const store = useOverviewStore()
       store.setWorktreeSnapshot('demo', [
         makeWorktree({ path: '/repos/demo/a', branch: 'a', merged: true }),
         makeWorktree({ path: '/repos/demo/b', branch: 'b', stale: true }),
         makeWorktree({ path: '/repos/demo/c', branch: 'c' }),
+        makeWorktree({ path: '/repos/demo/d', branch: 'd', merged: null }),
       ], 1000)
 
-      expect(store.cleanupAttention.map((i) => i.worktree.branch)).toEqual(['a', 'b'])
+      expect(store.cleanupAttention.map((i) => i.worktree.branch)).toEqual(['a'])
+      expect(store.staleAttention.map((i) => i.worktree.branch)).toEqual(['b'])
+    })
+
+    it('counts unknown upstream comparisons separately from known ahead commits', () => {
+      const store = useOverviewStore()
+      store.setWorktreeSnapshot('demo', [
+        makeWorktree({ path: '/a', branch: 'a', ahead: 2, behind: 0 }),
+        makeWorktree({ path: '/b', branch: 'b', ahead: null, behind: null }),
+        makeWorktree({ path: '/c', branch: 'c', ahead: 0, behind: 0 }),
+      ], 1000)
+
+      expect(store.stats.aheadCount).toBe(1)
+      expect(store.stats.unknownSyncCount).toBe(1)
+    })
+
+    it('keeps the last health result and its time when a later check fails', () => {
+      const store = useOverviewStore()
+      store.setWorktreeSnapshot('demo', [makeWorktree()], 1000)
+      store.setHealth('demo', makeHealth(), 5000)
+      store.setCheckError('demo', 'health', 'git status failed')
+
+      expect(store.snapshots['demo'].health).toBeDefined()
+      expect(store.snapshots['demo'].healthCheckedAt).toBe(5000)
+      expect(store.snapshots['demo'].healthError).toBe('git status failed')
+      expect(store.stats.failedCheckRepos).toBe(1)
+    })
+
+    it('never stamps a repository that has only failed as freshly loaded', () => {
+      const store = useOverviewStore()
+      store.setSnapshotError('new', 'boom', 9000)
+      expect(store.snapshots['new'].refreshedAt).toBe(0)
+      expect(store.snapshots['new'].failedAt).toBe(9000)
     })
 
     it('orders health issues critical first', () => {

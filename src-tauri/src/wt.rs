@@ -237,26 +237,14 @@ pub struct CancellationToken {
 }
 
 impl CancellationToken {
-    /// Create a new cancellation token and register it
-    pub fn new() -> Self {
-        let id = Uuid::new_v4().to_string();
+    fn identified(id: &str) -> WtResult<Self> {
+        Uuid::parse_str(id).map_err(|_| WtError::new("INVALID_OPERATION_ID", "Operation ID must be a UUID"))?;
+        let mut active = ACTIVE_OPERATION_ID.lock().unwrap_or_else(|e| e.into_inner());
+        if active.is_some() { return Err(WtError::new("OPERATION_BUSY", "Another mutation batch is running")); }
         let cancelled = Arc::new(AtomicBool::new(false));
-
-        // Register the token
-        if let Ok(mut tokens) = OPERATION_TOKENS.lock() {
-            tokens.insert(id.clone(), Arc::clone(&cancelled));
-        } else if let Err(e) = OPERATION_TOKENS.lock() {
-            // Recover from poisoned mutex
-            let mut tokens = e.into_inner();
-            tokens.insert(id.clone(), Arc::clone(&cancelled));
-        }
-
-        // Set as active operation
-        if let Ok(mut active) = ACTIVE_OPERATION_ID.lock() {
-            *active = Some(id.clone());
-        }
-
-        Self { id, cancelled }
+        OPERATION_TOKENS.lock().unwrap_or_else(|e| e.into_inner()).insert(id.to_string(), cancelled.clone());
+        *active = Some(id.to_string());
+        Ok(Self { id: id.to_string(), cancelled })
     }
 
     /// Check if this operation has been cancelled
@@ -279,6 +267,8 @@ impl CancellationToken {
 
 impl Drop for CancellationToken {
     fn drop(&mut self) {
+        // The registry owns one reference; only the last operation owner unregisters.
+        if Arc::strong_count(&self.cancelled) != 2 { return; }
         // Clean up the token from the registry (recover from poisoned mutex)
         match OPERATION_TOKENS.lock() {
             Ok(mut tokens) => { tokens.remove(&self.id); }
@@ -299,12 +289,6 @@ impl Drop for CancellationToken {
                 }
             }
         }
-    }
-}
-
-impl Default for CancellationToken {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -343,7 +327,7 @@ pub fn request_cancel_by_id(operation_id: &str) {
 ///
 /// Only allows alphanumeric characters, hyphens, underscores, and dots.
 /// Prevents names starting with - or . to avoid flag injection.
-fn validate_repo_name(name: &str) -> WtResult<()> {
+pub(crate) fn validate_repo_name(name: &str) -> WtResult<()> {
     if name.is_empty() {
         return Err(WtError::new(
             "INVALID_INPUT",
@@ -408,7 +392,7 @@ fn validate_repo_name(name: &str) -> WtResult<()> {
 /// Sidecar command timeout (5 minutes).
 const SIDECAR_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
 
-fn execute_wt(app: &tauri::AppHandle, args: &[&str]) -> WtResult<String> {
+pub(crate) fn execute_wt(app: &tauri::AppHandle, args: &[&str]) -> WtResult<String> {
     log::debug!("Executing sidecar: grove {}", args.join(" "));
 
     // Get the sidecar command for the bundled grove binary
@@ -422,25 +406,7 @@ fn execute_wt(app: &tauri::AppHandle, args: &[&str]) -> WtResult<String> {
     // Execute with timeout to prevent indefinite hangs
     // Use a scoped thread to avoid "Cannot start a runtime from within a runtime"
     // panics when called from spawn_blocking (which retains tokio runtime context)
-    let rt_handle = tauri::async_runtime::handle();
-    let output = std::thread::scope(|s| {
-        s.spawn(|| {
-            rt_handle.block_on(async {
-                tokio::time::timeout(SIDECAR_TIMEOUT, sidecar.args(args).output()).await
-            })
-        }).join().expect("sidecar thread panicked")
-    })
-    .map_err(|_| WtError::new("TIMEOUT", "Command timed out after 5 minutes"))?
-    .map_err(|e| {
-            let error_str = e.to_string();
-            if error_str.contains("not found") || error_str.contains("No such file") {
-                WtError::cli_not_found()
-            } else {
-                // H6: Sanitise error messages before returning to frontend
-                let sanitised = sanitise_error_message(&format!("Failed to execute grove: {}", e));
-                WtError::new("IO_ERROR", sanitised)
-            }
-        })?;
+    let output = crate::process_runner::run(sidecar.args(args).into(), SIDECAR_TIMEOUT, MAX_OUTPUT_SIZE)?;
 
     // H5: Check output size before processing to prevent memory exhaustion
     let total_output_size = output.stdout.len() + output.stderr.len();
@@ -457,38 +423,8 @@ fn execute_wt(app: &tauri::AppHandle, args: &[&str]) -> WtResult<String> {
     // Check exit status - sidecar uses code() method
     let success = output.status.code().map(|c| c == 0).unwrap_or(false);
 
-    if !success {
-        log::warn!("Sidecar command failed (exit code {:?})", output.status.code());
-
-        // First, try to parse structured JSON error from stdout
-        // The CLI outputs: {"success": false, "error": {"code": "...", "message": "..."}}
-        let stdout_str = String::from_utf8_lossy(&output.stdout);
-        if let Ok(cli_error) = extract_json_object::<CliErrorResponse>(&stdout_str) {
-            // H6: Sanitise error messages before returning to frontend
-            let sanitised = sanitise_error_message(&cli_error.error.message);
-            log::warn!("CLI error [{}]: {}", cli_error.error.code, sanitised);
-            return Err(WtError::new(&cli_error.error.code, sanitised));
-        }
-
-        // Fall back to stderr parsing if no structured JSON error in stdout
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        // Filter out progress messages (lines starting with arrow or containing "...")
-        let error_lines: Vec<&str> = stderr
-            .lines()
-            .filter(|line| {
-                !line.starts_with('→') && !line.starts_with("  →") && !line.contains("...")
-            })
-            .collect();
-
-        let error_msg = if error_lines.is_empty() {
-            stderr.to_string()
-        } else {
-            error_lines.join("\n")
-        };
-
-        // H6: Sanitise error messages before returning to frontend
-        let sanitised = sanitise_error_message(error_msg.trim());
-        return Err(WtError::command_failed(sanitised));
+    if let Some(error) = command_output_error(success, &String::from_utf8_lossy(&output.stdout), &String::from_utf8_lossy(&output.stderr)) {
+        return Err(error);
     }
 
     let stdout_str = String::from_utf8_lossy(&output.stdout);
@@ -511,6 +447,19 @@ fn structured_cli_error(stdout: &str) -> Option<WtError> {
     ))
 }
 
+// Preserve all diagnostic lines: progress-looking text may contain the failure.
+fn command_output_error(success: bool, stdout: &str, stderr: &str) -> Option<WtError> {
+    if let Some(error) = structured_cli_error(stdout) {
+        return Some(error);
+    }
+    if success {
+        return None;
+    }
+    let diagnostic = if stderr.trim().is_empty() { stdout } else { stderr };
+    let message = if diagnostic.trim().is_empty() { "CLI command failed without diagnostic output" } else { diagnostic.trim() };
+    Some(WtError::command_failed(sanitise_error_message(&strip_ansi(message))))
+}
+
 /// Execute a grove CLI command and return both stdout and stderr on success.
 ///
 /// Unlike `execute_wt` which discards stderr on success, this variant returns
@@ -524,26 +473,7 @@ fn execute_wt_with_stderr(app: &tauri::AppHandle, args: &[&str]) -> WtResult<(St
         )
     })?;
 
-    let rt_handle = tauri::async_runtime::handle();
-    let output = std::thread::scope(|s| {
-        s.spawn(|| {
-            rt_handle.block_on(async {
-                tokio::time::timeout(SIDECAR_TIMEOUT, sidecar.args(args).output()).await
-            })
-        })
-        .join()
-        .expect("sidecar thread panicked")
-    })
-    .map_err(|_| WtError::new("TIMEOUT", "Command timed out after 5 minutes"))?
-    .map_err(|e| {
-        let error_str = e.to_string();
-        if error_str.contains("not found") || error_str.contains("No such file") {
-            WtError::cli_not_found()
-        } else {
-            let sanitised = sanitise_error_message(&format!("Failed to execute grove: {}", e));
-            WtError::new("IO_ERROR", sanitised)
-        }
-    })?;
+    let output = crate::process_runner::run(sidecar.args(args).into(), SIDECAR_TIMEOUT, MAX_OUTPUT_SIZE)?;
 
     let total_output_size = output.stdout.len() + output.stderr.len();
     if total_output_size > MAX_OUTPUT_SIZE {
@@ -558,32 +488,8 @@ fn execute_wt_with_stderr(app: &tauri::AppHandle, args: &[&str]) -> WtResult<(St
 
     let success = output.status.code().map(|c| c == 0).unwrap_or(false);
 
-    if !success {
-        let stdout_str = String::from_utf8_lossy(&output.stdout);
-        if let Some(err) =
-            structured_cli_error(&stdout_str)
-        {
-            return Err(err);
-        }
-
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let error_lines: Vec<&str> = stderr
-            .lines()
-            .filter(|line| {
-                !line.starts_with('\u{2192}')
-                    && !line.starts_with("  \u{2192}")
-                    && !line.contains("...")
-            })
-            .collect();
-
-        let error_msg = if error_lines.is_empty() {
-            stderr.to_string()
-        } else {
-            error_lines.join("\n")
-        };
-
-        let sanitised = sanitise_error_message(error_msg.trim());
-        return Err(WtError::command_failed(sanitised));
+    if let Some(error) = command_output_error(success, &String::from_utf8_lossy(&output.stdout), &String::from_utf8_lossy(&output.stderr)) {
+        return Err(error);
     }
 
     let stdout_str = String::from_utf8_lossy(&output.stdout).into_owned();
@@ -732,24 +638,7 @@ fn execute_wt_json_result<T: serde::de::DeserializeOwned>(
     // Execute with timeout to prevent indefinite hangs
     // Use a scoped thread to avoid "Cannot start a runtime from within a runtime"
     // panics when called from spawn_blocking (which retains tokio runtime context)
-    let rt_handle = tauri::async_runtime::handle();
-    let output = std::thread::scope(|s| {
-        s.spawn(|| {
-            rt_handle.block_on(async {
-                tokio::time::timeout(SIDECAR_TIMEOUT, sidecar.args(args).output()).await
-            })
-        }).join().expect("sidecar thread panicked")
-    })
-    .map_err(|_| WtError::new("TIMEOUT", "Command timed out after 5 minutes"))?
-    .map_err(|e| {
-            let error_str = e.to_string();
-            if error_str.contains("not found") || error_str.contains("No such file") {
-                WtError::cli_not_found()
-            } else {
-                let sanitised = sanitise_error_message(&format!("Failed to execute grove: {}", e));
-                WtError::new("IO_ERROR", sanitised)
-            }
-        })?;
+    let output = crate::process_runner::run(sidecar.args(args).into(), SIDECAR_TIMEOUT, MAX_OUTPUT_SIZE)?;
 
     let total_output_size = output.stdout.len() + output.stderr.len();
     if total_output_size > MAX_OUTPUT_SIZE {
@@ -777,31 +666,8 @@ fn execute_wt_json_result<T: serde::de::DeserializeOwned>(
     // Check exit status - sidecar uses code() method
     let success = output.status.code().map(|c| c == 0).unwrap_or(false);
 
-    // No valid JSON of type T in stdout - check for structured error response
-    if !success {
-        // Try to parse as a structured CLI error response first
-        if let Ok(cli_error) = extract_json_object::<CliErrorResponse>(&stdout_str) {
-            let sanitised = sanitise_error_message(&cli_error.error.message);
-            return Err(WtError::new(&cli_error.error.code, sanitised));
-        }
-
-        // Fall back to stderr parsing
-        let stderr_str = String::from_utf8_lossy(&output.stderr);
-        let error_lines: Vec<&str> = stderr_str
-            .lines()
-            .filter(|line| {
-                !line.starts_with('→') && !line.starts_with("  →") && !line.contains("...")
-            })
-            .collect();
-
-        let error_msg = if error_lines.is_empty() {
-            stderr_str.to_string()
-        } else {
-            error_lines.join("\n")
-        };
-
-        let sanitised = sanitise_error_message(error_msg.trim());
-        return Err(WtError::command_failed(sanitised));
+    if let Some(error) = command_output_error(success, &stdout_str, &String::from_utf8_lossy(&output.stderr)) {
+        return Err(error);
     }
 
     // Exit was success but no JSON - parsing error
@@ -849,14 +715,8 @@ pub fn is_wt_available(app: &tauri::AppHandle) -> bool {
         Err(_) => return false,
     };
 
-    let rt_handle = tauri::async_runtime::handle();
-    std::thread::scope(|s| {
-        s.spawn(|| {
-            rt_handle.block_on(async { sidecar.args(["--version"]).output().await })
-        }).join().expect("sidecar thread panicked")
-    })
-        .map(|output| output.status.code().map(|c| c == 0).unwrap_or(false))
-        .unwrap_or(false)
+    crate::process_runner::run(sidecar.args(["--version"]).into(), SIDECAR_TIMEOUT, MAX_OUTPUT_SIZE)
+        .map(|output| output.status.success()).unwrap_or(false)
 }
 
 /// Get the wt CLI version
@@ -868,7 +728,7 @@ pub fn get_version(app: &tauri::AppHandle) -> WtResult<String> {
 /// The `grove rm` argument for a removal target: a branch name, or for a
 /// detached worktree (which has no branch) its absolute folder, as `--path=`.
 /// Git forbids branch names starting with '/', so the two cannot be confused.
-fn removal_target_arg(target: &str) -> WtResult<String> {
+pub(crate) fn removal_target_arg(target: &str) -> WtResult<String> {
     if target.starts_with('/') {
         if target.split('/').any(|c| c == "..") || target.chars().any(|c| c.is_control()) {
             return Err(WtError::new(
@@ -994,7 +854,7 @@ pub fn remove_worktree(
     let mut args = vec!["rm"];
 
     if force {
-        args.push("-f");
+        args.push("--allow-protected");
     }
     if delete_branch {
         args.push("--delete-branch");
@@ -1252,6 +1112,7 @@ fn emit_progress(
     }
 
     let event = OperationProgressEvent {
+        operation_id: ACTIVE_OPERATION_ID.lock().unwrap_or_else(|e| e.into_inner()).clone().unwrap_or_default(),
         operation: operation.to_string(),
         current,
         total,
@@ -1270,11 +1131,9 @@ fn emit_progress(
 /// progress events for each one. Supports cancellation via per-operation cancellation
 /// tokens. Used for retry functionality where only failed items need to be re-pulled.
 /// Returns aggregated results matching `PullAllResult` structure.
-pub fn pull_selected_with_progress(
-    repo_name: &str,
+pub fn pull_selected_with_progress_identified(repo_name: &str,
     branches: Vec<String>,
-    app: &tauri::AppHandle,
-) -> WtResult<PullAllResult> {
+    app: &tauri::AppHandle, operation_id: &str) -> WtResult<PullAllResult> {
     validate_repo_name(repo_name)?;
 
     // Validate all branch names
@@ -1283,7 +1142,7 @@ pub fn pull_selected_with_progress(
     }
 
     // Create a cancellation token for this specific operation
-    let cancel_token = CancellationToken::new();
+    let cancel_token = CancellationToken::identified(operation_id)?;
 
     let total = branches.len() as u32;
 
@@ -1458,15 +1317,13 @@ fn summarise_removals(repo_name: &str, items: Vec<RemoveSelectedItem>) -> Remove
 /// removal mutates the repo's worktree list and runs hooks, so parallelism is
 /// unsafe). Per-item failures are recorded and do not abort the batch.
 /// Cancellation is honoured between items via the global cancellation token.
-/// `force` is always true, matching the single-delete GUI behaviour.
-pub fn remove_selected_with_progress(
-    app: &tauri::AppHandle,
+/// Batch removal retains current-site and protected-branch safeguards.
+pub fn remove_selected_with_progress_identified(app: &tauri::AppHandle,
     repo_name: &str,
     branches: Vec<String>,
     delete_branch: bool,
     drop_db: bool,
-    skip_backup: bool,
-) -> WtResult<RemoveSelectedResult> {
+    skip_backup: bool, operation_id: &str) -> WtResult<RemoveSelectedResult> {
     validate_repo_name(repo_name)?;
     for branch in &branches {
         removal_target_arg(branch)?;
@@ -1478,7 +1335,7 @@ pub fn remove_selected_with_progress(
     }
 
     // Registers globally and becomes the active operation; request_cancel() flips it.
-    let cancel_token = CancellationToken::new();
+    let cancel_token = CancellationToken::identified(operation_id)?;
 
     // Emit initial "pending" for all items so the panel shows the full list.
     for (i, branch) in branches.iter().enumerate() {
@@ -1496,22 +1353,30 @@ pub fn remove_selected_with_progress(
                 success: false,
                 branch_deleted: false,
                 message: "Operation cancelled".to_string(),
+                error_code: None,
             });
             continue;
         }
 
         emit_progress(app, "remove_all", current, total, branch, "in_progress", None);
 
-        match remove_worktree(app, repo_name, branch, delete_branch, drop_db, skip_backup, true) {
+        match remove_worktree(app, repo_name, branch, delete_branch, drop_db, skip_backup, false) {
             Ok(resp) if resp.result.success => {
                 let deleted = resp.result.branch_deleted;
-                let details = if deleted { "branch deleted" } else { "worktree removed" };
+                let mut details = if deleted { "Worktree removed; branch deleted" } else { "Worktree removed; branch retained" }.to_string();
+                if resp.result.db_drop_requested {
+                    details.push_str("; database drop requested (outcome unconfirmed)");
+                }
+                for hook in resp.hooks.iter().filter(|hook| hook.status == "failed") {
+                    details.push_str(&format!("; hook failed: {}", hook.name));
+                }
                 emit_progress(app, "remove_all", current, total, branch, "success", Some(details.to_string()));
                 items.push(RemoveSelectedItem {
                     branch: branch.clone(),
                     success: true,
                     branch_deleted: deleted,
-                    message: "removed".to_string(),
+                    message: details,
+                    error_code: None,
                 });
             }
             Ok(_) => {
@@ -1521,6 +1386,7 @@ pub fn remove_selected_with_progress(
                     success: false,
                     branch_deleted: false,
                     message: "removal reported failure".to_string(),
+                    error_code: None,
                 });
             }
             Err(e) => {
@@ -1530,6 +1396,7 @@ pub fn remove_selected_with_progress(
                     success: false,
                     branch_deleted: false,
                     message: e.message,
+                    error_code: Some(e.code),
                 });
             }
         }
@@ -1544,11 +1411,11 @@ pub fn remove_selected_with_progress(
 /// for each one. Supports cancellation via per-operation cancellation tokens.
 /// Persists operation state to disk for resume capability.
 /// Returns aggregated results matching `PullAllResult` structure.
-pub fn pull_all_with_progress(repo_name: &str, app: &tauri::AppHandle) -> WtResult<PullAllResult> {
+pub fn pull_all_with_progress_identified(repo_name: &str, app: &tauri::AppHandle, operation_id: &str) -> WtResult<PullAllResult> {
     validate_repo_name(repo_name)?;
 
     // Create a cancellation token for this specific operation
-    let cancel_token = CancellationToken::new();
+    let cancel_token = CancellationToken::identified(operation_id)?;
 
     // Get list of worktrees to know total count
     let worktrees = get_worktrees(app, repo_name)?;
@@ -1570,16 +1437,15 @@ pub fn pull_all_with_progress(repo_name: &str, app: &tauri::AppHandle) -> WtResu
 
     // Create operation state for persistence
     let branch_names: Vec<String> = worktrees.iter().map(|wt| wt.branch.clone()).collect();
-    let op_state = OperationState::new(
+    let mut op_state = OperationState::new(
         PersistentOperationType::PullAll,
         repo_name,
         branch_names,
     );
 
     // Save initial state
-    if let Err(e) = operation_state::save_state(&op_state) {
-        eprintln!("[wt] Warning: Failed to save initial operation state: {}", e);
-    }
+    op_state.id = operation_id.to_string();
+    save_checkpoint(app, &op_state);
 
     // Emit initial "pending" status for all worktrees
     for (i, wt) in worktrees.iter().enumerate() {
@@ -1639,7 +1505,7 @@ pub fn pull_all_with_progress(repo_name: &str, app: &tauri::AppHandle) -> WtResu
                         state.mark_item_skipped(branch, Some("Operation cancelled".to_string()));
                         Some(state.clone())
                     } else { None };
-                    if let Some(s) = state_snapshot { let _ = operation_state::save_state(&s); }
+                    if let Some(s) = state_snapshot { save_checkpoint(app, &s); }
 
                     return PullAllWorktree {
                         branch: branch.clone(),
@@ -1674,7 +1540,7 @@ pub fn pull_all_with_progress(repo_name: &str, app: &tauri::AppHandle) -> WtResu
                             state.mark_item_success(branch, details);
                             Some(state.clone())
                         } else { None };
-                        if let Some(s) = state_snapshot { let _ = operation_state::save_state(&s); }
+                        if let Some(s) = state_snapshot { save_checkpoint(app, &s); }
 
                         PullAllWorktree {
                             branch: branch.clone(),
@@ -1700,7 +1566,7 @@ pub fn pull_all_with_progress(repo_name: &str, app: &tauri::AppHandle) -> WtResu
                             state.mark_item_failed(branch, e.message.clone());
                             Some(state.clone())
                         } else { None };
-                        if let Some(s) = state_snapshot { let _ = operation_state::save_state(&s); }
+                        if let Some(s) = state_snapshot { save_checkpoint(app, &s); }
 
                         PullAllWorktree {
                             branch: branch.clone(),
@@ -1791,7 +1657,7 @@ pub fn resume_pull_all_operation(
     validate_repo_name(&repo_name)?;
 
     // Create a cancellation token for this resumed operation
-    let cancel_token = CancellationToken::new();
+    let cancel_token = CancellationToken::identified(operation_id)?;
 
     // Get pending items to process
     let pending_branches = op_state.pending_item_names();
@@ -1808,9 +1674,7 @@ pub fn resume_pull_all_operation(
 
     // Mark operation as running again
     op_state.status = OperationStatus::Running;
-    if let Err(e) = operation_state::save_state(&op_state) {
-        eprintln!("[wt] Warning: Failed to save resumed operation state: {}", e);
-    }
+    save_checkpoint(app, &op_state);
 
     // Emit progress events for all items (showing current state)
     for (i, item) in op_state.items.iter().enumerate() {
@@ -1883,7 +1747,7 @@ pub fn resume_pull_all_operation(
                         state.mark_item_skipped(branch, Some("Operation cancelled".to_string()));
                         Some(state.clone())
                     } else { None };
-                    if let Some(s) = state_snapshot { let _ = operation_state::save_state(&s); }
+                    if let Some(s) = state_snapshot { save_checkpoint(app, &s); }
 
                     return PullAllWorktree {
                         branch: branch.clone(),
@@ -1912,7 +1776,7 @@ pub fn resume_pull_all_operation(
                             state.mark_item_success(branch, details);
                             Some(state.clone())
                         } else { None };
-                        if let Some(s) = state_snapshot { let _ = operation_state::save_state(&s); }
+                        if let Some(s) = state_snapshot { save_checkpoint(app, &s); }
 
                         PullAllWorktree {
                             branch: branch.clone(),
@@ -1937,7 +1801,7 @@ pub fn resume_pull_all_operation(
                             state.mark_item_failed(branch, e.message.clone());
                             Some(state.clone())
                         } else { None };
-                        if let Some(s) = state_snapshot { let _ = operation_state::save_state(&s); }
+                        if let Some(s) = state_snapshot { save_checkpoint(app, &s); }
 
                         PullAllWorktree {
                             branch: branch.clone(),
@@ -1969,7 +1833,7 @@ pub fn resume_pull_all_operation(
 ///
 /// Used when resuming operations to construct the result from the
 /// accumulated state.
-fn build_pull_all_result_from_state(state: &OperationState) -> PullAllResult {
+fn build_pull_all_result_from_state(state: &crate::types::OperationState) -> PullAllResult {
     let worktrees: Vec<PullAllWorktree> = state
         .items
         .iter()
@@ -2035,15 +1899,13 @@ fn build_pull_all_result_from_state(state: &OperationState) -> PullAllResult {
 /// First prunes stale refs, then iterates through merged branches
 /// and emits progress events for each one. Supports cancellation via
 /// per-operation cancellation tokens.
-pub fn prune_with_progress(
-    repo_name: &str,
+pub fn prune_with_progress_identified(repo_name: &str,
     force: bool,
-    app: &tauri::AppHandle,
-) -> WtResult<PruneResult> {
+    app: &tauri::AppHandle, operation_id: &str) -> WtResult<PruneResult> {
     validate_repo_name(repo_name)?;
 
     // H2: Create a cancellation token for this operation
-    let cancel_token = CancellationToken::new();
+    let cancel_token = CancellationToken::identified(operation_id)?;
 
     // First, do a dry-run to get the list of branches that will be affected
     // We parse the --json output to get the expected branches
@@ -2286,7 +2148,14 @@ pub fn get_uncommitted_files(
 ///
 /// Executes `wt config --json` and parses the output.
 pub fn get_config(app: &tauri::AppHandle) -> WtResult<crate::types::Config> {
-    let output = execute_wt(app, &["config", "--json"])?;
+    get_config_for_repo(app, None)
+}
+
+pub fn get_config_for_repo(app: &tauri::AppHandle, repo: Option<&str>) -> WtResult<crate::types::Config> {
+    let mut args = vec!["config"];
+    if let Some(repo) = repo { validate_repo_name(repo)?; args.push(repo); }
+    args.push("--json");
+    let output = execute_wt(app, &args)?;
 
     #[derive(Deserialize)]
     struct ConfigResponse {
@@ -2307,6 +2176,8 @@ pub fn get_config(app: &tauri::AppHandle) -> WtResult<crate::types::Config> {
         database: Option<ConfigDatabase>,
         #[serde(default)]
         url_subdomain: Option<String>,
+        #[serde(default)]
+        config_sources: std::collections::HashMap<String, String>,
     }
 
     #[derive(Deserialize)]
@@ -2331,6 +2202,7 @@ pub fn get_config(app: &tauri::AppHandle) -> WtResult<crate::types::Config> {
             user: db.user,
         }),
         url_subdomain: response.data.url_subdomain,
+        config_sources: response.data.config_sources,
     })
 }
 
@@ -2473,31 +2345,7 @@ fn unlock_result(repo_name: &str, stdout: &str, stderr: &str) -> UnlockResult {
 /// Returns the path to ~/.groverc (the CLI's config file location)
 /// Also checks HERD_ROOT/.groveconfig as a fallback
 pub fn get_config_path() -> WtResult<String> {
-    // Get home directory
-    let home = std::env::var("HOME").map_err(|_| {
-        WtError::new(
-            "CONFIG_NOT_FOUND",
-            "Could not determine home directory",
-        )
-    })?;
-
-    // Primary config location: ~/.groverc
-    let config_path = format!("{}/.groverc", home);
-    if std::path::Path::new(&config_path).exists() {
-        return Ok(config_path);
-    }
-
-    // Fallback: check HERD_ROOT/.groveconfig
-    if let Ok(herd_root) = std::env::var("HERD_ROOT") {
-        let herd_config = format!("{}/.groveconfig", herd_root);
-        if std::path::Path::new(&herd_config).exists() {
-            return Ok(herd_config);
-        }
-    }
-
-    // If neither exists, return the primary path (will be created)
-    // This allows the "open config" action to create a new file
-    Ok(config_path)
+    Ok(crate::config_files::get_global_config_path()?.to_string_lossy().into_owned())
 }
 
 /// Generate a markdown health report for a repository
@@ -2623,6 +2471,20 @@ pub fn register_repo(app: &tauri::AppHandle, path: &std::path::Path) -> WtResult
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reviewed_removal_contract() {
+        assert_eq!(removal_target_arg("fix/deploy-env-guard").unwrap(), "fix/deploy-env-guard");
+        assert_eq!(removal_target_arg("alias-name").unwrap(), "alias-name");
+        assert_eq!(removal_target_arg("/tmp/agent..work").unwrap(), "--path=/tmp/agent..work");
+        let error = command_output_error(false, "", "→ stop failed...\nSwitch aborted\nTOKEN=secret").unwrap();
+        assert!(error.message.contains("stop failed...\nSwitch aborted"));
+        assert!(!error.message.contains("secret"));
+        let error = command_output_error(true, r#"{"success":false,"error":{"code":"DATABASE_UNSAFE","message":"Identity mismatch\nNo database dropped"}}"#, "").unwrap();
+        assert_eq!(error.code, "DATABASE_UNSAFE");
+        assert!(error.message.contains('\n'));
+        assert!(command_output_error(true, "{}", "warning").is_none());
+    }
 
     #[test]
     fn test_is_wt_available() {
@@ -3030,9 +2892,9 @@ Some trailing text that isn't JSON"#;
     #[test]
     fn test_summarise_removals_counts() {
         let items = vec![
-            RemoveSelectedItem { branch: "a".into(), success: true, branch_deleted: true, message: "removed".into() },
-            RemoveSelectedItem { branch: "b".into(), success: false, branch_deleted: false, message: "boom".into() },
-            RemoveSelectedItem { branch: "c".into(), success: false, branch_deleted: false, message: "Operation cancelled".into() },
+            RemoveSelectedItem { branch: "a".into(), success: true, branch_deleted: true, message: "removed".into(), error_code: None },
+            RemoveSelectedItem { branch: "b".into(), success: false, branch_deleted: false, message: "boom".into(), error_code: None },
+            RemoveSelectedItem { branch: "c".into(), success: false, branch_deleted: false, message: "Operation cancelled".into(), error_code: None },
         ];
         let result = summarise_removals("myrepo", items);
         assert_eq!(result.repo, "myrepo");
@@ -3046,12 +2908,56 @@ Some trailing text that isn't JSON"#;
     fn test_remove_selected_result_serde_roundtrip() {
         let result = summarise_removals(
             "r",
-            vec![RemoveSelectedItem { branch: "x".into(), success: true, branch_deleted: false, message: "removed".into() }],
+            vec![RemoveSelectedItem { branch: "x".into(), success: true, branch_deleted: false, message: "removed".into(), error_code: None }],
         );
         let json = serde_json::to_string(&result).unwrap();
         let parsed: RemoveSelectedResult = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.worktrees.len(), 1);
         assert_eq!(parsed.worktrees[0].branch, "x");
         assert_eq!(parsed.summary.succeeded, 1);
+    }
+}
+
+pub fn pull_selected_with_progress(repo_name: &str,
+    branches: Vec<String>,
+    app: &tauri::AppHandle) -> WtResult<PullAllResult> { pull_selected_with_progress_identified(repo_name, branches, app, &Uuid::new_v4().to_string()) }
+
+pub fn remove_selected_with_progress(app: &tauri::AppHandle,
+    repo_name: &str,
+    branches: Vec<String>,
+    delete_branch: bool,
+    drop_db: bool,
+    skip_backup: bool) -> WtResult<RemoveSelectedResult> { remove_selected_with_progress_identified(app, repo_name, branches, delete_branch, drop_db, skip_backup, &Uuid::new_v4().to_string()) }
+
+pub fn pull_all_with_progress(repo_name: &str, app: &tauri::AppHandle) -> WtResult<PullAllResult> { pull_all_with_progress_identified(repo_name, app, &Uuid::new_v4().to_string()) }
+
+pub fn prune_with_progress(repo_name: &str,
+    force: bool,
+    app: &tauri::AppHandle) -> WtResult<PruneResult> { prune_with_progress_identified(repo_name, force, app, &Uuid::new_v4().to_string()) }
+
+fn save_checkpoint(app: &tauri::AppHandle, state: &crate::types::OperationState) {
+    if let Err(error) = operation_state::save_state(state) {
+        if error.code != "STALE_CHECKPOINT" {
+            emit_progress(app, &state.operation_type.to_string(), state.completed_items, state.total_items, "", "recovery_unavailable", Some(format!("Operation continues, recovery is unavailable: {}", error.message)));
+        }
+    }
+}
+
+#[cfg(test)]
+mod runtime_identity_tests {
+    use super::*;
+    #[test]
+    fn batches_are_exclusive_and_cancel_requires_matching_id() {
+        let id = Uuid::new_v4().to_string();
+        let token = CancellationToken::identified(&id).unwrap();
+        assert!(CancellationToken::identified(&Uuid::new_v4().to_string()).is_err());
+        request_cancel_by_id(&Uuid::new_v4().to_string());
+        assert!(!token.is_cancelled());
+        let worker = token.clone(); drop(worker);
+        assert!(CancellationToken::identified(&Uuid::new_v4().to_string()).is_err());
+        request_cancel_by_id(&id); assert!(token.is_cancelled());
+        drop(token);
+        let next = CancellationToken::identified(&Uuid::new_v4().to_string()).unwrap();
+        assert!(!next.is_cancelled());
     }
 }

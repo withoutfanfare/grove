@@ -42,3 +42,5 @@ export type { RecentSwitchEntry } from './useRecentSwitches';
 export { useUpdater } from './useUpdater';
 export type { UpdateInfo, UpdateStatus } from './useUpdater';
 export { useWorktreeSelection } from './useWorktreeSelection';
+export { useActivity, recordActivity, redact } from './useActivity';
+export type { ActivityEntry, ActivityStatus } from './useActivity';

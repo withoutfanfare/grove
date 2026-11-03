@@ -700,9 +700,7 @@ pub async fn get_config(
 ) -> Result<Config, WtError> {
     let handle = app.clone();
     spawn_blocking(move || {
-        let mut config = wt::get_config(&handle)?;
-        config_files::apply_all_config_layers(&mut config, repo_name.as_deref())?;
-        Ok(config)
+        wt::get_config_for_repo(&handle, repo_name.as_deref())
     })
     .await
     .map_err(|e| WtError {
@@ -979,18 +977,14 @@ pub async fn get_uncommitted_files(
 /// Emits `operation_progress` events for real-time feedback.
 /// Runs on a background thread to keep the UI responsive.
 /// Callable from frontend as: invoke('prune_repo', { repoName, force })
-#[command]
+#[command(rename_all = "camelCase")]
 pub async fn prune_repo(
-    repo_name: String,
-    force: bool,
-    app: tauri::AppHandle,
+    _repo_name: String,
+    _force: bool,
+    _operation_id: String,
+    _app: tauri::AppHandle,
 ) -> Result<PruneResult, WtError> {
-    spawn_blocking(move || wt::prune_with_progress(&repo_name, force, &app))
-        .await
-        .map_err(|e| WtError {
-            code: "SPAWN_ERROR".to_string(),
-            message: format!("Failed to spawn background task: {}", e),
-        })?
+    Err(WtError::new("PREVIEW_REQUIRED", "Preview the exact branch cleanup plan before running it"))
 }
 
 /// Pull all worktrees in a repository
@@ -999,12 +993,13 @@ pub async fn prune_repo(
 /// `operation_progress` events for each worktree for real-time feedback.
 /// Runs on a background thread to keep the UI responsive.
 /// Callable from frontend as: invoke('pull_all_worktrees', { repoName })
-#[command]
+#[command(rename_all = "camelCase")]
 pub async fn pull_all_worktrees(
     repo_name: String,
+    operation_id: String,
     app: tauri::AppHandle,
 ) -> Result<PullAllResult, WtError> {
-    spawn_blocking(move || wt::pull_all_with_progress(&repo_name, &app))
+    spawn_blocking(move || wt::pull_all_with_progress_identified(&repo_name, &app, &operation_id))
         .await
         .map_err(|e| WtError {
             code: "SPAWN_ERROR".to_string(),
@@ -1018,13 +1013,14 @@ pub async fn pull_all_worktrees(
 /// `operation_progress` events for each worktree for real-time feedback.
 /// Used to retry failed items from a previous pull-all operation.
 /// Callable from frontend as: invoke('pull_selected_worktrees', { repoName, branches })
-#[command]
+#[command(rename_all = "camelCase")]
 pub async fn pull_selected_worktrees(
     repo_name: String,
     branches: Vec<String>,
+    operation_id: String,
     app: tauri::AppHandle,
 ) -> Result<PullAllResult, WtError> {
-    spawn_blocking(move || wt::pull_selected_with_progress(&repo_name, branches, &app))
+    spawn_blocking(move || wt::pull_selected_with_progress_identified(&repo_name, branches, &app, &operation_id))
         .await
         .map_err(|e| WtError {
             code: "SPAWN_ERROR".to_string(),
@@ -1035,7 +1031,7 @@ pub async fn pull_selected_worktrees(
 /// Remove several worktrees in one batch operation.
 ///
 /// Emits `operation_progress` events (operation `"remove_all"`) per worktree.
-/// Options apply uniformly to every selected worktree; force is always on.
+/// Options apply uniformly; current-site and protected-branch safeguards remain enabled.
 /// Callable from frontend as: invoke('remove_selected_worktrees', { repoName, branches, deleteBranch, dropDb, skipBackup })
 #[command(rename_all = "camelCase")]
 pub async fn remove_selected_worktrees(
@@ -1044,10 +1040,11 @@ pub async fn remove_selected_worktrees(
     delete_branch: bool,
     drop_db: bool,
     skip_backup: bool,
+    operation_id: String,
     app: tauri::AppHandle,
 ) -> Result<RemoveSelectedResult, WtError> {
     spawn_blocking(move || {
-        wt::remove_selected_with_progress(&app, &repo_name, branches, delete_branch, drop_db, skip_backup)
+        wt::remove_selected_with_progress_identified(&app, &repo_name, branches, delete_branch, drop_db, skip_backup, &operation_id)
     })
     .await
     .map_err(|e| WtError {
@@ -1061,9 +1058,9 @@ pub async fn remove_selected_worktrees(
 /// Sets the global cancellation flag, which will be checked by operations
 /// like pull-all and prune between individual items.
 /// Callable from frontend as: invoke('cancel_operation')
-#[command]
-pub fn cancel_operation() {
-    wt::request_cancel();
+#[command(rename_all = "camelCase")]
+pub fn cancel_operation(operation_id: String) {
+    wt::request_cancel_by_id(&operation_id);
 }
 
 // ============================================================================
@@ -1798,36 +1795,36 @@ pub async fn get_diff_stats(
     let path = validate_path(&worktree_path)?;
 
     spawn_blocking(move || {
-        let base = base_branch.as_deref().unwrap_or("origin/main");
+        let sidecar_output = Command::new("git")
+            .args(["rev-parse", "--git-path", "grove-base"])
+            .current_dir(&path)
+            .output()
+            .map_err(|e| WtError::new("COMMAND_FAILED", format!("Failed to locate worktree base: {}", e)))?;
+        if !sidecar_output.status.success() {
+            return Err(WtError::new("COMMAND_FAILED", "Could not resolve the worktree's base metadata"));
+        }
+        let sidecar = path.join(String::from_utf8_lossy(&sidecar_output.stdout).trim());
+        let recorded_base = match std::fs::read_to_string(sidecar) {
+            Ok(value) => Some(value),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => return Err(WtError::new("IO_ERROR", format!("Could not read the worktree base: {}", error))),
+        };
+        let base = recorded_base.as_deref().map(str::trim).filter(|value| !value.is_empty())
+            .or(base_branch.as_deref()).unwrap_or("origin/main");
 
         // Get the merge base
         let merge_base_output = Command::new("git")
-            .args(["merge-base", "HEAD", base])
+            .args(["merge-base", "--", "HEAD", base])
             .current_dir(&path)
             .output()
             .map_err(|e| WtError::new("COMMAND_FAILED", format!("Failed to find merge base: {}", e)))?;
 
-        let merge_base = if merge_base_output.status.success() {
-            String::from_utf8_lossy(&merge_base_output.stdout).trim().to_string()
-        } else {
-            // If merge-base fails (e.g., no common ancestor), return empty stats
-            return Ok(crate::types::DiffStats {
-                files_changed: 0,
-                lines_added: 0,
-                lines_removed: 0,
-                display: "No changes".to_string(),
-                file_list: vec![],
-            });
-        };
-
+        if !merge_base_output.status.success() {
+            return Err(WtError::new("COMPARISON_UNAVAILABLE", "Could not compare HEAD with the worktree base; merge status and changes are unknown"));
+        }
+        let merge_base = String::from_utf8_lossy(&merge_base_output.stdout).trim().to_string();
         if merge_base.is_empty() {
-            return Ok(crate::types::DiffStats {
-                files_changed: 0,
-                lines_added: 0,
-                lines_removed: 0,
-                display: "No changes".to_string(),
-                file_list: vec![],
-            });
+            return Err(WtError::new("COMPARISON_UNAVAILABLE", "Git returned no merge base; changes are unknown"));
         }
 
         // Get numstat for accurate line counts
@@ -1836,6 +1833,10 @@ pub async fn get_diff_stats(
             .current_dir(&path)
             .output()
             .map_err(|e| WtError::new("COMMAND_FAILED", format!("Failed to get diff stats: {}", e)))?;
+
+        if !numstat_output.status.success() {
+            return Err(WtError::new("COMPARISON_UNAVAILABLE", "Git could not calculate changes; the diff is unknown"));
+        }
 
         let numstat_str = String::from_utf8_lossy(&numstat_output.stdout);
         let mut files_changed: u32 = 0;
@@ -2118,6 +2119,42 @@ fn build_worktree_context_menu(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn diff_stats_use_each_worktrees_recorded_base() {
+        let temp = tempfile::tempdir().unwrap();
+        let repo = temp.path().join("repo");
+        let sibling = temp.path().join("sibling");
+        std::fs::create_dir(&repo).unwrap();
+        let git = |dir: &std::path::Path, args: &[&str]| {
+            let output = Command::new("git").current_dir(dir).args(args)
+                .env("GIT_CONFIG_GLOBAL", "/dev/null").env("GIT_CONFIG_NOSYSTEM", "1").output().unwrap();
+            assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+            String::from_utf8(output.stdout).unwrap().trim().to_string()
+        };
+        git(&repo, &["init", "-b", "main"]);
+        git(&repo, &["config", "user.name", "Grove Test"]);
+        git(&repo, &["config", "user.email", "test@example.invalid"]);
+        git(&repo, &["-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "initial"]);
+        git(&repo, &["checkout", "-b", "topic"]);
+        std::fs::write(repo.join("change.txt"), "change\n").unwrap();
+        git(&repo, &["add", "change.txt"]);
+        git(&repo, &["-c", "commit.gpgsign=false", "commit", "-m", "topic"]);
+        git(&repo, &["worktree", "add", "-b", "sibling", sibling.to_str().unwrap()]);
+        for (path, base) in [(&repo, "topic"), (&sibling, "main")] {
+            let relative = git(path, &["rev-parse", "--git-path", "grove-base"]);
+            let base_path = path.join(relative);
+            std::fs::write(base_path, base).unwrap();
+        }
+        let topic_stats = tauri::async_runtime::block_on(get_diff_stats(repo.to_str().unwrap().into(), Some("main".into()))).unwrap();
+        let sibling_stats = tauri::async_runtime::block_on(get_diff_stats(sibling.to_str().unwrap().into(), Some("main".into()))).unwrap();
+        assert_eq!(topic_stats.files_changed, 0);
+        assert_eq!(sibling_stats.files_changed, 1);
+        let relative = git(&repo, &["rev-parse", "--git-path", "grove-base"]);
+        std::fs::write(repo.join(relative), "missing-ref").unwrap();
+        let unknown = tauri::async_runtime::block_on(get_diff_stats(repo.to_str().unwrap().into(), None)).unwrap_err();
+        assert_eq!(unknown.code, "COMPARISON_UNAVAILABLE");
+    }
 
     #[test]
     fn test_check_wt_available_does_not_panic() {

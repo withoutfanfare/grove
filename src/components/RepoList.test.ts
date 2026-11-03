@@ -5,6 +5,7 @@ import { nextTick } from 'vue'
 import RepoList from './RepoList.vue'
 import { useWorktreeStore } from '@/stores'
 import { mockTauriInvoke, resetTauriMocks } from '@/test/setup'
+import { useToast } from '@/composables/useToast'
 
 function mountRepoList() {
   return mount(RepoList, {
@@ -68,6 +69,26 @@ describe('RepoList keyboard navigation (filtered/sorted)', () => {
     // SListRow is stubbed so we verify repo list items rendered (3 items sorted)
     const listItems = wrapper.findAll('li.relative')
     expect(listItems.length).toBe(3)
+  })
+
+  it('keeps a slow backend fetch pending instead of reporting an independent timeout', async () => {
+    vi.useFakeTimers()
+    let finish!: (rows: never[]) => void
+    mockTauriInvoke.mockImplementation((command: string) => command === 'get_worktree_status'
+      ? new Promise(resolve => { finish = resolve })
+      : Promise.resolve([]))
+    const store = useWorktreeStore()
+    store.setRepositories([{ name: 'alpha', worktrees: 1 }])
+    const wrapper = mountRepoList()
+    const { toasts, removeToast } = useToast()
+    toasts.value.forEach(toast => removeToast(toast.id))
+    await wrapper.find('li.relative > *').trigger('click')
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(60000)
+    expect(toasts.value.some(toast => toast.message.includes('Request timed out'))).toBe(false)
+    finish([])
+    await vi.advanceTimersByTimeAsync(0)
+    wrapper.unmount()
   })
 
   it('quick-select (Ctrl+1) targets the first filtered repo, not the raw store order', async () => {

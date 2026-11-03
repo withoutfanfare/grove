@@ -26,6 +26,14 @@ export interface RepoSnapshot {
   expensiveRefreshedAt?: number;
   /** Error message when the repo failed to load (stale data retained) */
   error?: string;
+  /** Unix ms of the latest failed list attempt (refreshedAt stays the last success; 0 = never) */
+  failedAt?: number;
+  /** Unix ms of the last successful health check, and the latest failure since */
+  healthCheckedAt?: number;
+  healthError?: string;
+  /** Unix ms of the last successful disk measurement, and the latest failure since */
+  diskCheckedAt?: number;
+  diskError?: string;
 }
 
 /** A worktree needing attention, tagged with its repository */
@@ -54,6 +62,12 @@ export interface OverviewStats {
   totalDiskBytes: number;
   /** Human-readable disk total, or null when no disk usage has loaded yet */
   diskDisplay: string | null;
+  /** Worktrees with a known count of commits ahead of their upstream */
+  aheadCount: number;
+  /** Worktrees whose upstream comparison is unknown (never counted as level) */
+  unknownSyncCount: number;
+  /** Repositories whose latest list, health or disk check failed */
+  failedCheckRepos: number;
 }
 
 const STORAGE_KEY = 'grove-overview-snapshots';
@@ -128,11 +142,17 @@ export const useOverviewStore = defineStore('overview', () => {
     let behindCount = 0;
     let totalDiskBytes = 0;
     let hasDiskUsage = false;
+    let aheadCount = 0;
+    let unknownSyncCount = 0;
+    let failedCheckRepos = 0;
     for (const snap of Object.values(snapshots.value)) {
       worktreeCount += snap.worktrees.length;
+      if (snap.error || snap.healthError || snap.diskError) failedCheckRepos++;
       for (const worktree of snap.worktrees) {
         if (worktree.dirty) dirtyCount++;
         if ((worktree.behind ?? 0) > 0) behindCount++;
+        if ((worktree.ahead ?? 0) > 0) aheadCount++;
+        if (worktree.ahead === null || worktree.behind === null) unknownSyncCount++;
       }
       if (snap.diskUsage) {
         hasDiskUsage = true;
@@ -145,6 +165,9 @@ export const useOverviewStore = defineStore('overview', () => {
       behindCount,
       totalDiskBytes,
       diskDisplay: hasDiskUsage ? formatBytes(totalDiskBytes) : null,
+      aheadCount,
+      unknownSyncCount,
+      failedCheckRepos,
     };
   });
 
@@ -152,9 +175,11 @@ export const useOverviewStore = defineStore('overview', () => {
 
   const behindAttention = computed(() => collectWorktrees((wt) => (wt.behind ?? 0) > 0));
 
-  const cleanupAttention = computed(() =>
-    collectWorktrees((wt) => Boolean(wt.merged) || Boolean(wt.stale))
-  );
+  // Merged (Git ancestry) worktrees are review candidates for removal, never a safety verdict.
+  const cleanupAttention = computed(() => collectWorktrees((wt) => wt.merged === true));
+
+  // Far behind base but not merged: work to sync, not to remove.
+  const staleAttention = computed(() => collectWorktrees((wt) => wt.stale === true && wt.merged !== true));
 
   const healthAttention = computed<AttentionHealthItem[]>(() => {
     const items = new Map<string, AttentionHealthItem>();
@@ -197,8 +222,11 @@ export const useOverviewStore = defineStore('overview', () => {
       healthAttention.value.length > 0 ||
       dirtyAttention.value.length > 0 ||
       behindAttention.value.length > 0 ||
+      staleAttention.value.length > 0 ||
       cleanupAttention.value.length > 0 ||
-      repoErrors.value.length > 0
+      repoErrors.value.length > 0 ||
+      // A failed check is not "all clear"
+      Object.values(snapshots.value).some((snap) => snap.healthError || snap.diskError)
   );
 
   // ── Actions ─────────────────────────────────────────────────────────
@@ -212,34 +240,44 @@ export const useOverviewStore = defineStore('overview', () => {
       diskUsage: existing?.diskUsage,
       refreshedAt,
       expensiveRefreshedAt: existing?.expensiveRefreshedAt,
+      healthCheckedAt: existing?.healthCheckedAt,
+      healthError: existing?.healthError,
+      diskCheckedAt: existing?.diskCheckedAt,
+      diskError: existing?.diskError,
       error: undefined,
     };
   }
 
   function setSnapshotError(repo: string, error: string, refreshedAt: number) {
     const existing = snapshots.value[repo];
-    // Retain stale data so the overview still shows last-known state
+    // Retain stale data (with its own success time) so the overview still shows last-known state
     snapshots.value[repo] = {
+      ...existing,
       repo,
       worktrees: existing?.worktrees ?? [],
-      health: existing?.health,
-      diskUsage: existing?.diskUsage,
-      refreshedAt: existing?.refreshedAt ?? refreshedAt,
-      expensiveRefreshedAt: existing?.expensiveRefreshedAt,
+      refreshedAt: existing?.refreshedAt ?? 0,
+      failedAt: refreshedAt,
       error,
     };
   }
 
-  function setHealth(repo: string, health: HealthResult) {
+  function setHealth(repo: string, health: HealthResult, checkedAt = Date.now()) {
     const existing = snapshots.value[repo];
     if (!existing) return;
-    snapshots.value[repo] = { ...existing, health };
+    snapshots.value[repo] = { ...existing, health, healthCheckedAt: checkedAt, healthError: undefined };
   }
 
-  function setDiskUsage(repo: string, diskUsage: RepoDiskUsage) {
+  function setDiskUsage(repo: string, diskUsage: RepoDiskUsage, checkedAt = Date.now()) {
     const existing = snapshots.value[repo];
     if (!existing) return;
-    snapshots.value[repo] = { ...existing, diskUsage };
+    snapshots.value[repo] = { ...existing, diskUsage, diskCheckedAt: checkedAt, diskError: undefined };
+  }
+
+  /** A failed check keeps the last-known result and its old timestamp */
+  function setCheckError(repo: string, kind: 'health' | 'disk', error: string) {
+    const existing = snapshots.value[repo];
+    if (!existing) return;
+    snapshots.value[repo] = { ...existing, [kind === 'health' ? 'healthError' : 'diskError']: error };
   }
 
   /** Drop snapshots for repositories that are no longer registered */
@@ -283,6 +321,7 @@ export const useOverviewStore = defineStore('overview', () => {
     dirtyAttention,
     behindAttention,
     cleanupAttention,
+    staleAttention,
     healthAttention,
     repoErrors,
     hasAttentionItems,
@@ -291,6 +330,7 @@ export const useOverviewStore = defineStore('overview', () => {
     setSnapshotError,
     setHealth,
     setDiskUsage,
+    setCheckError,
     pruneSnapshots,
     setRefreshing,
     shouldRefreshExpensive,

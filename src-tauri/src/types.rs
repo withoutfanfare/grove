@@ -120,6 +120,19 @@ pub struct Worktree {
     /// Whether the worktree is stale (beyond the configured threshold behind base)
     #[serde(default)]
     pub stale: Option<bool>,
+    #[serde(default)]
+    pub base_ref: Option<String>,
+    #[serde(default)]
+    pub base_sha: Option<String>,
+    #[serde(default)]
+    pub head_sha: Option<String>,
+    #[serde(default)]
+    pub behind_base: Option<u32>,
+    #[serde(default)]
+    pub behind_threshold: Option<u32>,
+    #[serde(default)]
+    pub checked_at: Option<String>,
+
 }
 
 /// Detailed dirty state breakdown from `git status --porcelain`
@@ -205,6 +218,9 @@ pub struct RemoveSelectedItem {
     pub branch_deleted: bool,
     /// Outcome message (or error/cancellation reason)
     pub message: String,
+    /// Structured failure code, retained for cache reconciliation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
 }
 
 /// Summary of a batch remove operation
@@ -456,6 +472,7 @@ pub struct PullAllResult {
 /// real-time feedback to the frontend.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OperationProgressEvent {
+    pub operation_id: String,
     /// Operation type: "pull_all", "prune"
     pub operation: String,
     /// Current item index (1-based)
@@ -734,6 +751,8 @@ impl OperationItem {
 /// resumption of interrupted operations.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OperationState {
+    #[serde(default)]
+    pub revision: u64,
     /// Unique identifier for this operation
     pub id: String,
     /// Type of operation
@@ -765,6 +784,7 @@ impl OperationState {
         let total_items = items.len() as u32;
 
         Self {
+            revision: 0,
             id: uuid::Uuid::new_v4().to_string(),
             operation_type,
             repo_name: repo_name.into(),
@@ -811,6 +831,7 @@ impl OperationState {
 
     /// Update the state timestamp
     pub fn touch(&mut self) {
+        self.revision += 1;
         self.updated_at = chrono::Utc::now().to_rfc3339();
     }
 
@@ -1118,6 +1139,9 @@ fn default_true() -> bool {
 /// replacing the previous unstructured String return type.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Config {
+    /// Source of each effective setting, reported by the CLI resolver.
+    #[serde(default)]
+    pub config_sources: std::collections::HashMap<String, String>,
     /// Default base branch for new worktrees (e.g., "origin/staging")
     #[serde(default)]
     pub default_base_branch: Option<String>,

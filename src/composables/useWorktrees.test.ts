@@ -3,6 +3,8 @@ import { setActivePinia, createPinia } from 'pinia'
 import { useWorktrees } from './useWorktrees'
 import { useWorktreeStore } from '@/stores'
 import { mockTauriInvoke, resetTauriMocks } from '@/test/setup'
+import { useOverviewStore } from '@/stores/overview'
+import { flushPromises } from '@vue/test-utils'
 
 const TRAY_REFRESH_DEBOUNCE_MS = 500
 
@@ -163,6 +165,7 @@ describe('useWorktrees', () => {
 
       expect(setErrorSpy).not.toHaveBeenCalled()
       expect(store.error).toBeNull()
+      expect(store.refreshErrors?.['my-repo']).toContain('transient hiccup')
     })
 
     it('surfaces an error banner when a non-silent fetch fails', async () => {
@@ -180,6 +183,73 @@ describe('useWorktrees', () => {
 
       expect(setErrorSpy).toHaveBeenCalled()
       expect(store.error?.code).toBe('FETCH_FAILED')
+    })
+  })
+
+  describe('removal reconciliation', () => {
+    const rows = [
+      { path: '/repo/envguard', branch: 'fix/deploy-env-guard', dirty: false, ahead: 0, behind: 0, sha: 'abc' },
+      { path: '/repo/retained', branch: 'feature/retained', dirty: false, ahead: 0, behind: 0, sha: 'def' },
+    ]
+
+    function seedRows() {
+      const store = useWorktreeStore()
+      store.setRepositories([{ name: 'my-repo', worktrees: 2 }])
+      store.selectRepository('my-repo')
+      store.setWorktrees(rows)
+      store.setSelection(rows.map(row => row.path))
+      useOverviewStore().setWorktreeSnapshot('my-repo', rows, 123)
+      return store
+    }
+
+    afterEach(() => useWorktrees().cleanup())
+
+    it('retires an absent single target from visible and persisted caches without reporting success', async () => {
+      const store = seedRows()
+      const error = { code: 'WORKTREE_NOT_FOUND', message: 'No matching worktree registered' }
+      mockTauriInvoke.mockRejectedValue(error)
+
+      const result = await useWorktrees().removeWorktree({ repo: 'my-repo', branch: rows[0].branch })
+
+      expect(result).toBeNull()
+      expect(store.error).toEqual(error)
+      expect(store.worktrees).toEqual([rows[1]])
+      expect(store.getCachedWorktrees('my-repo')).toEqual([rows[1]])
+      expect([...store.selectedPaths]).toEqual([rows[1].path])
+      expect(useOverviewStore().snapshots['my-repo'].worktrees).toEqual([rows[1]])
+    })
+
+    it('keeps blocked targets while retiring confirmed absent batch rows even if refresh fails', async () => {
+      const store = seedRows()
+      mockTauriInvoke.mockResolvedValue({ repo: 'my-repo', worktrees: [
+        { branch: rows[0].branch, success: false, branch_deleted: false, error_code: 'WORKTREE_NOT_FOUND', message: 'No matching worktree registered' },
+        { branch: rows[1].branch, success: false, branch_deleted: false, error_code: 'REMOVAL_BLOCKED', message: 'Live agent session' },
+      ], summary: { total: 2, succeeded: 0, failed: 2, cancelled: 0 } })
+
+      await useWorktrees().removeSelectedWorktrees('my-repo', rows.map(row => row.branch), { deleteBranch: false, dropDb: false, skipBackup: false })
+
+      expect(store.worktrees).toEqual([rows[1]])
+      expect([...store.selectedPaths]).toEqual([rows[1].path])
+    })
+
+    it('waits for a post-removal listing and discards an older in-flight capture', async () => {
+      const store = seedRows()
+      const reads: Array<(rows: typeof store.worktrees) => void> = []
+      mockTauriInvoke.mockImplementation((command: string) => command === 'get_worktree_status'
+        ? new Promise(resolve => reads.push(resolve))
+        : Promise.resolve({ result: { success: true, path: rows[0].path }, hooks: [] }))
+      const api = useWorktrees()
+      const oldRead = api.fetchWorktrees()
+      let settled = false
+      const removal = api.removeWorktree({ repo: 'my-repo', branch: rows[0].branch }).then(() => { settled = true })
+      await flushPromises()
+      reads[0](rows)
+      await flushPromises()
+      expect(store.worktrees).toEqual([rows[1]])
+      expect(settled).toBe(false)
+      reads[1]([rows[1]])
+      await Promise.all([oldRead, removal])
+      expect(settled).toBe(true)
     })
   })
 

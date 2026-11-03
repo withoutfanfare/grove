@@ -10,7 +10,7 @@ import type { Worktree } from '../types'
 export interface OrphanedWorktreeInfo {
   worktree: Worktree
   repoName: string
-  isSafeToDelete: boolean
+  isCleanupCandidate: boolean
 }
 
 /**
@@ -79,10 +79,11 @@ export function useOrphanedDetection() {
   }
 
   /**
-   * Check if an orphaned worktree is safe to delete
-   * (merged into base and no uncommitted changes)
+   * Check if an orphaned worktree is a cleanup candidate
+   * (merged into base and no uncommitted changes). Only a hint: the removal
+   * checks decide whether deletion is actually safe.
    */
-  function isSafeToDelete(worktree: Worktree): boolean {
+  function isCleanupCandidate(worktree: Worktree): boolean {
     return worktree.merged === true && !worktree.dirty
   }
 
@@ -98,7 +99,7 @@ export function useOrphanedDetection() {
       .map(wt => ({
         worktree: wt,
         repoName,
-        isSafeToDelete: isSafeToDelete(wt),
+        isCleanupCandidate: isCleanupCandidate(wt),
       }))
   })
 
@@ -110,7 +111,7 @@ export function useOrphanedDetection() {
   return {
     detectOrphaned,
     isOrphaned,
-    isSafeToDelete,
+    isCleanupCandidate,
     orphanedWorktrees,
     orphanedCount,
   }

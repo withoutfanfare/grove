@@ -7,7 +7,7 @@
  * Includes copy actions and Quick Launch functionality (Phase 1 Quick Actions).
  * Phase 2: Added age display and status badges (MERGED, STALE, MISMATCH).
  */
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { Worktree } from '../types'
 import StatusBadge from './StatusBadge.vue'
 import GradeBadge from './GradeBadge.vue'
@@ -55,8 +55,10 @@ function handleCheckboxClick(e: MouseEvent) {
 // Check if git client is configured
 const hasGitClient = computed(() => settingsStore.settings.gitClient !== 'none')
 
-const baseBranch = computed(() => settingsStore.settings.defaultBaseBranch || undefined)
-const diffStats = diagnostics.getDiffStats(props.worktree.path, baseBranch.value)
+const baseBranch = computed(() => props.worktree.base_ref || settingsStore.settings.defaultBaseBranch || undefined)
+const comparisonRevision = computed(() => `${props.worktree.sha}:${props.worktree.base_sha ?? ""}`)
+const diffEntry = diagnostics.getDiffStats(() => props.worktree.path, comparisonRevision, baseBranch)
+const diffStats = computed(() => diffEntry.value?.value)
 
 // Branch protection detection
 const isProtectedBranch = computed(() => {
@@ -79,18 +81,17 @@ const isStaleWorktree = computed(() => {
   return Date.now() - new Date(props.worktree.lastAccessed).getTime() > thresholdMs
 })
 
-onMounted(() => {
-  diagnostics.requestDiffStats(props.worktree.path, baseBranch.value)
-  if (props.worktree.dirty) {
-    diagnostics.requestDirtyDetails(props.worktree.path)
-  }
-})
+// Every list refresh delivers a new worktree object; the cache skips checks younger than its expiry.
+watch([() => props.worktree, baseBranch], () => {
+  diagnostics.requestDiffStats(props.worktree.path, comparisonRevision.value, baseBranch.value)
+  if (props.worktree.dirty) diagnostics.requestDirtyDetails(props.worktree.path)
+}, { immediate: true })
 
 // M8: Local refs for double-click prevention on git actions
 const isLocalPulling = ref(false)
 const isLocalSyncing = ref(false)
 
-const dirtyDetails = diagnostics.getDirtyDetails(props.worktree.path)
+const dirtyDetails = diagnostics.getDirtyDetails(() => props.worktree.path)
 
 // Refresh dirty details when the worktree dirty state changes
 watch(() => props.worktree.dirty, (isDirty) => {
@@ -443,19 +444,19 @@ async function handleOpenAll() {
           <SBadge v-if="isOrphanedWorktree"
             variant="warning"
             class="!border-transparent gap-1 compact-badge"
-            title="Remote branch has been deleted — this worktree may be ready for cleanup">
+            title="No same-name branch in the last-fetched remote refs. That does not prove the branch was deleted or merged, or that removal is safe.">
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878l4.242 4.242M15 12a3 3 0 00-3-3m0 0l7.5 7.5" />
             </svg>
-            Orphaned
+            No remote branch
           </SBadge>
 
           <!-- Stale worktree badge (configurable threshold) -->
           <SBadge v-if="isStaleWorktree && !worktree.stale"
             variant="warning"
             class="!border-transparent gap-1 compact-badge"
-            title="Worktree not accessed within stale threshold">
-            Stale
+            :title="`Folder last modified more than ${settingsStore.settings.staleThresholdDays ?? 14} days ago (file-system time, not when it was last opened). Not a reason to remove it.`">
+            Idle folder
           </SBadge>
 
           <!-- Diff stats badge -->
@@ -467,6 +468,13 @@ async function handleOpenAll() {
             <span>{{ diffStats.files_changed }} file{{ diffStats.files_changed === 1 ? '' : 's' }}</span>,&#32;
             <span class="text-success">+{{ diffStats.lines_added }}</span><span class="text-text-muted">/</span><span class="text-danger">-{{ diffStats.lines_removed }}</span>
           </SBadge>
+          <SBadge v-else-if="diffEntry?.error"
+            variant="default"
+            class="compact-badge text-text-muted"
+            data-testid="diff-stats-unknown"
+            :title="`Changes against ${baseBranch || 'the base'} could not be checked: ${diffEntry.error}`">
+            Diff unknown
+          </SBadge>
 
           <span class="text-text-muted text-[11px] font-mono truncate" :title="worktree.path">
             {{ shortPath }}
@@ -474,7 +482,7 @@ async function handleOpenAll() {
 
           <!-- Phase 2: Age display -->
           <span v-if="worktree.lastAccessed" class="text-text-muted text-[11px] flex-shrink-0"
-            :title="`Last accessed: ${ageDisplay.full}`">
+            :title="`Folder last modified: ${ageDisplay.full}`">
             {{ ageDisplay.short }}
           </span>
         </div>

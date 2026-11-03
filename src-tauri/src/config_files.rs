@@ -151,7 +151,12 @@ fn is_sensitive_key(key: &str) -> bool {
 /// Get the path to the global config file (~/.groverc).
 pub fn get_global_config_path() -> Result<PathBuf, WtError> {
     let home = get_home_dir()?;
-    Ok(home.join(".groverc"))
+    Ok(selected_global_path(&home, std::env::var_os("GROVE_CONFIG")))
+}
+
+fn selected_global_path(home: &std::path::Path, selected: Option<std::ffi::OsString>) -> PathBuf {
+    selected.filter(|value| !value.is_empty()).map(PathBuf::from)
+        .unwrap_or_else(|| home.join(".groverc"))
 }
 
 /// Get the path to the project config file ($HERD_ROOT/.groveconfig).
@@ -552,7 +557,8 @@ pub fn update_config_keys(
 ///   DB_USER               → database.user
 ///   GROVE_URL_SUBDOMAIN   → url_subdomain
 ///   HERD_ROOT             → herd_root
-pub fn apply_config_entries(config: &mut crate::types::Config, entries: &[ConfigEntry]) {
+#[cfg(test)]
+fn apply_config_entries(config: &mut crate::types::Config, entries: &[ConfigEntry]) {
     for entry in entries {
         // Skip commented-out entries — they don't contribute to resolved config
         if entry.commented {
@@ -603,46 +609,9 @@ pub fn apply_config_entries(config: &mut crate::types::Config, entries: &[Config
 }
 
 /// Parse a string as a boolean (true/1/yes → true, everything else → false).
+#[cfg(test)]
 fn parse_bool(value: &str) -> bool {
     matches!(value.to_lowercase().as_str(), "true" | "1" | "yes")
-}
-
-/// Read all config layers and overlay entries onto a Config struct.
-///
-/// Reads global, project (if herd_root available), and repo (if repo_name provided)
-/// config files in order, applying non-commented entries from each layer.
-/// Later layers override earlier ones, matching the CLI's own precedence:
-/// global → project → repo.
-pub fn apply_all_config_layers(
-    config: &mut crate::types::Config,
-    repo_name: Option<&str>,
-) -> Result<(), WtError> {
-    log::debug!("Resolving config layers (repo: {:?})", repo_name);
-    let herd_root = config.herd_root.clone();
-
-    // Layer 1: Global (~/.groverc)
-    if let Ok(global) = read_config_file(ConfigLayer::Global, None, None) {
-        log::debug!("Applied {} global config entries", global.entries.len());
-        apply_config_entries(config, &global.entries);
-    }
-
-    // Layer 2: Project ($HERD_ROOT/.groveconfig)
-    if let Some(ref herd) = herd_root {
-        if let Ok(project) = read_config_file(ConfigLayer::Project, Some(herd), None) {
-            log::debug!("Applied {} project config entries", project.entries.len());
-            apply_config_entries(config, &project.entries);
-        }
-    }
-
-    // Layer 3: Repo ($HERD_ROOT/<repo>.git/.groveconfig)
-    if let (Some(ref herd), Some(repo)) = (&herd_root, repo_name) {
-        if let Ok(repo_cfg) = read_config_file(ConfigLayer::Repo, Some(herd), Some(repo)) {
-            log::debug!("Applied {} repo config entries for '{}'", repo_cfg.entries.len(), repo);
-            apply_config_entries(config, &repo_cfg.entries);
-        }
-    }
-
-    Ok(())
 }
 
 // ============================================================================
@@ -652,6 +621,14 @@ pub fn apply_all_config_layers(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn selected_config_file_is_the_edit_target() {
+        let home = std::path::Path::new("/fixture/home");
+        assert_eq!(selected_global_path(home, Some("/fixture/selected.rc".into())), PathBuf::from("/fixture/selected.rc"));
+        assert_eq!(selected_global_path(home, None), home.join(".groverc"));
+        assert_eq!(selected_global_path(home, Some("".into())), home.join(".groverc"));
+    }
 
     #[test]
     fn test_parse_config_simple() {

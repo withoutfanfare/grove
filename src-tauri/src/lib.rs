@@ -3,12 +3,15 @@
 // This library provides the Rust backend for Grove.
 // It bridges the Vue frontend to the grove CLI tool via Tauri IPC commands.
 
+mod build_info;
 mod commands;
 mod config_files;
 mod fs_safety;
 mod hooks_fs;
 mod operation_state;
+mod process_runner;
 mod tray;
+mod trust_commands;
 mod types;
 mod watcher;
 mod wt;
@@ -184,6 +187,10 @@ pub fn run() {
             // Context menus
             show_worktree_context_menu,
             // Auto-updater
+            trust_commands::get_prune_plan,
+            trust_commands::prune_repo_confirmed,
+            trust_commands::get_removal_preflight,
+            build_info::get_build_info,
             updater::check_for_update,
             updater::get_app_version,
         ])

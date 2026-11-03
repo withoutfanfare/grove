@@ -2,6 +2,7 @@ import { ref } from 'vue';
 import { useWorktreeStore, useSettingsStore } from '../stores';
 import { useWt } from './useWt';
 import { useNotifications } from './useNotifications';
+import { recordActivity } from './useActivity';
 import type {
   CreateWorktreeOptions,
   CreateWorktreeResponse,
@@ -11,9 +12,9 @@ import type {
   SyncResult,
   BranchesResult,
   HealthResult,
-  PruneResult,
   PullAllResult,
   RemoveSelectedResult,
+  WtError,
 } from '../types';
 
 // Debounce delay for refresh operations (prevents UI flickering, reduced from 300ms)
@@ -133,7 +134,10 @@ export function useWorktrees() {
       // (e.g. a mutation that just landed), so joining alone could leave the
       // UI stale. Flag one trailing silent refresh to run after it settles.
       rerunRequested.add(repoName);
-      return inFlight;
+      await inFlight;
+      const trailing = inFlightFetches.get(repoName);
+      if (trailing) await trailing;
+      return;
     }
     const run = doFetchWorktrees(repoName, opts).finally(() => {
       inFlightFetches.delete(repoName);
@@ -180,11 +184,16 @@ export function useWorktrees() {
         }
 
         store.setWorktrees(worktrees);
+        store.observedAt[repoName] = Date.now();
       } catch (error) {
+        if (expectedFetchId.get(repoName) === fetchId) {
+          store.refreshErrors[repoName] = wt.toWtError(error).message;
+          store.refreshFailedAt[repoName] = Date.now();
+        }
         // C2 Fix: Only set error if this is still the active fetch.
         // Silent revalidation must never surface an error banner over the
         // usable cached list (plan item 4 risk note) — a transient background
-        // fetch failure leaves the cached worktrees untouched and unannounced.
+        // fetch failure keeps the cached rows, with a freshness warning in the toolbar.
         if (!opts?.silent && expectedFetchId.get(repoName) === fetchId && store.selectedRepoName === repoName) {
           const wtError = wt.toWtError(error);
           store.setError({
@@ -383,12 +392,16 @@ export function useWorktrees() {
 
     try {
       const response = await wt.createWorktree(options);
+      const failedHooks = (response.hooks ?? []).filter((h) => h.status === 'failed').map((h) => `Hook ${h.name} failed`);
+      recordActivity({ action: 'Create worktree', repo: options.repo, target: response.result?.path || options.branch, status: failedHooks.length ? 'partial' : 'succeeded', warnings: failedHooks });
       // Refresh the worktree list after creation
-      await fetchWorktrees();
+      await fetchWorktreesInternal(options.repo);
       scheduleTrayRefresh();
       return response;
     } catch (error) {
-      store.setError(wt.toWtError(error));
+      const wtError = wt.toWtError(error);
+      recordActivity({ action: 'Create worktree', repo: options.repo, target: options.branch, status: 'failed', details: wtError.message });
+      store.setError(wtError);
       return null;
     } finally {
       store.setLoadingWorktrees(false);
@@ -405,12 +418,32 @@ export function useWorktrees() {
 
     try {
       const response = await wt.removeWorktree(options);
+      if (response.result?.success) {
+        reconcileRemovedTargets(options.repo, [response.result.path || options.branch]);
+      }
+      recordActivity({
+        action: 'Delete worktree',
+        repo: options.repo,
+        target: `${response.result?.path || options.branch}${options.branch ? ` (branch ${options.branch})` : ''}`,
+        status: !response.result?.success ? 'failed' : (response.hooks ?? []).some((h) => h.status === 'failed') ? 'partial' : 'succeeded',
+        warnings: [
+          ...(response.hooks ?? []).filter((h) => h.status === 'failed').map((h) => `Hook ${h.name} failed after the worktree was removed`),
+          ...(response.result?.db_drop_requested ? ['Database drop was requested from hooks; Grove did not confirm it happened'] : []),
+          ...(options.deleteBranch && response.result?.success && !response.result.branch_deleted ? ['Branch was kept: Git did not delete it'] : []),
+        ],
+        details: response.result?.branch_deleted ? 'Branch deleted' : 'Branch kept',
+      });
       // Refresh the worktree list after removal
-      await fetchWorktrees();
+      await fetchWorktreesInternal(options.repo);
       scheduleTrayRefresh();
       return response;
     } catch (error) {
-      store.setError(wt.toWtError(error));
+      const wtError = wt.toWtError(error);
+      if (wtError.code === 'WORKTREE_NOT_FOUND') {
+        reconcileRemovedTargets(options.repo, [options.branch]);
+      }
+      recordActivity({ action: 'Delete worktree', repo: options.repo, target: options.branch, status: 'failed', details: wtError.message });
+      store.setError(wtError);
       return null;
     } finally {
       store.setLoadingWorktrees(false);
@@ -425,12 +458,15 @@ export function useWorktrees() {
     setWorktreeOperation(repo, branch, 'pulling');
     try {
       const result = await wt.pullWorktree(repo, branch);
+      recordActivity({ action: 'Pull', repo, target: branch, status: result.success && !result.conflicts ? 'succeeded' : 'failed', details: result.message });
       // Refresh the worktree list to update status
       await fetchWorktrees();
       scheduleTrayRefresh();
       return result;
     } catch (error) {
-      store.setError(wt.toWtError(error));
+      const wtError = wt.toWtError(error);
+      recordActivity({ action: 'Pull', repo, target: branch, status: 'failed', details: wtError.message });
+      store.setError(wtError);
       return null;
     } finally {
       setWorktreeOperation(repo, branch, 'idle');
@@ -445,12 +481,15 @@ export function useWorktrees() {
     setWorktreeOperation(repo, branch, 'syncing');
     try {
       const result = await wt.syncWorktree(repo, branch);
+      recordActivity({ action: `Sync onto ${result.base}`, repo, target: branch, status: result.success && !result.conflicts ? 'succeeded' : 'failed', details: result.message });
       // Refresh the worktree list to update status
       await fetchWorktrees();
       scheduleTrayRefresh();
       return result;
     } catch (error) {
-      store.setError(wt.toWtError(error));
+      const wtError = wt.toWtError(error);
+      recordActivity({ action: 'Sync', repo, target: branch, status: 'failed', details: wtError.message });
+      store.setError(wtError);
       return null;
     } finally {
       setWorktreeOperation(repo, branch, 'idle');
@@ -488,33 +527,13 @@ export function useWorktrees() {
   }
 
   /**
-   * Prune stale worktree refs and merged branches
-   * Returns the prune result on success, null on failure
-   */
-  async function pruneRepo(repoName: string, force?: boolean): Promise<PruneResult | null> {
-    try {
-      const result = await wt.pruneRepo(repoName, force);
-      // Refresh the worktree list after pruning
-      await fetchWorktrees();
-      scheduleTrayRefresh();
-      // Notify if window not focused
-      if (result?.summary) {
-        notifications.notifyPruneComplete(result.summary.branches_deleted, repoName);
-      }
-      return result;
-    } catch (error) {
-      store.setError(wt.toWtError(error));
-      return null;
-    }
-  }
-
-  /**
    * Pull all worktrees in a repository
    * Returns the pull-all result on success, null on failure
    */
-  async function pullAllWorktrees(repoName: string): Promise<PullAllResult | null> {
+  async function pullAllWorktrees(repoName: string, operationId?: string): Promise<PullAllResult | null> {
     try {
-      const result = await wt.pullAllWorktrees(repoName);
+      const result = await wt.pullAllWorktrees(repoName, operationId);
+      recordBatch('Pull all', repoName, result.worktrees.map((w) => ({ target: w.branch, ok: w.success, message: w.message })));
       // Refresh the worktree list after pulling all (debounced to prevent flicker)
       fetchWorktreesDebounced();
       scheduleTrayRefresh();
@@ -524,7 +543,9 @@ export function useWorktrees() {
       }
       return result;
     } catch (error) {
-      store.setError(wt.toWtError(error));
+      const wtError = operationError(wt.toWtError(error));
+      recordActivity({ action: 'Pull all', repo: repoName, target: 'repository', status: 'failed', details: wtError.message });
+      store.setError(wtError);
       return null;
     }
   }
@@ -533,15 +554,18 @@ export function useWorktrees() {
    * Pull selected worktrees in a repository (for retry functionality)
    * Returns the pull-all result on success, null on failure
    */
-  async function pullSelectedWorktrees(repoName: string, branches: string[]): Promise<PullAllResult | null> {
+  async function pullSelectedWorktrees(repoName: string, branches: string[], operationId?: string): Promise<PullAllResult | null> {
     try {
-      const result = await wt.pullSelectedWorktrees(repoName, branches);
+      const result = await wt.pullSelectedWorktrees(repoName, branches, operationId);
+      recordBatch('Pull selected', repoName, result.worktrees.map((w) => ({ target: w.branch, ok: w.success, message: w.message })), branches);
       // Refresh the worktree list after pulling (debounced to prevent flicker)
       fetchWorktreesDebounced();
       scheduleTrayRefresh();
       return result;
     } catch (error) {
-      store.setError(wt.toWtError(error));
+      const wtError = operationError(wt.toWtError(error));
+      recordActivity({ action: 'Pull selected', repo: repoName, target: 'repository', status: 'failed', details: wtError.message });
+      store.setError(wtError);
       return null;
     }
   }
@@ -553,18 +577,61 @@ export function useWorktrees() {
   async function removeSelectedWorktrees(
     repoName: string,
     branches: string[],
-    options: { deleteBranch: boolean; dropDb: boolean; skipBackup: boolean }
+    options: { deleteBranch: boolean; dropDb: boolean; skipBackup: boolean },
+    operationId?: string
   ): Promise<RemoveSelectedResult | null> {
     try {
-      const result = await wt.removeSelectedWorktrees(repoName, branches, options);
+      const result = await wt.removeSelectedWorktrees(repoName, branches, options, operationId);
+      recordBatch('Delete worktrees', repoName, result.worktrees.map((w) => ({
+        target: w.branch,
+        ok: w.success,
+        message: `${w.message}${w.success ? (w.branch_deleted ? ' (branch deleted)' : ' (branch kept)') : ''}`,
+      })), branches);
+      reconcileRemovedTargets(repoName, result.worktrees
+        .filter(item => item.success || item.error_code === 'WORKTREE_NOT_FOUND')
+        .map(item => item.branch));
       // Refresh after batch removal (debounced to prevent flicker)
       fetchWorktreesDebounced();
       scheduleTrayRefresh();
       return result;
     } catch (error) {
-      store.setError(wt.toWtError(error));
+      const wtError = operationError(wt.toWtError(error));
+      recordActivity({ action: 'Delete worktrees', repo: repoName, target: 'repository', status: 'failed', details: wtError.message });
+      store.setError(wtError);
       return null;
     }
+  }
+
+  /** A second batch while one runs is refused by the backend; say so plainly */
+  function operationError(error: WtError): WtError {
+    return error.code === 'OPERATION_BUSY'
+      ? { ...error, message: `Another operation is still running. Wait for it to finish, then try again. (${error.message})` }
+      : error;
+  }
+
+    /** One receipt per batch; items the backend never reached are listed as not started */
+  function recordBatch(action: string, repo: string, items: { target: string; ok: boolean; message: string }[], requested: string[] = []) {
+    const reached = new Set(items.map((i) => i.target));
+    // This sentinel is the backend's explicit cancellation outcome, also used by its summary.
+    const cancelled = (item: { message: string }) => item.message === 'Operation cancelled';
+    const notStarted = [...new Set([...requested.filter((t) => !reached.has(t)), ...items.filter(cancelled).map((i) => i.target)])];
+    const failed = items.filter((i) => !i.ok && !cancelled(i)).length;
+    const succeeded = items.filter((i) => i.ok).length;
+    recordActivity({
+      action,
+      repo,
+      target: `${requested.length || items.length} worktree(s)`,
+      status: notStarted.length ? 'cancelled' : failed === 0 ? 'succeeded' : succeeded === 0 ? 'failed' : 'partial',
+      warnings: notStarted.length ? [`${notStarted.length} not started: ${notStarted.join(', ')}`] : [],
+      details: items.map((i) => `${cancelled(i) ? 'NOT STARTED' : i.ok ? 'OK' : 'FAILED'}  ${i.target}: ${i.message}`).join('\n'),
+    });
+  }
+
+  function reconcileRemovedTargets(repoName: string, targets: string[]) {
+    if (targets.length === 0) return;
+    // A listing captured before removal must not restore these rows afterwards.
+    expectedFetchId.set(repoName, ++globalFetchId);
+    store.removeWorktreeTargets(repoName, targets);
   }
 
   // ============================================================================
@@ -575,9 +642,9 @@ export function useWorktrees() {
    * Cancel the current long-running operation.
    * This signals the backend to stop processing remaining items.
    */
-  async function cancelOperation(): Promise<void> {
+  async function cancelOperation(operationId: string): Promise<void> {
     try {
-      await wt.cancelOperation();
+      await wt.cancelOperation(operationId);
     } catch (error) {
       // Log but don't set error - cancellation failure is not critical
       console.warn('Failed to cancel operation:', error);
@@ -623,12 +690,12 @@ export function useWorktrees() {
     openAll,
     createWorktree,
     removeWorktree,
+    reconcileRemovedTargets,
     pullWorktree,
     syncWorktree,
     // Phase 3: Branches, Health, Prune, Pull-All
     listBranches,
     getRepoHealth,
-    pruneRepo,
     pullAllWorktrees,
     pullSelectedWorktrees,
     removeSelectedWorktrees,

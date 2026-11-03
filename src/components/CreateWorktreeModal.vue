@@ -121,8 +121,7 @@ async function handleFetchPr() {
     prTitle.value = result.title
     toast.success(`PR #${num}: ${result.headRefName}`)
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    prError.value = msg
+    prError.value = useWt().toWtError(e).message
     toast.error(`Failed to fetch PR #${num}`)
   } finally {
     loadingPr.value = false
@@ -319,7 +318,7 @@ async function handleSubmit() {
       phase.value = 'form'
     }
   } catch (e) {
-    const errorMessage = e instanceof Error ? e.message : 'Failed to create worktree'
+    const errorMessage = useWt().toWtError(e).message
     error.value = errorMessage
     toast.error(errorMessage)
     phase.value = 'form'

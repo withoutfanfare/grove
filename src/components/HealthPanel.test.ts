@@ -159,3 +159,21 @@ describe('HealthPanel', () => {
     wrapper.unmount()
   })
 })
+
+describe('HealthPanel errors', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    resetTauriMocks()
+  })
+
+  it('keeps the real reason from a plain {code, message} rejection', async () => {
+    mockTauriInvoke.mockImplementation((command: string) =>
+      command === 'get_repo_health'
+        ? Promise.reject({ code: 'GIT_ERROR', message: "fatal: Unable to create '.git/index.lock': File exists" })
+        : Promise.resolve([])
+    )
+    const wrapper = await mountOpenPanel()
+    expect(wrapper.text()).toContain('index.lock')
+    expect(wrapper.text()).not.toContain('may not have any worktrees')
+  })
+})

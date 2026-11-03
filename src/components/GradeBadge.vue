@@ -34,8 +34,11 @@ const gradeClass = computed(() => {
 
 const gradeLabel = computed(() => props.grade ?? '-')
 
+// '?' means the CLI could not score the worktree; its placeholder 0 is not a real score
+const isUnknown = computed(() => props.grade === '?')
+
 const scoreLabel = computed(() => {
-  if (props.score !== undefined && props.score !== null) {
+  if (!isUnknown.value && props.score !== undefined && props.score !== null) {
     return props.score.toString()
   }
   return null
@@ -52,7 +55,7 @@ const scoreLabel = computed(() => {
       'text-[11px] font-semibold rounded',
       'transition-all duration-150',
     ]"
-    :title="scoreLabel ? `Health score: ${scoreLabel}/100` : `Health grade: ${gradeLabel}`"
+    :title="isUnknown ? 'Health unknown: the CLI could not score this worktree' : scoreLabel ? `Health score: ${scoreLabel}/100` : `Health grade: ${gradeLabel}`"
   >
     <!-- Grade letter with subtle icon -->
     <span class="font-bold tracking-tight">{{ gradeLabel }}</span>

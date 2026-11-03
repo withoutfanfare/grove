@@ -1,7 +1,7 @@
 import { ref, computed, watch, onUnmounted, type Ref, type ComputedRef } from 'vue';
 import { useWindowFocus, useTimestamp, useThrottleFn } from '@vueuse/core';
 import { useWorktreeStore } from '../stores';
-import { useWt } from './useWt';
+import { useWorktrees } from './useWorktrees';
 
 /**
  * Auto-refresh interval when user is active (60 seconds).
@@ -90,7 +90,7 @@ export type UseAutoRefreshReturn = AutoRefreshState & AutoRefreshControls;
  */
 export function useAutoRefresh(): UseAutoRefreshReturn {
   const store = useWorktreeStore();
-  const wt = useWt();
+  const { fetchWorktrees } = useWorktrees();
 
   // State
   const isEnabled = ref(false);
@@ -110,17 +110,22 @@ export function useAutoRefresh(): UseAutoRefreshReturn {
   // Track activity event listener cleanup
   let activityCleanup: (() => void) | null = null;
 
+  // When the selected repository's list was last loaded successfully, by any path
+  const observedTime = computed<number | null>(() =>
+    store.selectedRepoName ? store.observedAt[store.selectedRepoName] ?? null : lastRefreshTime.value
+  );
+
   // Computed: is data stale?
   const isStale = computed<boolean>(() => {
-    if (lastRefreshTime.value === null) return true;
-    return currentTimestamp.value - lastRefreshTime.value > STALE_THRESHOLD_MS;
+    if (observedTime.value === null) return true;
+    return currentTimestamp.value - observedTime.value > STALE_THRESHOLD_MS;
   });
 
   // Computed: human-readable last updated text
   const lastUpdatedText = computed<string>(() => {
-    if (lastRefreshTime.value === null) return 'Never updated';
+    if (observedTime.value === null) return 'Never updated';
 
-    const elapsed = currentTimestamp.value - lastRefreshTime.value;
+    const elapsed = currentTimestamp.value - observedTime.value;
 
     if (elapsed < 5000) return 'Updated just now';
     if (elapsed < 60000) {
@@ -212,11 +217,8 @@ export function useAutoRefresh(): UseAutoRefreshReturn {
     isRefreshing.value = true;
 
     try {
-      // get_worktree_status and list_worktrees run the identical CLI command,
-      // so there is no fallback here — a failed refresh just logs and waits
-      // for the next tick (no error spam during background refreshes).
       try {
-        const worktrees = await wt.getWorktreeStatus(repoName);
+        await fetchWorktrees({ silent: true });
 
         // Guard against stale responses if repo changed during await
         if (store.selectedRepoName !== repoName) {
@@ -224,8 +226,7 @@ export function useAutoRefresh(): UseAutoRefreshReturn {
           return;
         }
 
-        store.setWorktrees(worktrees);
-        lastRefreshTime.value = Date.now();
+        if (!store.refreshErrors[repoName]) lastRefreshTime.value = Date.now();
       } catch (error) {
         console.warn('[useAutoRefresh] Refresh failed:', error);
       }

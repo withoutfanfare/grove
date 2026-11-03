@@ -1,50 +1,24 @@
 #!/bin/bash
-# Prepare grove CLI as a sidecar binary for Tauri bundling
-#
-# This script copies the grove CLI binary from the grove-cli repository to the
-# src-tauri/binaries directory with the correct target triple suffix required
-# by Tauri's sidecar system.
-#
-# Usage:
-#   ./scripts/prepare-sidecar.sh
-#
-# Prerequisites:
-#   - The grove CLI must be built in the grove-cli directory (run ../grove-cli/build.sh first)
-#   - Rust must be installed (to get the target triple)
-
-set -e
-
-# Get the directory where this script lives
+# Bundle exactly the reviewed CLI input recorded in sidecar.lock.json.
+set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-
-# Get the current platform's target triple
 TARGET=$(rustc --print host-tuple 2>/dev/null || rustc -vV | sed -n 's/host: //p')
-
-if [ -z "$TARGET" ]; then
-    echo "Error: Could not determine target triple. Is Rust installed?"
-    exit 1
-fi
-
-# Path to the grove CLI. GROVE_CLI_SOURCE overrides the sibling-checkout
-# default — needed when building from a git worktree, where ../grove-cli
-# does not resolve.
+[ -n "$TARGET" ] || { echo 'Could not determine Rust target'; exit 1; }
 GROVE_SOURCE="${GROVE_CLI_SOURCE:-$PROJECT_ROOT/../grove-cli/grove}"
-
-if [ ! -f "$GROVE_SOURCE" ]; then
-    echo "Error: grove CLI not found at $GROVE_SOURCE"
-    echo "Please build the grove CLI first by running: cd ../grove-cli && ./build.sh"
-    exit 1
-fi
-
-# Create binaries directory
+PIN="$PROJECT_ROOT/src-tauri/sidecar.lock.json"
+[ -f "$GROVE_SOURCE" ] || { echo 'Build the pinned grove-cli checkout first, or set GROVE_CLI_SOURCE'; exit 1; }
+python3 - "$GROVE_SOURCE" "$PIN" <<'PY'
+import hashlib,json,sys
+source,pin=sys.argv[1:]
+expected=json.load(open(pin))
+actual=hashlib.sha256(open(source,'rb').read()).hexdigest()
+if actual != expected['sha256']:
+    raise SystemExit('CLI digest differs from sidecar.lock.json; review and pin the intended CLI before bundling')
+print('Verified CLI sha256 '+actual+' at revision '+expected['revision'])
+PY
 BINARIES_DIR="$PROJECT_ROOT/src-tauri/binaries"
 mkdir -p "$BINARIES_DIR"
-
-# Copy with target triple suffix
-DEST="$BINARIES_DIR/grove-$TARGET"
-cp "$GROVE_SOURCE" "$DEST"
-chmod +x "$DEST"
-
-echo "Prepared sidecar binary: grove-$TARGET"
-echo "Location: $DEST"
+cp "$GROVE_SOURCE" "$BINARIES_DIR/grove-$TARGET"
+chmod +x "$BINARIES_DIR/grove-$TARGET"
+echo "Prepared pinned sidecar: grove-$TARGET"

@@ -8,7 +8,7 @@
  * start/stop/restart actions.
  */
 import { ref, watch, onUnmounted } from 'vue'
-import { useWt, useToast } from '../composables'
+import { useWt, useToast, recordActivity } from '../composables'
 import { useServicesStore } from '../stores'
 import type { ServiceAction, ServiceApp } from '../types'
 import { SPanel, SButton, SSkeleton, SSectionHeader } from '@stuntrocket/ui'
@@ -35,7 +35,7 @@ async function fetchStatus(silent = false) {
     const result = await wtApi.listServicesStatus()
     store.setStatus(result)
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'An unexpected error occurred while fetching service status'
+    error.value = wtApi.toWtError(e).message
   }
 
   store.setLoading(false)
@@ -71,10 +71,14 @@ async function runAction(app: ServiceApp, action: ServiceAction) {
   store.setActionPending(app.name, true)
   try {
     await wtApi.runServiceAction(app.name, action)
+    recordActivity({ action: `Service ${action}`, repo: app.name, target: app.name, status: 'succeeded' })
     toast.success(`${actionLabel(action)} ${app.name}`)
     await fetchStatus(true)
   } catch (e) {
     toast.error(`${app.name}: ${wtApi.toWtError(e).message}`)
+    recordActivity({ action: `Service ${action}`, repo: app.name, target: app.name, status: 'failed', details: wtApi.toWtError(e).message })
+    // A failed action can still have stopped some services: show what is really running.
+    await fetchStatus(true)
   } finally {
     store.setActionPending(app.name, false)
   }
@@ -148,11 +152,15 @@ async function applySwitch(app: ServiceApp) {
   store.setActionPending(app.name, true)
   try {
     await wtApi.switchServiceWorktree(app.name, target)
+    recordActivity({ action: 'Switch served worktree', repo: app.name, target, status: 'succeeded' })
     toast.success(`Switched ${app.name} to ${target}`)
     closeSwitcher()
     await fetchStatus(true)
   } catch (e) {
     toast.error(`${app.name}: ${wtApi.toWtError(e).message}`)
+    recordActivity({ action: 'Switch served worktree', repo: app.name, target, status: 'failed', details: wtApi.toWtError(e).message })
+    // A later step can fail after services stopped or the link moved: show the real state.
+    await fetchStatus(true)
   } finally {
     store.setActionPending(app.name, false)
   }
@@ -236,7 +244,7 @@ function handleClose() {
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        <p class="text-danger text-sm">{{ error }}</p>
+        <p class="text-danger text-sm whitespace-pre-wrap">{{ error }}</p>
       </div>
     </div>
 

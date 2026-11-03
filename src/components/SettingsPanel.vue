@@ -9,7 +9,9 @@ import { ref, watch, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useSettingsStore, EDITOR_OPTIONS, TERMINAL_OPTIONS, GIT_CLIENT_OPTIONS } from '../stores'
 import type { EditorChoice, TerminalChoice, GitClientChoice } from '../stores'
-import { useUpdater } from '../composables'
+import { useUpdater, useWt, useToast, redact, formatRelativeTime } from '../composables'
+import type { BuildInfo } from '../types'
+import { copyToClipboard } from '../utils/clipboard'
 import { SPanel, SButton, SInput, SSelect, SToggle, SSectionHeader, SDivider } from '@stuntrocket/ui'
 
 const props = defineProps<{
@@ -36,7 +38,60 @@ const staleThresholdDays = ref(settings.value.staleThresholdDays)
 const trayBadgeEnabled = ref(settings.value.trayBadgeEnabled)
 const autoCheckUpdates = ref(settings.value.autoCheckUpdates)
 
-const { status: updateStatus, currentVersion, checkForUpdate } = useUpdater()
+const { status: updateStatus, currentVersion, checkForUpdate, errorMessage: updateError, lastCheckedAt } = useUpdater()
+const wtApi = useWt()
+const { toast } = useToast()
+
+// About: exact build identity, so two builds with the same version can be told apart
+const buildInfo = ref<BuildInfo | null>(null)
+const buildInfoError = ref<string | null>(null)
+
+async function loadBuildInfo() {
+  try {
+    buildInfo.value = await wtApi.getBuildInfo()
+    buildInfoError.value = null
+  } catch (e) {
+    buildInfo.value = null
+    buildInfoError.value = wtApi.toWtError(e).message
+  }
+}
+
+const aboutRows = computed(() => {
+  const b = buildInfo.value
+  return [
+    ['App version', b?.appVersion || currentVersion.value || 'Unknown'],
+    ['App revision', b?.appRevision || 'Unknown'],
+    ['Bundled CLI revision', b?.cliRevision || 'Unknown'],
+    ['Bundled CLI SHA-256', b?.cliSha256 || 'Unknown'],
+    ['Built', b?.builtAt || 'Unknown'],
+    ['Target', b?.target || 'Unknown'],
+    ['CLI protocol', b?.protocol || 'Unknown'],
+    ['CLI compatibility', b?.compatibility || 'Unknown'],
+  ] as const
+})
+
+const updateStatusText = computed(() => {
+  switch (updateStatus.value) {
+    case 'checking': return 'Checking…'
+    case 'up-to-date': return `No update available (checked ${formatRelativeTime(new Date(lastCheckedAt.value ?? Date.now()).toISOString()).full})`
+    case 'check-failed': return `Update check failed: ${updateError.value || 'unknown error'}`
+    case 'available': return 'An update is available'
+    default: return 'Not checked this session'
+  }
+})
+
+async function copyDiagnostics() {
+  const lines = [
+    'Grove diagnostics',
+    ...aboutRows.value.map(([label, value]) => `${label}: ${value}`),
+    `Update check: ${updateStatusText.value}`,
+    buildInfoError.value ? `Build info error: ${buildInfoError.value}` : '',
+    `User agent: ${navigator.userAgent}`,
+  ].filter(Boolean)
+  const result = await copyToClipboard(redact(lines.join('\n')))
+  if (result.success) toast.success('Diagnostics copied (home folder and secrets redacted)')
+  else toast.error('Failed to copy diagnostics')
+}
 
 // M6: Validation for custom editor path
 const customEditorPathError = computed(() => {
@@ -79,6 +134,7 @@ const isFormValid = computed(() => {
 // Reset local values when panel opens
 watch(() => props.isOpen, (open) => {
   if (open) {
+    void loadBuildInfo()
     editor.value = settings.value.editor
     customEditorPath.value = settings.value.customEditorPath
     terminal.value = settings.value.terminal
@@ -315,7 +371,7 @@ const gitClientDescription = computed(() => {
             <option :value="60">60 days</option>
           </select>
           <p class="mt-1 text-xs text-text-muted">
-            Mark worktrees as stale when not accessed within this period
+            Flag worktree folders as idle when not modified within this period (file-system time, not when last opened). Separate from the behind-base Stale badge.
           </p>
         </div>
 
@@ -342,6 +398,9 @@ const gitClientDescription = computed(() => {
           <div>
             <p class="text-sm text-text-secondary">Current version</p>
             <p class="text-xs text-text-muted">{{ currentVersion || 'Unknown' }}</p>
+            <p class="text-xs mt-0.5" :class="updateStatus === 'check-failed' ? 'text-warning' : 'text-text-muted'" data-testid="update-status">
+              {{ updateStatusText }}
+            </p>
           </div>
           <SButton
             variant="ghost"
@@ -349,9 +408,24 @@ const gitClientDescription = computed(() => {
             :disabled="updateStatus === 'checking'"
             @click="checkForUpdate"
           >
-            {{ updateStatus === 'checking' ? 'Checking...' : 'Check Now' }}
+            {{ updateStatus === 'checking' ? 'Checking...' : updateStatus === 'check-failed' ? 'Retry' : 'Check Now' }}
           </SButton>
         </div>
+      </section>
+
+      <SDivider />
+
+      <!-- About: build provenance -->
+      <section class="space-y-3" data-testid="about-section">
+        <SSectionHeader title="About" />
+        <dl class="space-y-1">
+          <div v-for="[label, value] in aboutRows" :key="label" class="flex justify-between gap-3 text-xs">
+            <dt class="text-text-muted flex-shrink-0">{{ label }}</dt>
+            <dd class="text-text-secondary font-mono truncate" :title="value">{{ value }}</dd>
+          </div>
+        </dl>
+        <p v-if="buildInfoError" class="text-xs text-warning">Build details unavailable: {{ buildInfoError }}</p>
+        <SButton variant="ghost" size="sm" @click="copyDiagnostics">Copy diagnostics</SButton>
       </section>
     </div>
 

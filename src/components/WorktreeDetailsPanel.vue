@@ -7,8 +7,10 @@
  */
 import { ref, watch, computed } from 'vue'
 import type { Worktree, Commit, FileChange, HealthGrade } from '../types'
-import { useWt, useToast } from '../composables'
+import { useWt, useToast, formatRelativeTime } from '../composables'
+import { useOverviewStore, useWorktreeStore } from '../stores'
 import { copyPath, copyUrl } from '../utils/clipboard'
+import { parseHealthIssueMessage } from '../utils/healthIssues'
 import CommitList from './CommitList.vue'
 import FileChangesList from './FileChangesList.vue'
 import GradeBadge from './GradeBadge.vue'
@@ -22,7 +24,9 @@ const props = defineProps<{
 
 // No emits needed - toggle is handled by parent card click
 
-const { getRecentCommits, getUncommittedFiles } = useWt()
+const { getRecentCommits, getUncommittedFiles, toWtError } = useWt()
+const overviewStore = useOverviewStore()
+const worktreeStore = useWorktreeStore()
 const { toast } = useToast()
 
 // State for commits
@@ -63,7 +67,7 @@ async function fetchCommits() {
     commits.value = result.commits
     commitsFetched.value = true
   } catch (e) {
-    commitsError.value = e instanceof Error ? e.message : 'Failed to fetch commits'
+    commitsError.value = toWtError(e).message
   } finally {
     commitsLoading.value = false
   }
@@ -78,7 +82,7 @@ async function fetchFiles() {
     files.value = result.files
     filesFetched.value = true
   } catch (e) {
-    filesError.value = e instanceof Error ? e.message : 'Failed to fetch file changes'
+    filesError.value = toWtError(e).message
   } finally {
     filesLoading.value = false
   }
@@ -119,50 +123,65 @@ async function handleCopyUrl() {
 const hasUrl = computed(() => Boolean(props.worktree.url))
 const fileCount = computed(() => files.value.length)
 
-// Health status explanations
+// Only the grade band is stated here; the reasons come from the CLI's own findings below.
 const healthExplanation = computed(() => {
   const grade = props.worktree.health_grade as HealthGrade | undefined
   if (!grade) return null
-
-  switch (grade) {
-    case 'A':
-      return 'Excellent health - worktree is clean and up to date'
-    case 'B':
-      return 'Good health - minor issues may need attention'
-    case 'C':
-      return 'Fair health - some issues should be addressed'
-    case 'D':
-      return 'Poor health - significant issues need attention'
-    case 'F':
-      return 'Critical health - immediate attention required'
-    default:
-      return null
-  }
+  if (grade === '?') return 'Health unknown: the CLI could not score this worktree.'
+  const score = props.worktree.health_score
+  return `Grade ${grade}${typeof score === 'number' ? `, score ${score}/100` : ''}, from the last list refresh.`
 })
 
-// Sync status explanation
+// Sync status explanation. A null count is an unknown comparison, never zero.
 const syncExplanation = computed(() => {
-  // ?? handles null (base ref unresolvable) as well as undefined
-  const { dirty } = props.worktree
-  const ahead = props.worktree.ahead ?? 0
-  const behind = props.worktree.behind ?? 0
-  const parts: string[] = []
+  const { dirty, ahead, behind } = props.worktree
+  const parts: string[] = [dirty ? 'Has uncommitted changes' : 'No uncommitted changes']
 
-  if (dirty) {
-    parts.push('Has uncommitted changes')
-  }
-  if (ahead > 0) {
-    parts.push(`${ahead} commit${ahead === 1 ? '' : 's'} ahead of remote`)
-  }
-  if (behind > 0) {
-    parts.push(`${behind} commit${behind === 1 ? '' : 's'} behind remote`)
+  if (ahead === null || behind === null) {
+    parts.push('Comparison with its upstream is unknown (none configured, or the check failed)')
+  } else if (ahead === 0 && behind === 0) {
+    parts.push('Level with its upstream as of the last fetch')
+  } else {
+    if (ahead > 0) parts.push(`${ahead} commit${ahead === 1 ? '' : 's'} ahead of its upstream`)
+    if (behind > 0) parts.push(`${behind} commit${behind === 1 ? '' : 's'} behind its upstream`)
   }
 
-  if (parts.length === 0) {
-    return 'Clean and synchronised with remote'
-  }
+  return `${parts.join('. ')}. Remote figures come from the last fetch, not a live check.`
+})
 
-  return parts.join('. ')
+// Evidence behind the Merged/Stale badges: exact base, commits and check time
+const short = (sha?: string) => (sha ? sha.slice(0, 7) : 'unknown')
+const comparisonFacts = computed(() => {
+  const w = props.worktree
+  const base = w.base_ref || 'the base branch'
+  const facts: { label: string; value: string }[] = []
+  if (w.merged === true) facts.push({ label: 'Merged', value: `Yes, by Git ancestry: ${short(w.head_sha || w.sha)} is contained in ${base} @ ${short(w.base_sha)}. This does not check the pull request or squash merges, and is not a removal safety check.` })
+  else if (w.merged === false) facts.push({ label: 'Merged', value: `No: ${short(w.head_sha || w.sha)} is not contained in ${base}${w.base_sha ? ` @ ${short(w.base_sha)}` : ''}. Squash or rebase merges also show here.` })
+  else if (w.merged === null) facts.push({ label: 'Merged', value: `Unknown: the ancestry check against ${base} failed.` })
+  if (typeof w.behind_base === 'number') {
+    const threshold = w.behind_threshold !== undefined ? ` (stale threshold ${w.behind_threshold})` : ''
+    facts.push({ label: 'Behind base', value: `${w.behind_base} commit${w.behind_base === 1 ? '' : 's'} behind ${base}${threshold}` })
+  } else if (w.behind_base === null || w.stale === null) {
+    facts.push({ label: 'Behind base', value: `Unknown: counting commits behind ${base} failed.` })
+  }
+  const remoteAt = worktreeStore.remoteFetchedAt[props.repoName]
+  facts.push({ label: 'Remote last fetched', value: remoteAt ? formatRelativeTime(new Date(remoteAt).toISOString()).full : 'Unknown; no successful fetch observed this session' })
+  const remoteError = worktreeStore.remoteFetchErrors[props.repoName]
+  if (remoteError) facts.push({ label: 'Latest fetch failed', value: remoteError })
+  if (w.checked_at) facts.push({ label: 'Checked', value: `${formatRelativeTime(w.checked_at).full} (local Git; remote refs as of the last fetch)` })
+  if (w.lastAccessed) facts.push({ label: 'Folder last modified', value: `${formatRelativeTime(w.lastAccessed).full} (file-system time, not when it was last opened)` })
+  return facts
+})
+
+// "Why this grade?": the repository health check's findings for this worktree
+const healthSnapshot = computed(() => overviewStore.snapshots[props.repoName])
+const gradeFindings = computed(() => {
+  const entry = healthSnapshot.value?.health?.worktrees.find((w) => w.branch === props.worktree.branch)
+  return entry ? entry.issues.flatMap(parseHealthIssueMessage) : null
+})
+const healthCheckedText = computed(() => {
+  const at = healthSnapshot.value?.healthCheckedAt
+  return at ? formatRelativeTime(new Date(at).toISOString()).full : null
 })
 </script>
 
@@ -258,6 +277,23 @@ const syncExplanation = computed(() => {
                 <p v-if="healthExplanation" class="text-xs text-text-muted mt-0.5">
                   {{ healthExplanation }}
                 </p>
+                <div v-if="gradeFindings" class="mt-2" data-testid="grade-findings">
+                  <p class="text-xs font-medium text-text-secondary">
+                    Why this grade?
+                    <span v-if="healthCheckedText" class="font-normal text-text-muted">(health check {{ healthCheckedText }})</span>
+                  </p>
+                  <ul v-if="gradeFindings.length" class="mt-1 space-y-1">
+                    <li v-for="finding in gradeFindings" :key="finding.raw" class="text-xs text-text-muted">
+                      <span class="text-text-secondary">{{ finding.title }}</span>
+                      <span v-if="finding.scoreImpact" class="tabular-nums"> ({{ finding.scoreImpact }})</span>
+                      — {{ finding.explanation }}
+                    </li>
+                  </ul>
+                  <p v-else class="text-xs text-text-muted mt-1">The last health check found no issues.</p>
+                </div>
+                <p v-else class="text-xs text-text-muted mt-1">
+                  Open the Health panel to see the findings behind this grade.
+                </p>
               </div>
             </div>
 
@@ -292,6 +328,17 @@ const syncExplanation = computed(() => {
                 </p>
               </div>
             </div>
+          </section>
+
+          <!-- Stale / merged evidence -->
+          <section v-if="comparisonFacts.length" class="space-y-2" data-testid="comparison-facts">
+            <SSectionHeader title="Base comparison" />
+            <dl class="space-y-1 p-3 rounded-lg bg-surface-overlay/50">
+              <div v-for="fact in comparisonFacts" :key="fact.label" class="text-xs">
+                <dt class="inline text-text-secondary">{{ fact.label }}:</dt>
+                <dd class="inline text-text-muted"> {{ fact.value }}</dd>
+              </div>
+            </dl>
           </section>
 
           <!-- Recent Commits -->

@@ -8,12 +8,14 @@
  * via the shared OperationProgressPanel.
  */
 import { ref, computed, watch } from 'vue'
-import type { Worktree } from '../types'
+import type { Worktree, CheckState } from '../types'
 import { SButton, SModal, SCheckbox } from '@stuntrocket/ui'
+import { useWt } from '../composables'
 
 const props = defineProps<{
   isOpen: boolean
   worktrees: Worktree[]
+  repoName: string
 }>()
 
 const emit = defineEmits<{
@@ -21,26 +23,69 @@ const emit = defineEmits<{
   confirm: [options: { deleteBranch: boolean; dropDb: boolean; skipBackup: boolean }]
 }>()
 
-const deleteBranch = ref(true)
+const deleteBranch = ref(false)
 const dropDatabase = ref(false)
 const skipBackup = ref(false)
 
 const count = computed(() => props.worktrees.length)
 const dirtyWorktrees = computed(() => props.worktrees.filter((w) => w.dirty))
 
+// Read-only preflight per worktree (the same gate rm re-runs); anything not "clear" blocks the batch.
+const wtApi = useWt()
+const verdicts = ref<Record<string, { state: CheckState; reason: string }>>({})
+const checking = ref(false)
+let run = 0
+
+const target = (w: Worktree) => w.branch || w.path
+const notClear = computed(() =>
+  props.worktrees.filter((w) => verdicts.value[target(w)]?.state !== 'clear').map((w) => ({
+    name: w.branch || w.path,
+    reason: verdicts.value[target(w)]?.reason ?? 'not checked',
+  }))
+)
+const canConfirm = computed(() => !checking.value && props.worktrees.length > 0 && notClear.value.length === 0)
+
+async function runPreflight() {
+  const current = ++run
+  checking.value = true
+  const next: typeof verdicts.value = {}
+  for (const w of props.worktrees) {
+    try {
+      const result = await wtApi.getRemovalPreflight(props.repoName, target(w), deleteBranch.value, dropDatabase.value)
+      const failing = result?.checks.filter((c) => c.state !== 'clear').map((c) => c.message).join('; ')
+      next[target(w)] = result
+        ? { state: result.verdict, reason: failing || result.verdict }
+        : { state: 'unknown', reason: 'the safety check returned no result' }
+    } catch (e) {
+      next[target(w)] = { state: 'unknown', reason: `safety check unavailable: ${wtApi.toWtError(e).message}` }
+    }
+    if (current !== run) return
+  }
+  verdicts.value = next
+  checking.value = false
+}
+
+watch([deleteBranch, dropDatabase], () => {
+  if (props.isOpen) void runPreflight()
+})
+
 // Reset options each time the dialog opens
 watch(
   () => props.isOpen,
   (open) => {
     if (open) {
-      deleteBranch.value = true
+      // Keep branches unless asked: deleting them is a separate, unrecoverable choice.
+      deleteBranch.value = false
       dropDatabase.value = false
       skipBackup.value = false
+      void runPreflight()
     }
-  }
+  },
+  { immediate: true }
 )
 
 function handleConfirm() {
+  if (!canConfirm.value) return
   emit('confirm', {
     deleteBranch: deleteBranch.value,
     dropDb: dropDatabase.value,
@@ -66,10 +111,26 @@ function handleConfirm() {
     </template>
 
     <div class="space-y-5">
-      <p class="text-text-secondary text-sm leading-relaxed">
-        Are you sure you want to delete {{ count }} worktree{{ count === 1 ? '' : 's' }}?
-        This action cannot be undone.
-      </p>
+      <div class="space-y-1">
+        <p class="text-text-secondary text-sm leading-relaxed">
+          Deletes these {{ count }} worktree folder{{ count === 1 ? '' : 's' }}. This cannot be undone.
+          Branches are {{ deleteBranch ? 'also deleted (Git refuses unmerged ones)' : 'kept' }}.
+        </p>
+        <ul class="text-xs text-text-muted font-mono max-h-28 overflow-y-auto space-y-0.5" data-testid="batch-targets">
+          <li v-for="wt in worktrees" :key="wt.path" class="truncate" :title="wt.path">{{ wt.path }}<template v-if="wt.branch"> ({{ wt.branch }})</template></li>
+        </ul>
+      </div>
+
+      <div class="p-3 rounded-lg bg-surface-overlay/50 space-y-1" data-testid="batch-preflight" role="status">
+        <p v-if="checking" class="text-xs text-text-muted">Running safety checks…</p>
+        <template v-else-if="notClear.length">
+          <p class="text-xs text-danger">{{ notClear.length }} cannot be removed right now, so nothing will run:</p>
+          <ul class="text-xs text-text-muted space-y-0.5">
+            <li v-for="item in notClear" :key="item.name"><span class="font-mono text-text-secondary">{{ item.name }}</span> — {{ item.reason }}</li>
+          </ul>
+        </template>
+        <p v-else class="text-xs text-text-muted">All safety checks passed just now. They run again for each worktree during deletion.</p>
+      </div>
 
       <!-- Dirty warning -->
       <div v-if="dirtyWorktrees.length > 0" class="p-3 bg-warning-muted rounded-lg border border-warning/20">
@@ -82,6 +143,7 @@ function handleConfirm() {
             <p class="text-warning text-sm font-medium">
               {{ dirtyWorktrees.length }} with uncommitted changes
             </p>
+            <p class="text-warning/80 text-xs">Uncommitted changes block removal; these will be refused.</p>
             <ul class="text-warning/80 text-xs mt-1 space-y-0.5">
               <li v-for="wt in dirtyWorktrees" :key="wt.path" class="font-mono truncate">{{ wt.branch }}</li>
             </ul>
@@ -93,13 +155,13 @@ function handleConfirm() {
       <div class="space-y-3 pt-1">
         <SCheckbox
           v-model="deleteBranch"
-          label="Delete branches"
-          description="Removes each branch from the git repository"
+          label="Also delete the branches"
+          description="Off by default. Git refuses to delete unmerged branches"
         />
         <SCheckbox
           v-model="dropDatabase"
           label="Drop associated databases"
-          description="Deletes the database for each worktree"
+          description="Asks the removal hooks to drop each worktree's database"
         />
         <Transition
           enter-active-class="transition ease-out duration-150"
@@ -124,7 +186,7 @@ function handleConfirm() {
     <template #footer>
       <div class="flex items-center justify-end gap-3">
         <SButton variant="ghost" @click="emit('close')">Cancel</SButton>
-        <SButton variant="danger" data-testid="batch-delete-confirm" @click="handleConfirm">
+        <SButton variant="danger" data-testid="batch-delete-confirm" :disabled="!canConfirm" @click="handleConfirm">
           Delete {{ count }}
         </SButton>
       </div>
