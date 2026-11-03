@@ -16,7 +16,7 @@
 - [x] Release: pinned CLI bytes/revision, build identity, supported Node/macOS checks and dependency advisory triage (9).
 - [x] Independent cross-review and final frontend/Rust/CLI regression suites after integration.
 - [x] New version, develop commit, release bundle, Applications installation and version/digest comparison.
-- [ ] Bundled CLI startup acceptance: **0.4.0 FAILED** after the installed app displayed `CLI Not Found`; corrected 0.4.1 package and installation checks are pending.
+- [ ] Bundled CLI startup acceptance: **0.4.0 FAILED** after the installed app displayed `CLI Not Found`; corrected 0.4.2 package and installation checks are pending.
 - [ ] Native screen interaction acceptance: the earlier computer-use bridge failure left this unverified; process survival and startup logging were insufficient.
 
 ## Acceptance focus
@@ -39,7 +39,7 @@ Branch cleanup uses Git's native worktree protection plus a private reference-tr
 
 Hosted CI is separate from local acceptance. The clean Node 22 installation was proved in a fresh temporary npm cache using the exact private UI archive; no registry server was required. Hosted CI still needs authorised private-artifact and CLI read access, and has not been presented as passing.
 
-This record distinguishes the installed 0.4.0 evidence from the pending 0.4.1 correction. The earlier discovery report is historical evidence, not completion proof.
+This record distinguishes the installed 0.4.0 evidence from the pending 0.4.2 correction. The earlier discovery report is historical evidence, not completion proof.
 
 ## API boundaries
 
@@ -92,7 +92,7 @@ was used as proof. No development server was started for this work.
 A supporting SnippetsLab entry was created and read back: **grove: inspect merge
 evidence and deletion safety**, UUID `1005E4BA-EB43-4F0A-951F-3FFFE71609B6`.
 
-## 0.4.1 startup correction — package and installation pending
+## 0.4.2 startup correction — package and installation pending
 
 The runner retained the exited child with `waitid(..., WNOWAIT)` while finishing
 process-group cleanup. On macOS, signalling a group containing only zombie
@@ -102,12 +102,13 @@ The correction inspects group members before accepting that macOS result.
 Live members, incomplete inspection and genuine permission failures still fail
 closed; uncertainty about deliberately detached hooks remains explicit.
 
-Nine runner fixture tests passed, and the full Rust suite passed **123 tests**.
+Nine runner fixture tests passed, the full Rust suite passed **123 tests**, and
+the final frontend suite passed **433 tests** with a successful type check/build.
 The corrected debug app's actual `--check-bundled-cli` path reported CLI **4.2.0**
 and **10 repositories** with the normal environment. With the minimal system
 PATH, an empty `HERD_ROOT` and `GROVE_CONFIG=/dev/null`, it reported **zero
 repositories**. These are debug-app observations, not release-package or
-installed-0.4.1 proof. The independent Astra review reported no remaining findings.
+installed-0.4.2 proof. The independent Astra review reported no remaining findings.
 
 The startup screen now retains the actual typed failure and offers **Retry**
 and **Copy diagnostics**. It no longer advises installing another CLI or changing
@@ -119,7 +120,14 @@ It uses the same bundled resolver and runner for the version and repository-list
 queries, without windows, application stores or normal UI actions. CI includes
 the packaged minimal-PATH check; no hosted pass is claimed here.
 
-Release **0.4.1** is planned. Before recording it as accepted, build the release
+The 0.4.1 candidate passed the real packaged version/repository probe, including
+minimal PATH, but was never installed. The missing-sidecar package fixture caught
+its diagnostic printing an error while returning exit zero on macOS. The diagnostic
+now flushes its result and exits with that result explicitly. The packaged regression
+script checks success and failure, including refusal to use a fake CLI on PATH.
+The existing 0.4.1 tag is retained; the corrected candidate receives a new version.
+
+Release **0.4.2** is planned. Before recording it as accepted, build the release
 bundle, run that packaged probe with the isolated environment, install it, and
 repeat the probe against `/Applications/Grove.app/Contents/MacOS/grove-app`.
 Record the actual app/CLI versions, repository count, exit status and installed

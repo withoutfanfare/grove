@@ -73,7 +73,10 @@ pub fn run() {
                     println!("{}", output);
                     use std::io::Write;
                     let _ = std::io::stdout().flush();
-                    handle.exit(code);
+                    // This diagnostic has no stores or windows to close. On
+                    // macOS the event loop can return zero after exit(1), so
+                    // finish the process with the actual probe result.
+                    std::process::exit(code);
                 });
                 Ok(())
             })

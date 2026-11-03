@@ -98,6 +98,18 @@ repository's existing Rust formatting or warning baseline is clean.
 
 ## Packaged CLI startup gate
 
+Run the packaged success and failure checks before installing:
+
+```sh
+python3 scripts/check-packaged-cli.py src-tauri/target/release/bundle/macos/Grove.app
+```
+
+This requires the isolated success response to match the app version and pinned
+CLI version. It then removes the CLI only from a temporary app copy and requires
+a non-zero failure with `BUNDLED_CLI_MISSING`. A fake CLI on PATH must remain
+unused. This catches both a broken bundled command and a misleading diagnostic
+exit status. No live worktree is modified.
+
 Run the actual app executable after packaging. A surviving app process or a
 `Grove started successfully` log does not prove that its bundled CLI can run.
 
