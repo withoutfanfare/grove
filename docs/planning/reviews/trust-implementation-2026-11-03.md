@@ -13,9 +13,10 @@
 - [x] Presentation: unknown sync state, refreshed diagnostics, per-repository observation times and failed-check visibility (5, 6).
 - [x] Errors and configuration: retain typed errors and updater failures; authoritative effective config and exact selected file/source information (7, 8).
 - [x] Actions and insight: exact prune/deletion consequences, authoritative preview, session receipts, grade explanations and distinct behind-base/folder-age/cached labels (10, 11).
-- [ ] Release: pinned CLI bytes/revision, build identity, supported Node/macOS checks and dependency advisory triage (9).
-- [ ] Independent cross-review and final frontend/Rust/CLI regression suites after integration.
-- [ ] New version, develop commit, release bundle, Applications installation, version/digest comparison and native smoke check.
+- [x] Release: pinned CLI bytes/revision, build identity, supported Node/macOS checks and dependency advisory triage (9).
+- [x] Independent cross-review and final frontend/Rust/CLI regression suites after integration.
+- [x] New version, develop commit, release bundle, Applications installation and version/digest comparison.
+- [ ] Native screen interaction acceptance: blocked by the computer-use bridge; process/startup smoke passed.
 
 ## Acceptance focus
 
@@ -29,7 +30,7 @@ Astra Medium implements runtime/recovery; a separate Astra Medium task implement
 
 Implementation is integrated. Astra Medium and Opus High independently reviewed the safety and cross-layer contracts. Their confirmed defects were fixed: native Git checkout protection, locked expected-SHA validation while preserving existing transaction hooks, ordered atomic startup recovery, non-destructive preview-cache eviction, busy checks before panel changes, and the correct Rust toolchain action. A timed-out prune target retains earlier results and is explicitly unknown.
 
-Local evidence before release: 421 frontend tests, 117 Rust tests, frontend type check/build and Clippy pass; npm audit reports zero vulnerabilities after a clean dependency install. The full CLI run and final package verification are recorded below when complete.
+Local evidence before release: 422 frontend tests, 117 Rust tests, frontend type check/build and Clippy pass; npm audit reports zero vulnerabilities after a clean dependency install. The full CLI run and final package verification are recorded below when complete.
 
 Runtime containment covers the owned Unix process group, including background children that redirect output. User hooks which deliberately detach into another session can escape that group; deadline errors explicitly preserve that uncertainty and require refreshed observations before retrying. No rollback or absolute cross-client ownership is promised.
 
@@ -59,3 +60,73 @@ no real database deletion was tested or performed.
 runtime. A mismatch reports `cliRevision: "unknown"` and a compatibility warning;
 a hashing failure returns `PROVENANCE_UNAVAILABLE`. The release pin and observed
 installed digest must agree before the local installation is accepted.
+
+
+## Installed release — 3 November 2026, 09:56 GMT
+
+- App **0.4.0**, built from `develop` release commit `7d6b29cf1cf6df88e14c5b22576b91e3e5d2bb6c`, tag `v0.4.0`. This is a minor bump for Activity and the new trust/action screens. No automated main merge was made.
+- CLI **4.2.0**, committed and pushed on `fix/respect-herd-skip` at `5697e5467a56b92c8e9bbb89e844e4a0c776c0bd`. Pinned SHA-256: `a0b2c7146b311d34937ff89ff2352ea81dc52433cb921be227594f2fc55c704a`.
+- `npm test`: **422 passed, 40 files**, no unhandled errors. `cargo test --manifest-path src-tauri/Cargo.toml`: **117 passed**, no failures. `npm run build` passed; Clippy completed with existing dead-code/style warnings.
+- CLI `./run-tests.sh`: **707 passed, 9 skipped, 0 failed (716 cases)**. The separately rerun `trust-plans.bats` has **6 passing cases**, including the additional timeout-receipt regression. Skips concern live MySQL/Herd, real npm builds and unbundled local hooks; they are not claimed as acceptance.
+- `npm audit --json --registry=https://registry.npmjs.org`: **0 vulnerabilities**. The Node 22 clean-cache installation and patched formatter/glob API smoke passed.
+- Release command: prepare the pinned sidecar, then `npm run tauri -- build --bundles app --config '{"bundle":{"createUpdaterArtifacts":false}}'`, with Node 22 and Cargo on PATH. The nested `tauri:build` script did not forward optional flags correctly through npm 12, so the documented direct invocation was used. The build finished in **2m 02s**. No DMG or updater distribution was produced.
+- The local bundle initially carried only the linker's ad hoc signature. It was sealed for this local installation, then `codesign --verify --deep --strict --verbose=2` reported **valid on disk / satisfies its Designated Requirement**. This is local ad hoc signing, not Developer ID signing or notarisation.
+- Installed at `/Applications/Grove.app`. `PlistBuddy` returned **0.4.0**. Both installed executables match the verified bundle, and the installed CLI digest matches the pin. The old app was quit before replacement and retained in Trash; a fresh process started at **09:56:31** and logged **Grove started successfully** at **09:56:32**.
+- The maintained removal checker was also installed from the committed source, with the prior installed copy retained as a backup. The packaged CLI remains self-contained and uses its bundled checker unless explicitly overridden.
+
+The installed screens could not be clicked through: two native computer-use attempts,
+including a fresh session, returned `Sky Computer Use native pipe startup failed`.
+Native screen acceptance remains open; the installed version, bytes, signature,
+process restart and startup log are verified separately. The earlier native
+acceptance follow-up remains relevant. Hosted CI needs the private inputs described
+in the [build guide](../../api/reproducible-macos-build.md); that configuration action
+was added to Things. No live worktree deletion, database operation or service switch
+was used as proof. No development server was started for this work.
+
+A supporting SnippetsLab entry was created and read back: **grove: inspect merge
+evidence and deletion safety**, UUID `1005E4BA-EB43-4F0A-951F-3FFFE71609B6`.
+
+## Created or newly tracked files
+
+The release also tracks the earlier integration handoff and regression tests that
+were already present in the dirty checkout. The complete added-file list is:
+
+- `docs/api/2026-11-03-cli-review-compatibility.md`
+- `docs/api/2026-11-03-cli-review-integration-handoff.md`
+- `docs/api/reproducible-macos-build.md`
+- `docs/planning/reviews/trust-and-qol-review-2026-11-03.md`
+- `docs/planning/reviews/trust-implementation-2026-11-03.md`
+- `scripts/cache-ui.mjs`
+- `src-tauri/sidecar.lock.json`
+- `src-tauri/src/build_info.rs`
+- `src-tauri/src/process_runner.rs`
+- `src-tauri/src/trust_commands.rs`
+- `src/components/ActivityPanel.vue`
+- `src/components/GlobalConfigPanel.test.ts`
+- `src/components/OperationProgressPanel.test.ts`
+- `src/components/ServicesPanel.test.ts`
+- `src/components/SettingsPanel.test.ts`
+- `src/components/StatusBadge.test.ts`
+- `src/components/overview/PruneConfirmDialog.test.ts`
+- `src/composables/useActivity.test.ts`
+- `src/composables/useActivity.ts`
+- `src/composables/useOperationProgress.test.ts`
+- `src/composables/useUpdater.test.ts`
+- `src/stores/freshness.test.ts`
+
+CLI source and regression additions:
+
+- `grove-cli/docs/development/2026-11-02-code-review.md`
+- `grove-cli/lib/commands/trust.sh`
+- `grove-cli/tests/integration/completion-herd-root.bats`
+- `grove-cli/tests/integration/config-resolution.bats`
+- `grove-cli/tests/integration/install.bats`
+- `grove-cli/tests/integration/migration.bats`
+- `grove-cli/tests/integration/report-base.bats`
+- `grove-cli/tests/integration/trust-plans.bats`
+- `grove-cli/tests/integration/trust-unknown.bats`
+- `grove-cli/tests/integration/uninstall.bats`
+- `grove-cli/tests/integration/wizard.bats`
+- `grove-cli/tests/unit/template-load.bats`
+- `grove-cli/tools/prune-plan.py`
+- `grove-cli/tools/wt-removal-check`
