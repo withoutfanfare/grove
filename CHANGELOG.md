@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.2] - 3 November 2026
+
+### Fixed
+
+- Packaged CLI diagnostics return a failing exit status when startup fails on macOS. The release check verifies both the working bundle and a temporary copy missing its CLI, including refusal to use a separate CLI from PATH.
+- The 0.4.1 candidate was not installed after this failure was caught during package acceptance; 0.4.2 includes the bundled CLI startup fix.
+
 ## [0.4.1] - 3 November 2026
 
 ### Fixed
