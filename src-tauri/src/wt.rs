@@ -904,15 +904,42 @@ pub fn remove_worktree(
 /// Uses execute_wt_json_result to handle non-zero exit codes gracefully,
 /// since `wt pull` returns valid JSON with success=false on failures like
 /// dirty worktrees or merge conflicts.
+fn pull_target_label(worktree: &Worktree) -> String {
+    if worktree.branch.trim().is_empty() {
+        worktree.path.clone()
+    } else {
+        worktree.branch.clone()
+    }
+}
+
+fn resolve_pull_branch<'a>(worktrees: &'a [Worktree], target: &str) -> WtResult<&'a str> {
+    let worktree = worktrees.iter()
+        .find(|wt| wt.path == target || (!target.trim().is_empty() && wt.branch == target))
+        .ok_or_else(|| WtError::new("INVALID_INPUT", format!("Pull target no longer exists: {}", if target.is_empty() { "(missing target)" } else { target })))?;
+    if worktree.branch.trim().is_empty() {
+        return Err(WtError::new("INVALID_INPUT", format!("Cannot pull {}: detached HEAD has no branch", worktree.path)));
+    }
+    if worktree.sha.is_empty() || worktree.sha.chars().all(|c| c == '0') {
+        return Err(WtError::new("INVALID_INPUT", format!("Cannot pull {}: branch has no commit (unborn HEAD)", worktree.path)));
+    }
+    validate_branch_name(&worktree.branch)?;
+    Ok(&worktree.branch)
+}
+
 pub fn pull_worktree(
     app: &tauri::AppHandle,
     repo_name: &str,
     branch: &str,
 ) -> WtResult<PullResult> {
     validate_repo_name(repo_name)?;
-    validate_branch_name(branch)?;
-
-    execute_wt_json_result(app, &["pull", repo_name, branch, "--json"])
+    let resolved = if branch.starts_with('/') {
+        let worktrees = get_worktrees(app, repo_name)?;
+        resolve_pull_branch(&worktrees, branch)?.to_string()
+    } else {
+        validate_branch_name(branch)?;
+        branch.to_string()
+    };
+    execute_wt_json_result(app, &["pull", repo_name, &resolved, "--json"])
 }
 
 /// Batch progress must use the CLI's result, not merely successful JSON parsing.
@@ -1151,10 +1178,8 @@ pub fn pull_selected_with_progress_identified(repo_name: &str,
     app: &tauri::AppHandle, operation_id: &str) -> WtResult<PullAllResult> {
     validate_repo_name(repo_name)?;
 
-    // Validate all branch names
-    for branch in &branches {
-        validate_branch_name(branch)?;
-    }
+    // Resolve each target independently so one unavailable worktree does not
+    // prevent the rest of the batch from producing terminal results.
 
     // Create a cancellation token for this specific operation
     let cancel_token = CancellationToken::identified(operation_id)?;
@@ -1451,7 +1476,7 @@ pub fn pull_all_with_progress_identified(repo_name: &str, app: &tauri::AppHandle
     }
 
     // Create operation state for persistence
-    let branch_names: Vec<String> = worktrees.iter().map(|wt| wt.branch.clone()).collect();
+    let branch_names: Vec<String> = worktrees.iter().map(pull_target_label).collect();
     let mut op_state = OperationState::new(
         PersistentOperationType::PullAll,
         repo_name,
@@ -1469,7 +1494,7 @@ pub fn pull_all_with_progress_identified(repo_name: &str, app: &tauri::AppHandle
             "pull_all",
             (i + 1) as u32,
             total,
-            &wt.branch,
+            &pull_target_label(wt),
             "pending",
             None,
         );
@@ -1500,7 +1525,8 @@ pub fn pull_all_with_progress_identified(repo_name: &str, app: &tauri::AppHandle
             .par_iter()
             .enumerate()
             .map(|(i, wt)| {
-                let branch = &wt.branch;
+                let target = pull_target_label(wt);
+                let branch = &target;
                 let current = (i + 1) as u32;
 
                 // Check for cancellation before starting (using per-operation token)
@@ -2486,6 +2512,29 @@ pub fn register_repo(app: &tauri::AppHandle, path: &std::path::Path) -> WtResult
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pull_targets_preserve_identity_and_reject_unpullable_heads() {
+        let make = |path: &str, branch: &str, sha: &str| -> Worktree {
+            serde_json::from_value(serde_json::json!({
+                "path": path, "branch": branch, "sha": sha, "dirty": false
+            })).unwrap()
+        };
+        let trees = vec![
+            make("/tmp/a", "", "abc123"),
+            make("/tmp/b", "", "def456"),
+            make("/tmp/new", "new", "0000000"),
+            make("/tmp/main", "main", "abc123"),
+        ];
+        assert_ne!(pull_target_label(&trees[0]), pull_target_label(&trees[1]));
+        assert!(resolve_pull_branch(&trees, "/tmp/a").unwrap_err().message.contains("detached HEAD"));
+        assert!(resolve_pull_branch(&trees, "new").unwrap_err().message.contains("unborn HEAD"));
+        assert!(resolve_pull_branch(&trees, "missing").unwrap_err().message.contains("no longer exists"));
+        assert!(resolve_pull_branch(&trees, "").is_err());
+        assert_eq!(resolve_pull_branch(&trees, "main").unwrap(), "main");
+        assert_eq!(resolve_pull_branch(&trees, "/tmp/main").unwrap(), "main");
+    }
+
 
     #[test]
     fn bundled_startup_probe_preserves_success_missing_file_and_failure_reason() {

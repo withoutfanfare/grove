@@ -169,6 +169,26 @@ is claimed. That service follow-up is tracked separately from this local install
 The new diagnostic command is saved in SnippetsLab as **Grove: verify the app's
 bundled CLI**, UUID `5FC2D000-712A-42D1-98E2-B841671F7E1E`.
 
+## 0.4.3 pull correction — verification and release pending
+
+The user reported `DATABASE_UNKNOWN` when pulling review worktrees with no
+database or a shared database, plus `Branch name cannot be empty` for branchless
+targets. The CLI required database resolution before starting the Git pull,
+making database identity an unnecessary prerequisite for that Git operation.
+Opus is implementing safe handling for database-less and shared-database
+worktrees.
+
+Branchless app targets also shared an empty progress key, causing distinct
+results to collide and leaving progress at **94%**. The current app changes use
+worktree paths to identify those targets and give a clear detached-HEAD refusal.
+Single and selected pulls accept path identities where needed. Ordinary branch
+pulls retain direct branch handling; the proposed repository rescan for every
+branch pull was removed to avoid repeated scans as the batch grows.
+
+The intended app release is **0.4.3**. CLI and app regression checks, final CLI
+pinning, packaged checks and installation remain pending. These implementation
+changes do not yet establish a successful pull or an installed correction.
+
 ## Created or newly tracked files
 
 The release also tracks the earlier integration handoff and regression tests that

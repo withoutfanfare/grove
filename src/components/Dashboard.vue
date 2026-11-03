@@ -588,9 +588,7 @@ async function handlePullAll() {
   // Phase 5: Build a map of branch names to worktree paths for conflict resolution actions
   const worktreePathMap = new Map<string, string>()
   for (const wt of worktrees.value) {
-    if (wt.branch) {
-      worktreePathMap.set(wt.branch, wt.path)
-    }
+    worktreePathMap.set(wt.branch || wt.path, wt.path)
   }
 
   // Don't pre-populate expected items - let the backend's progress events
@@ -624,12 +622,12 @@ async function handlePullAll() {
 async function handleBatchPull() {
   if (isBatchRunning.value) return
   if (!selectedRepoName.value) return
-  const branches = selection.selectedBranches(worktrees.value)
+  const branches = selection.selectedWorktrees(worktrees.value).map(wt => wt.branch || wt.path)
   if (branches.length === 0) return
 
   const worktreePathMap = new Map<string, string>()
   for (const wt of worktrees.value) {
-    if (wt.branch) worktreePathMap.set(wt.branch, wt.path)
+    worktreePathMap.set(wt.branch || wt.path, wt.path)
   }
 
   closeAllPanels()
@@ -972,7 +970,7 @@ const { commands: paletteCommands } = useCommandRegistry({
   },
   onPullWorktree: () => {
     const wt = getFocusedWorktree()
-    if (wt && selectedRepoName.value) pullWorktree(selectedRepoName.value, wt.branch)
+    if (wt && selectedRepoName.value) pullWorktree(selectedRepoName.value, wt.branch || wt.path)
   },
   onSyncWorktree: () => {
     const wt = getFocusedWorktree()

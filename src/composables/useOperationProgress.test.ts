@@ -48,3 +48,21 @@ it('keeps a recovery warning as a warning, never as an item failure', async () =
   expect(progress.progress.value?.stopping).toBe(true)
   await progress.reset()
 })
+
+it('completes every detached target independently alongside successful pulls', async () => {
+  let receive!: (event: { payload: unknown }) => void
+  mockTauriListen.mockImplementationOnce((_name, listener) => {
+    receive = listener
+    return Promise.resolve(vi.fn())
+  })
+  const progress = useOperationProgress()
+  const operationId = await progress.startListening('pull_all', [])
+  for (const [index, item] of ['main', '/worktrees/a', '/worktrees/b'].entries()) {
+    receive({ payload: { operation_id: operationId, operation: 'pull_all', current: index + 1, total: 3, item, status: index === 0 ? 'success' : 'failed', details: index === 0 ? '+1 commits' : 'Cannot pull: detached HEAD has no branch' } })
+  }
+  expect(progress.progress.value?.items).toHaveLength(3)
+  expect(progress.progress.value?.isComplete).toBe(true)
+  expect(progress.getPercentage()).toBe(100)
+  expect(progress.getStatusCounts()).toMatchObject({ success: 1, failed: 2 })
+  await progress.reset()
+})

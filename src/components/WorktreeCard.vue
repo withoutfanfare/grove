@@ -234,7 +234,7 @@ async function handlePull() {
   isLocalPulling.value = true
 
   try {
-    const result = await pullWorktree(props.repoName, props.worktree.branch)
+    const result = await pullWorktree(props.repoName, props.worktree.branch || props.worktree.path)
     if (result) {
       const branchName = props.worktree.branch
       if (!result.success) {
