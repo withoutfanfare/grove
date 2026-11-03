@@ -16,7 +16,7 @@
 - [x] Release: pinned CLI bytes/revision, build identity, supported Node/macOS checks and dependency advisory triage (9).
 - [x] Independent cross-review and final frontend/Rust/CLI regression suites after integration.
 - [x] New version, develop commit, release bundle, Applications installation and version/digest comparison.
-- [ ] Bundled CLI startup acceptance: **0.4.0 FAILED** after the installed app displayed `CLI Not Found`; corrected 0.4.2 package and installation checks are pending.
+- [x] Bundled CLI startup acceptance: **0.4.0 FAILED**; the corrected **0.4.2** release package and installed copy passed real bundled-CLI success and missing-resource checks.
 - [ ] Native screen interaction acceptance: the earlier computer-use bridge failure left this unverified; process survival and startup logging were insufficient.
 
 ## Acceptance focus
@@ -39,7 +39,7 @@ Branch cleanup uses Git's native worktree protection plus a private reference-tr
 
 Hosted CI is separate from local acceptance. The clean Node 22 installation was proved in a fresh temporary npm cache using the exact private UI archive; no registry server was required. Hosted CI still needs authorised private-artifact and CLI read access, and has not been presented as passing.
 
-This record distinguishes the installed 0.4.0 evidence from the pending 0.4.2 correction. The earlier discovery report is historical evidence, not completion proof.
+This record distinguishes the failed 0.4.0 startup acceptance from the verified 0.4.2 bundled-CLI correction. The earlier discovery report is historical evidence, not completion proof.
 
 ## API boundaries
 
@@ -92,7 +92,7 @@ was used as proof. No development server was started for this work.
 A supporting SnippetsLab entry was created and read back: **grove: inspect merge
 evidence and deletion safety**, UUID `1005E4BA-EB43-4F0A-951F-3FFFE71609B6`.
 
-## 0.4.2 startup correction — package and installation pending
+## Installed 0.4.2 correction — 3 November 2026, 10:39 GMT
 
 The runner retained the exited child with `waitid(..., WNOWAIT)` while finishing
 process-group cleanup. On macOS, signalling a group containing only zombie
@@ -127,11 +127,47 @@ now flushes its result and exits with that result explicitly. The packaged regre
 script checks success and failure, including refusal to use a fake CLI on PATH.
 The existing 0.4.1 tag is retained; the corrected candidate receives a new version.
 
-Release **0.4.2** is planned. Before recording it as accepted, build the release
-bundle, run that packaged probe with the isolated environment, install it, and
-repeat the probe against `/Applications/Grove.app/Contents/MacOS/grove-app`.
-Record the actual app/CLI versions, repository count, exit status and installed
-digest comparison. Native screen interaction remains a separate acceptance gate.
+Release **0.4.2** was built from clean `develop` commit
+`c6fb142065217c72e37ce37177517c9feeb73c6a`, tag `v0.4.2`, and installed at
+`/Applications/Grove.app` at **10:39:38 GMT**. This patch fixes the macOS startup
+regression and makes the packaged diagnostic failure result truthful. No main
+merge was made; both release tags retain their original commits.
+
+- Final source checks: `npm test -- --run` reported **433 passed (40 files)**;
+  `npm run build` passed; `cargo test --manifest-path src-tauri/Cargo.toml`
+  reported **123 passed, 0 failed**. The unchanged CLI retains the full-suite
+  evidence recorded above.
+- The release build completed in **1m 59s**. The CLI script and then the outer
+  app were signed in that order with local ad hoc signatures. Strict deep
+  verification reported **valid on disk / satisfies its Designated Requirement**.
+  No Developer ID, notarisation, DMG or updater publication is claimed.
+- `python3 scripts/check-packaged-cli.py` passed against both the release bundle
+  and `/Applications/Grove.app`. Minimal system PATH with empty repository root:
+  **exit 0**, app **0.4.2**, CLI **4.2.0**, `repository_count: 0`,
+  `source: "bundled-sidecar"`, `success: true`. A temporary copy missing its CLI:
+  **exit 1**, `BUNDLED_CLI_MISSING`, `success: false`; the fake PATH CLI was unused.
+- `/Applications/Grove.app/Contents/MacOS/grove-app --check-bundled-cli` with the
+  normal environment reported **exit 0**, app **0.4.2**, CLI **4.2.0**,
+  **10 repositories**, `source: "bundled-sidecar"`, `success: true`.
+- Installed `Info.plist` reports **0.4.2**. Main executable and CLI bytes match
+  the signed release bundle; CLI SHA-256 matches the existing pin:
+  `a0b2c7146b311d34937ff89ff2352ea81dc52433cb921be227594f2fc55c704a`.
+  The 0.4.0 app was retained in Trash. The new installed process started at
+  **10:39:39 GMT** and is left running. No development server was started.
+
+Native screen interaction remains unverified: the new installed app inspection
+again returned `Sky Computer Use native pipe startup failed`. That does not
+negate the actual packaged CLI checks, and those checks do not establish native
+click-through acceptance. The existing acceptance follow-up remains open.
+
+Hosted CI at this exact release commit [failed before installation and tests](https://github.com/withoutfanfare/grove/actions/runs/41620835634)
+because `STUNTROCKET_UI_TARBALL_URL` is missing. The existing private-input CI
+configuration follow-up remains open. The installed app also logs a failed
+request to its configured updater endpoint; no successful update-feed delivery
+is claimed. That service follow-up is tracked separately from this local install.
+
+The new diagnostic command is saved in SnippetsLab as **Grove: verify the app's
+bundled CLI**, UUID `5FC2D000-712A-42D1-98E2-B841671F7E1E`.
 
 ## Created or newly tracked files
 
@@ -144,6 +180,7 @@ were already present in the dirty checkout. The complete added-file list is:
 - `docs/planning/reviews/trust-and-qol-review-2026-11-03.md`
 - `docs/planning/reviews/trust-implementation-2026-11-03.md`
 - `scripts/cache-ui.mjs`
+- `scripts/check-packaged-cli.py`
 - `src-tauri/sidecar.lock.json`
 - `src-tauri/src/build_info.rs`
 - `src-tauri/src/process_runner.rs`
