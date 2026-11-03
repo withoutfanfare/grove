@@ -184,11 +184,13 @@ pub async fn get_worktree_status(
 ///
 /// Callable from frontend as: invoke('check_wt_available')
 #[command]
-pub async fn check_wt_available(app: tauri::AppHandle) -> bool {
-    let handle = app.clone();
-    spawn_blocking(move || wt::is_wt_available(&handle))
-        .await
-        .unwrap_or(false)
+pub async fn check_wt_available(app: tauri::AppHandle) -> Result<bool, WtError> {
+    let result = spawn_blocking(move || wt::is_wt_available(&app))
+        .await.map_err(|error| WtError::spawn_error(error.to_string()))?;
+    if let Err(ref error) = result {
+        log::error!("Bundled CLI startup check failed [{}]: {}", error.code, error.message);
+    }
+    result
 }
 
 /// Get grove CLI version

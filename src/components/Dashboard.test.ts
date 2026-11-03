@@ -9,6 +9,7 @@ import PruneConfirmDialog from './overview/PruneConfirmDialog.vue'
 import { useToast } from '@/composables/useToast'
 import pr5 from '../../src-tauri/tests/fixtures/cli-pr5.json'
 import { useWorktreeStore } from '@/stores'
+import { useRepos } from '@/composables/useRepos'
 import { mockTauriInvoke, mockTauriListen, resetTauriMocks } from '@/test/setup'
 
 type ListenCallback = (event: { payload: unknown }) => void
@@ -323,4 +324,86 @@ describe('Dashboard batch selection', () => {
     wrapper.unmount()
   })
 
+})
+
+describe('Dashboard bundled CLI startup failure', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    resetTauriMocks()
+    mockTauriListen.mockResolvedValue(() => {})
+  })
+
+  async function failStartup(reason: { code: string; message: string } | false) {
+    mockTauriInvoke.mockImplementation((command: string) => command === 'check_wt_available'
+      ? (reason === false ? Promise.resolve(false) : Promise.reject(reason))
+      : Promise.resolve(undefined))
+    await useRepos().checkAvailability()
+    const wrapper = mountDashboard()
+    await flushPromises()
+    return wrapper
+  }
+
+  it('shows the plain WtError reason and never claims a separate install or PATH', async () => {
+    const wrapper = await failStartup({ code: 'IO_ERROR', message: 'Failed to spawn /Users/alice/Grove.app/grove: Permission denied (os error 13)' })
+    const text = wrapper.text()
+    expect(text).toContain('Bundled CLI could not start')
+    expect(wrapper.get('[data-testid="startup-error-reason"]').text())
+      .toBe('IO_ERROR: Failed to spawn ~/Grove.app/grove: Permission denied (os error 13)')
+    expect(text).not.toMatch(/PATH|Installation Guide|Reinstall|not installed/i)
+    expect(wrapper.find('a[href*="github.com"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('advises reinstalling only when the bundled resource is truly missing', async () => {
+    const wrapper = await failStartup({ code: 'BUNDLED_CLI_MISSING', message: 'Sidecar not found at ~/Grove.app/Contents/MacOS/grove' })
+    expect(wrapper.text()).toContain('Bundled CLI is missing')
+    expect(wrapper.text()).toContain('Reinstall Grove')
+    expect(wrapper.get('[data-testid="startup-error-reason"]').text()).toContain('BUNDLED_CLI_MISSING')
+    wrapper.unmount()
+  })
+
+  it('treats an unrelated failure (even legacy CLI_NOT_FOUND) as a start failure, not missing', async () => {
+    const wrapper = await failStartup({ code: 'CLI_NOT_FOUND', message: 'grove CLI not found. Please ensure grove is installed and in your PATH.' })
+    expect(wrapper.text()).toContain('Bundled CLI could not start')
+    expect(wrapper.text()).not.toContain('Reinstall Grove')
+    wrapper.unmount()
+  })
+
+  it('retry recovers into the main layout and loads repositories', async () => {
+    const wrapper = await failStartup({ code: 'TIMEOUT', message: 'Command timed out' })
+    mockTauriInvoke.mockImplementation((command: string) => Promise.resolve(
+      command === 'check_wt_available' ? true
+        : command === 'list_repositories' ? [{ name: 'grove', worktrees: 1 }]
+        : undefined))
+    await wrapper.get('[data-testid="startup-retry"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="startup-error-reason"]').exists()).toBe(false)
+    expect(useWorktreeStore().repositories).toEqual([{ name: 'grove', worktrees: 1 }])
+    wrapper.unmount()
+  })
+
+  it('copies redacted diagnostics including the build-info failure message', async () => {
+    const wrapper = await failStartup({ code: 'COMMAND_FAILED', message: 'grove --version exited with status 1 in /Users/alice' })
+    let copied = ''
+    mockTauriInvoke.mockImplementation((command: string, args?: { text: string }) => {
+      if (command === 'get_build_info') return Promise.reject({ code: 'PROVENANCE_UNAVAILABLE', message: 'Could not verify the installed CLI bytes' })
+      if (command === 'plugin:clipboard-manager|write_text') { copied = args!.text; return Promise.resolve() }
+      return Promise.resolve(undefined)
+    })
+    await wrapper.get('[data-testid="startup-copy-diagnostics"]').trigger('click')
+    await flushPromises()
+    expect(copied).toContain('COMMAND_FAILED: grove --version exited with status 1 in ~')
+    expect(copied).toContain('PROVENANCE_UNAVAILABLE: Could not verify the installed CLI bytes')
+    expect(copied).not.toContain('/Users/alice')
+    wrapper.unmount()
+  })
+})
+
+describe('placeholder links', () => {
+  it('no source file links to the placeholder GitHub organisation', () => {
+    const sources = import.meta.glob('/src/**/*.{vue,ts}', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
+    const placeholder = 'your-' + 'org'
+    expect(Object.keys(sources).length).toBeGreaterThan(10)
+    expect(Object.entries(sources).filter(([, src]) => src.includes(placeholder)).map(([file]) => file)).toEqual([])
+  })
 })

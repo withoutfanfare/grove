@@ -10,7 +10,7 @@ import {
 
 describe('getErrorTitle', () => {
   it('should return title for known error codes', () => {
-    expect(getErrorTitle('CLI_NOT_FOUND')).toBe('CLI Not Installed')
+    expect(getErrorTitle('CLI_NOT_FOUND')).toBe('Bundled CLI Unavailable')
     expect(getErrorTitle('REPO_NOT_FOUND')).toBe('Repository Not Found')
     expect(getErrorTitle('GIT_ERROR')).toBe('Git Error')
     expect(getErrorTitle('INVALID_INPUT')).toBe('Invalid Input')
@@ -80,7 +80,9 @@ describe('getErrorAction', () => {
     expect(getErrorAction('PROTECTED_BRANCH')).not.toContain('force')
   })
   it('should return action for known error codes', () => {
-    expect(getErrorAction('CLI_NOT_FOUND')).toContain('grove CLI')
+    expect(getErrorAction('CLI_NOT_FOUND')).toContain('Grove includes its CLI')
+    expect(getErrorAction('CLI_NOT_FOUND')).not.toContain('PATH')
+    expect(getErrorAction('BUNDLED_CLI_MISSING')).toBe('Reinstall Grove to restore its bundled CLI')
     expect(getErrorAction('REPO_NOT_FOUND')).toContain('repository name')
     expect(getErrorAction('WORKTREE_EXISTS')).toContain('already exists')
   })

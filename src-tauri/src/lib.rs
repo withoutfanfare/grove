@@ -45,6 +45,42 @@ use tauri::{Emitter, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // A packaged, read-only startup check exercises the exact sidecar resolver
+    // and execution path without opening windows or starting normal UI work.
+    let startup_check = std::env::args().any(|arg| arg == "--check-bundled-cli");
+    let mut context = tauri::generate_context!();
+    if startup_check {
+        context.config_mut().app.windows.clear();
+        tauri::Builder::default()
+            .plugin(tauri_plugin_shell::init())
+            .setup(|app| {
+                let handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    let result = wt::get_version(&handle).and_then(|version| {
+                        wt::get_repositories(&handle).map(|repos| serde_json::json!({
+                            "success": true,
+                            "app_version": env!("CARGO_PKG_VERSION"),
+                            "cli_version": version,
+                            "repository_count": repos.len(),
+                            "source": "bundled-sidecar"
+                        }))
+                    });
+                    let code = if result.is_ok() { 0 } else { 1 };
+                    let output = match result {
+                        Ok(output) => output,
+                        Err(error) => serde_json::json!({ "success": false, "error": error }),
+                    };
+                    println!("{}", output);
+                    use std::io::Write;
+                    let _ = std::io::stdout().flush();
+                    handle.exit(code);
+                });
+                Ok(())
+            })
+            .run(context)
+            .expect("error while checking the bundled CLI");
+        return;
+    }
     let builder = tauri::Builder::default();
 
     // Single instance must be registered first
@@ -194,7 +230,7 @@ pub fn run() {
             updater::check_for_update,
             updater::get_app_version,
         ])
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("error while running tauri application");
 }
 

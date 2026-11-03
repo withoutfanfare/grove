@@ -709,20 +709,35 @@ pub fn get_worktree_status(app: &tauri::AppHandle, repo_name: &str) -> WtResult<
 /// Check if the grove CLI is available
 ///
 /// Uses Tauri's sidecar API to check if the bundled grove binary is accessible.
-pub fn is_wt_available(app: &tauri::AppHandle) -> bool {
-    let sidecar = match app.shell().sidecar("grove") {
-        Ok(s) => s,
-        Err(_) => return false,
-    };
-
-    crate::process_runner::run(sidecar.args(["--version"]).into(), SIDECAR_TIMEOUT, MAX_OUTPUT_SIZE)
-        .map(|output| output.status.success()).unwrap_or(false)
+pub fn is_wt_available(app: &tauri::AppHandle) -> WtResult<bool> {
+    get_version(app).map(|_| true)
 }
 
-/// Get the wt CLI version
+/// Probe the bundled executable. A PATH installation is never consulted.
+fn probe_bundled_cli(mut command: std::process::Command) -> WtResult<String> {
+    let path = std::path::Path::new(command.get_program());
+    match std::fs::metadata(path) {
+        Ok(metadata) if metadata.is_file() => (),
+        Ok(_) => return Err(WtError::new("BUNDLED_CLI_MISSING", "The bundled CLI resource is not an executable file")),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Err(WtError::new("BUNDLED_CLI_MISSING", "The bundled CLI resource is missing from the app")),
+        Err(error) => return Err(WtError::new("IO_ERROR", format!("Cannot inspect the bundled CLI: {}", error))),
+    }
+    command.arg("--version");
+    let output = crate::process_runner::run(command, SIDECAR_TIMEOUT, MAX_OUTPUT_SIZE)?;
+    if let Some(error) = command_output_error(output.status.success(), &String::from_utf8_lossy(&output.stdout), &String::from_utf8_lossy(&output.stderr)) {
+        return Err(WtError::new(error.code, format!("Bundled CLI version check exited with {}: {}", output.status, error.message)));
+    }
+    let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if !version.starts_with("grove version ") {
+        return Err(WtError::new("CLI_VERSION_INVALID", "The bundled CLI returned an unexpected version response"));
+    }
+    Ok(version)
+}
+
+/// Get the version of Grove's own sidecar, preserving the real startup reason.
 pub fn get_version(app: &tauri::AppHandle) -> WtResult<String> {
-    let output = execute_wt(app, &["--version"])?;
-    Ok(output.trim().to_string())
+    let sidecar = app.shell().sidecar("grove").map_err(|error| WtError::new("SIDECAR_ERROR", format!("Cannot resolve the bundled CLI: {}", error)))?;
+    probe_bundled_cli(sidecar.into())
 }
 
 /// The `grove rm` argument for a removal target: a branch name, or for a
@@ -2471,6 +2486,25 @@ pub fn register_repo(app: &tauri::AppHandle, path: &std::path::Path) -> WtResult
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bundled_startup_probe_preserves_success_missing_file_and_failure_reason() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("grove");
+        let missing = probe_bundled_cli(std::process::Command::new(&path)).unwrap_err();
+        assert_eq!(missing.code, "BUNDLED_CLI_MISSING");
+        std::fs::write(&path, "#!/usr/bin/env zsh\nprint -r -- 'grove version 4.2.0'\n").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let mut command = std::process::Command::new(&path);
+        command.env("PATH", "/usr/bin:/bin:/usr/sbin:/sbin");
+        assert_eq!(probe_bundled_cli(command).unwrap(), "grove version 4.2.0");
+        std::fs::write(&path, "#!/bin/sh\necho 'fixture startup failure' >&2\nexit 7\n").unwrap();
+        let failure = probe_bundled_cli(std::process::Command::new(&path)).unwrap_err();
+        assert_eq!(failure.code, "COMMAND_FAILED");
+        assert!(failure.message.contains("7"));
+        assert!(failure.message.contains("fixture startup failure"));
+    }
 
     #[test]
     fn reviewed_removal_contract() {

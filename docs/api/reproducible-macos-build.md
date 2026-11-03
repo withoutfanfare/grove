@@ -3,8 +3,10 @@
 The `Tests` workflow builds a native macOS app on pushes and pull requests targeting
 `main`, `master` or `develop`. It runs the frontend tests and build, the pinned CLI's
 trust/configuration/report contract tests, Rust tests and Clippy, then uploads an
-unsigned `grove-macos-unsigned` app archive. A successful run proves the build path;
-opening the app, signing, notarisation and publishing remain separate release checks.
+unsigned `grove-macos-unsigned` app archive. Before uploading, it exercises the
+packaged app's bundled CLI with a minimal system PATH and an empty repository root.
+A successful run proves those build and startup checks; screen interaction,
+signing, notarisation and publishing remain separate release checks.
 
 ## Required inputs and access
 
@@ -93,6 +95,40 @@ The updater artefact override avoids requiring a release signing key for this
 build check. It does not alter the committed updater configuration. Clippy runs
 without promoting existing warnings to errors; this lane does not claim the
 repository's existing Rust formatting or warning baseline is clean.
+
+## Packaged CLI startup gate
+
+Run the actual app executable after packaging. A surviving app process or a
+`Grove started successfully` log does not prove that its bundled CLI can run.
+
+```bash
+(
+  fixture_root="$(mktemp -d "${TMPDIR:-/tmp}/grove-startup.XXXXXX")"
+  trap 'rmdir "$fixture_root"' EXIT
+  PATH=/usr/bin:/bin:/usr/sbin:/sbin HERD_ROOT="$fixture_root" GROVE_CONFIG=/dev/null \
+    src-tauri/target/release/bundle/macos/Grove.app/Contents/MacOS/grove-app --check-bundled-cli
+)
+```
+
+`--check-bundled-cli` uses the normal bundled executable resolver and command
+runner to read the CLI version and repository list. It opens no windows, loads
+no application stores and performs no worktree or service actions. It never
+selects a CLI installation from PATH. The minimal PATH retains macOS system
+tools required by the bundled script; the empty `HERD_ROOT` and `/dev/null`
+configuration isolate repository discovery from the normal project root.
+
+Success exits zero and prints one JSON object with `success: true`,
+`app_version`, `cli_version`, `repository_count` and `source: "bundled-sidecar"`.
+The empty-root check must report zero repositories and the intended app and CLI
+versions. Failure exits non-zero and reports `success: false` with the typed
+error. Read both the exit status and JSON before accepting the package.
+
+After installation, repeat the same check with
+`/Applications/Grove.app/Contents/MacOS/grove-app` as the executable. Check the
+installed version and CLI digest against the verified bundle separately. This
+read-only probe does not establish screen interaction or destructive-action
+acceptance. The `Tests` workflow runs the packaged minimal-PATH check; a workflow
+change alone does not establish a successful hosted run.
 
 ## Change a pinned input
 

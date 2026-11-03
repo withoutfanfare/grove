@@ -16,7 +16,8 @@
 - [x] Release: pinned CLI bytes/revision, build identity, supported Node/macOS checks and dependency advisory triage (9).
 - [x] Independent cross-review and final frontend/Rust/CLI regression suites after integration.
 - [x] New version, develop commit, release bundle, Applications installation and version/digest comparison.
-- [ ] Native screen interaction acceptance: blocked by the computer-use bridge; process/startup smoke passed.
+- [ ] Bundled CLI startup acceptance: **0.4.0 FAILED** after the installed app displayed `CLI Not Found`; corrected 0.4.1 package and installation checks are pending.
+- [ ] Native screen interaction acceptance: the earlier computer-use bridge failure left this unverified; process survival and startup logging were insufficient.
 
 ## Acceptance focus
 
@@ -38,7 +39,7 @@ Branch cleanup uses Git's native worktree protection plus a private reference-tr
 
 Hosted CI is separate from local acceptance. The clean Node 22 installation was proved in a fresh temporary npm cache using the exact private UI archive; no registry server was required. Hosted CI still needs authorised private-artifact and CLI read access, and has not been presented as passing.
 
- This record will be updated with actual commands and the installed version; the earlier discovery report is historical evidence, not completion proof.
+This record distinguishes the installed 0.4.0 evidence from the pending 0.4.1 correction. The earlier discovery report is historical evidence, not completion proof.
 
 ## API boundaries
 
@@ -61,8 +62,12 @@ runtime. A mismatch reports `cliRevision: "unknown"` and a compatibility warning
 a hashing failure returns `PROVENANCE_UNAVAILABLE`. The release pin and observed
 installed digest must agree before the local installation is accepted.
 
+## Installed 0.4.0 — 3 November 2026, 09:56 GMT; startup acceptance FAILED
 
-## Installed release — 3 November 2026, 09:56 GMT
+The user's subsequent screenshot showed **CLI Not Found** in the installed app.
+This failed bundled-CLI startup acceptance despite the verified version, bytes,
+signature, process restart and startup log below. Those observations established
+installation identity and process launch only; they did not establish CLI use.
 
 - App **0.4.0**, built from `develop` release commit `7d6b29cf1cf6df88e14c5b22576b91e3e5d2bb6c`, tag `v0.4.0`. This is a minor bump for Activity and the new trust/action screens. No automated main merge was made.
 - CLI **4.2.0**, committed and pushed on `fix/respect-herd-skip` at `5697e5467a56b92c8e9bbb89e844e4a0c776c0bd`. Pinned SHA-256: `a0b2c7146b311d34937ff89ff2352ea81dc52433cb921be227594f2fc55c704a`.
@@ -77,7 +82,8 @@ installed digest must agree before the local installation is accepted.
 The installed screens could not be clicked through: two native computer-use attempts,
 including a fresh session, returned `Sky Computer Use native pipe startup failed`.
 Native screen acceptance remains open; the installed version, bytes, signature,
-process restart and startup log are verified separately. The earlier native
+process restart and startup log are verified separately and do not override the
+subsequent startup failure. The earlier native
 acceptance follow-up remains relevant. Hosted CI needs the private inputs described
 in the [build guide](../../api/reproducible-macos-build.md); that configuration action
 was added to Things. No live worktree deletion, database operation or service switch
@@ -85,6 +91,39 @@ was used as proof. No development server was started for this work.
 
 A supporting SnippetsLab entry was created and read back: **grove: inspect merge
 evidence and deletion safety**, UUID `1005E4BA-EB43-4F0A-951F-3FFFE71609B6`.
+
+## 0.4.1 startup correction — package and installation pending
+
+The runner retained the exited child with `waitid(..., WNOWAIT)` while finishing
+process-group cleanup. On macOS, signalling a group containing only zombie
+processes can return `EPERM`. The runner treated this as
+`TERMINATION_UNCERTAIN`, incorrectly rejecting successful bundled CLI commands.
+The correction inspects group members before accepting that macOS result.
+Live members, incomplete inspection and genuine permission failures still fail
+closed; uncertainty about deliberately detached hooks remains explicit.
+
+Nine runner fixture tests passed, and the full Rust suite passed **123 tests**.
+The corrected debug app's actual `--check-bundled-cli` path reported CLI **4.2.0**
+and **10 repositories** with the normal environment. With the minimal system
+PATH, an empty `HERD_ROOT` and `GROVE_CONFIG=/dev/null`, it reported **zero
+repositories**. These are debug-app observations, not release-package or
+installed-0.4.1 proof. The independent Astra review reported no remaining findings.
+
+The startup screen now retains the actual typed failure and offers **Retry**
+and **Copy diagnostics**. It no longer advises installing another CLI or changing
+PATH; placeholder download URLs were removed.
+
+The actual app now accepts the read-only `--check-bundled-cli` mode described in
+the [build guide](../../api/reproducible-macos-build.md#packaged-cli-startup-gate).
+It uses the same bundled resolver and runner for the version and repository-list
+queries, without windows, application stores or normal UI actions. CI includes
+the packaged minimal-PATH check; no hosted pass is claimed here.
+
+Release **0.4.1** is planned. Before recording it as accepted, build the release
+bundle, run that packaged probe with the isolated environment, install it, and
+repeat the probe against `/Applications/Grove.app/Contents/MacOS/grove-app`.
+Record the actual app/CLI versions, repository count, exit status and installed
+digest comparison. Native screen interaction remains a separate acceptance gate.
 
 ## Created or newly tracked files
 

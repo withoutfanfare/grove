@@ -118,6 +118,14 @@ jobs:
       - name: Build unsigned macOS app
         run: npm run tauri -- build --bundles app --config '{"bundle":{"createUpdaterArtifacts":false}}'
 
+      - name: Exercise the packaged bundled CLI without a PATH installation
+        shell: bash
+        run: |
+          fixture_root="$(mktemp -d "$RUNNER_TEMP/grove-startup.XXXXXX")"
+          trap 'rmdir "$fixture_root"' EXIT
+          PATH=/usr/bin:/bin:/usr/sbin:/sbin HERD_ROOT="$fixture_root" GROVE_CONFIG=/dev/null \
+            src-tauri/target/release/bundle/macos/Grove.app/Contents/MacOS/grove-app --check-bundled-cli
+
       - name: Archive macOS app
         run: ditto -c -k --sequesterRsrc --keepParent src-tauri/target/release/bundle/macos/*.app "$RUNNER_TEMP/grove-macos.zip"
 

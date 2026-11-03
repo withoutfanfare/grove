@@ -104,13 +104,56 @@ describe('useRepos', () => {
     it('should handle unavailable wt', async () => {
       mockTauriInvoke.mockResolvedValue(false)
 
-      const { checkAvailability } = useRepos()
+      const { checkAvailability, startupError } = useRepos()
       const store = useWorktreeStore()
 
       const result = await checkAvailability()
 
       expect(result).toBe(false)
       expect(store.wtAvailable).toBe(false)
+      expect(startupError.value?.code).toBe('COMMAND_FAILED')
+    })
+
+    it('keeps the real WtError reason, with the home folder redacted', async () => {
+      mockTauriInvoke.mockRejectedValue({
+        code: 'IO_ERROR',
+        message: 'Failed to spawn /Users/alice/Applications/Grove.app/Contents/MacOS/grove: Permission denied (os error 13)',
+      })
+
+      const { checkAvailability, startupError } = useRepos()
+      await checkAvailability()
+
+      expect(startupError.value).toEqual({
+        code: 'IO_ERROR',
+        message: 'Failed to spawn ~/Applications/Grove.app/Contents/MacOS/grove: Permission denied (os error 13)',
+      })
+    })
+
+    it('clears the startup error once a retry succeeds', async () => {
+      mockTauriInvoke.mockRejectedValueOnce({ code: 'TIMEOUT', message: 'Command timed out' })
+      const { checkAvailability, startupError } = useRepos()
+      const store = useWorktreeStore()
+
+      expect(await checkAvailability()).toBe(false)
+      expect(startupError.value?.code).toBe('TIMEOUT')
+
+      mockTauriInvoke.mockImplementation((command: string) =>
+        Promise.resolve(command === 'check_wt_available' ? true : 'grove 3.0.0'))
+      expect(await checkAvailability()).toBe(true)
+      expect(startupError.value).toBeNull()
+      expect(store.wtAvailable).toBe(true)
+    })
+
+    it('keeps a failed version query visible instead of marking startup successful', async () => {
+      mockTauriInvoke.mockImplementation((command: string) => command === 'check_wt_available'
+        ? Promise.resolve(true)
+        : Promise.reject({ code: 'TIMEOUT', message: 'Version query timed out' }))
+      const { checkAvailability, startupError } = useRepos()
+      const store = useWorktreeStore()
+
+      expect(await checkAvailability()).toBe(false)
+      expect(store.wtAvailable).toBe(false)
+      expect(startupError.value).toEqual({ code: 'TIMEOUT', message: 'Version query timed out' })
     })
   })
 })

@@ -59,7 +59,7 @@ const globalShortcuts = [
 
 async function openExternalDocs() {
   try {
-    await wt.openInBrowser('https://github.com/your-org/grove#readme')
+    await wt.openInBrowser('https://github.com/withoutfanfare/grove/tree/main/docs/users')
   } catch (e) {
     console.error('Failed to open external docs:', e)
   }

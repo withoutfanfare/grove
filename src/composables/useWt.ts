@@ -43,14 +43,21 @@ import { useWorktreeStore } from '../stores/worktrees';
  */
 export function useWt() {
   /**
-   * Check if the grove CLI is available on the system
+   * Check that the bundled grove CLI starts. Resolves true, or rejects with
+   * the backend's WtError so the real reason reaches the user.
    */
   async function checkWtAvailable(): Promise<boolean> {
+    let ok: boolean;
     try {
-      return await invoke<boolean>('check_wt_available');
-    } catch {
-      return false;
+      ok = await invoke<boolean>('check_wt_available');
+    } catch (error) {
+      throw toWtError(error);
     }
+    if (!ok) {
+      // Older backends answer a bare false with no reason
+      throw { code: 'COMMAND_FAILED', message: 'The bundled CLI check failed without giving a reason.' } satisfies WtError;
+    }
+    return true;
   }
 
   /**
@@ -61,11 +68,11 @@ export function useWt() {
     return await invoke<BuildInfo>('get_build_info');
   }
 
-  async function getWtVersion(): Promise<string | null> {
+  async function getWtVersion(): Promise<string> {
     try {
       return await invoke<string>('get_wt_version');
-    } catch {
-      return null;
+    } catch (error) {
+      throw toWtError(error);
     }
   }
 

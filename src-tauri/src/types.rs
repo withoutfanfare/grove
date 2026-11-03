@@ -537,7 +537,7 @@ pub struct ServicesStatusResult {
 // - wt.rs: CLI execution errors
 //
 // Standard error codes:
-// - CLI_NOT_FOUND: grove CLI binary not found in PATH
+// - BUNDLED_CLI_MISSING: the Grove installation is missing its bundled executable
 // - COMMAND_FAILED: grove CLI command returned non-zero exit code
 // - PARSE_ERROR: Failed to parse JSON output from grove
 // - IO_ERROR: General I/O error (file, network, etc.)
@@ -566,11 +566,11 @@ impl WtError {
         }
     }
 
-    /// grove CLI not found in PATH
+    /// The installation is missing its bundled CLI resource
     pub fn cli_not_found() -> Self {
         Self::new(
-            "CLI_NOT_FOUND",
-            "grove CLI not found. Please ensure grove is installed and in your PATH.",
+            "BUNDLED_CLI_MISSING",
+            "The Grove installation is missing its bundled CLI. Reinstall Grove to restore it.",
         )
     }
 

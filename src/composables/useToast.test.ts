@@ -170,7 +170,7 @@ describe('useToast', () => {
 
       expect(toasts.value).toHaveLength(1)
       expect(toasts.value[0].variant).toBe('error')
-      expect(toasts.value[0].message).toContain('CLI Not Installed')
+      expect(toasts.value[0].message).toContain('Bundled CLI Unavailable')
       expect(toasts.value[0].message).toContain('grove CLI not found in PATH')
     })
 
@@ -180,7 +180,7 @@ describe('useToast', () => {
       showWtError({ code: 'CLI_NOT_FOUND', message: 'Not found' })
 
       expect(toasts.value[0].message).toContain(
-        "Install the grove CLI tool and ensure it's in your PATH",
+        "Grove includes its CLI. Copy diagnostics to inspect the startup failure.",
       )
     })
 

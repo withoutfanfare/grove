@@ -18,13 +18,26 @@ describe('useWt', () => {
       expect(mockTauriInvoke).toHaveBeenCalledWith('check_wt_available')
     })
 
-    it('should return false when invoke throws', async () => {
-      mockTauriInvoke.mockRejectedValue(new Error('Not found'))
-      
-      const wt = useWt()
-      const result = await wt.checkWtAvailable()
-      
-      expect(result).toBe(false)
+    it('rejects with the backend WtError instead of swallowing the reason', async () => {
+      const reason = { code: 'IO_ERROR', message: 'Permission denied (os error 13)' }
+      mockTauriInvoke.mockRejectedValue(reason)
+
+      await expect(useWt().checkWtAvailable()).rejects.toEqual(reason)
+    })
+
+    it('turns a plain Error rejection into a WtError with its message', async () => {
+      mockTauriInvoke.mockRejectedValue(new Error('Bad CPU type in executable'))
+
+      await expect(useWt().checkWtAvailable()).rejects.toEqual({
+        code: 'UNKNOWN_ERROR',
+        message: 'Bad CPU type in executable',
+      })
+    })
+
+    it('rejects when an older backend answers a bare false', async () => {
+      mockTauriInvoke.mockResolvedValue(false)
+
+      await expect(useWt().checkWtAvailable()).rejects.toMatchObject({ code: 'COMMAND_FAILED' })
     })
   })
 
@@ -39,13 +52,12 @@ describe('useWt', () => {
       expect(mockTauriInvoke).toHaveBeenCalledWith('get_wt_version')
     })
 
-    it('should return null on error', async () => {
-      mockTauriInvoke.mockRejectedValue(new Error('Failed'))
+    it('should preserve the version query error', async () => {
+      const error = { code: 'TIMEOUT', message: 'Version query timed out' }
+      mockTauriInvoke.mockRejectedValue(error)
       
       const wt = useWt()
-      const result = await wt.getWtVersion()
-      
-      expect(result).toBeNull()
+      await expect(wt.getWtVersion()).rejects.toEqual(error)
     })
   })
 

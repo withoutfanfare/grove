@@ -28,7 +28,8 @@ export function getErrorTitle(code: WtErrorCode | string): string {
     WORKTREE_EXISTS: 'Worktree Already Exists',
     PROTECTED_BRANCH: 'Protected Branch',
     // System
-    CLI_NOT_FOUND: 'CLI Not Installed',
+    CLI_NOT_FOUND: 'Bundled CLI Unavailable',
+    BUNDLED_CLI_MISSING: 'Bundled CLI Missing',
     COMMAND_FAILED: 'Command Failed',
     PARSE_ERROR: 'Parse Error',
     IO_ERROR: 'File System Error',
@@ -59,7 +60,8 @@ export function isRetryableError(code: WtErrorCode | string): boolean {
  */
 export function getErrorAction(code: WtErrorCode | string): string | null {
   const actions: Record<string, string> = {
-    CLI_NOT_FOUND: "Install the grove CLI tool and ensure it's in your PATH",
+    CLI_NOT_FOUND: "Grove includes its CLI. Copy diagnostics to inspect the startup failure.",
+    BUNDLED_CLI_MISSING: "Reinstall Grove to restore its bundled CLI",
     REPO_NOT_FOUND: 'Check the repository name and try again',
     BRANCH_NOT_FOUND: 'Fetch the latest branches and try again',
     WORKTREE_NOT_FOUND: 'The worktree may have been removed. Refresh the list.',
@@ -77,7 +79,7 @@ export function getErrorAction(code: WtErrorCode | string): string | null {
  * Check if an error indicates a missing CLI installation.
  */
 export function isCliMissingError(code: WtErrorCode | string): boolean {
-  return code === 'CLI_NOT_FOUND'
+  return code === 'CLI_NOT_FOUND' || code === 'BUNDLED_CLI_MISSING'
 }
 
 /**

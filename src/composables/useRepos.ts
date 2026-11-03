@@ -1,5 +1,15 @@
 import { useWorktreeStore } from '../stores';
 import { useWt } from './useWt';
+import { ref } from 'vue';
+import type { WtError } from '../types';
+
+/** Why the bundled CLI failed its startup check (null when it started) */
+export const startupError = ref<WtError | null>(null);
+
+/** Hide the user's home folder name in text shown or copied */
+export function redactHome(text: string): string {
+  return text.replace(/\/Users\/[^/\s:'"]+/g, '~');
+}
 
 /**
  * Composable for repository operations.
@@ -34,18 +44,22 @@ export function useRepos() {
   }
 
   /**
-   * Check if grove CLI is available and store the result
+   * Check the bundled grove CLI starts; keep the real reason when it doesn't
    */
   async function checkAvailability(): Promise<boolean> {
-    const available = await wt.checkWtAvailable();
-    store.setWtAvailable(available);
-
-    if (available) {
+    try {
+      await wt.checkWtAvailable();
       const version = await wt.getWtVersion();
+      startupError.value = null;
       store.setWtVersion(version);
+      store.setWtAvailable(true);
+      return true;
+    } catch (error) {
+      const err = wt.toWtError(error);
+      startupError.value = { code: err.code, message: redactHome(err.message) };
+      store.setWtAvailable(false);
+      return false;
     }
-
-    return available;
   }
 
   /**
@@ -60,5 +74,6 @@ export function useRepos() {
     refreshRepositories,
     selectRepository,
     checkAvailability,
+    startupError,
   };
 }

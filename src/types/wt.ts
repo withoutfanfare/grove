@@ -30,6 +30,7 @@ export type WtErrorCode =
   | 'PROTECTED_BRANCH'
   // System
   | 'CLI_NOT_FOUND'
+  | 'BUNDLED_CLI_MISSING'
   | 'COMMAND_FAILED'
   | 'PARSE_ERROR'
   | 'IO_ERROR'

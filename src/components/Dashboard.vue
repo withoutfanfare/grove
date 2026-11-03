@@ -38,7 +38,8 @@ import SelectionActionBar from './SelectionActionBar.vue'
 import BatchDeleteDialog from './BatchDeleteDialog.vue'
 import { SButton, SIconButton, SResizableSplit } from '@stuntrocket/ui'
 import { SkeletonCard } from './ui'
-import { copyPath, copyBranch, copyUrl, copyCdCommand } from '../utils/clipboard'
+import { copyPath, copyBranch, copyUrl, copyCdCommand, copyToClipboard } from '../utils/clipboard'
+import { redactHome } from '../composables/useRepos'
 
 /**
  * L4: Number of worktrees above which the list switches from animated
@@ -61,7 +62,7 @@ const {
   focusTransient,
 } = storeToRefs(store)
 
-const { fetchRepositories } = useRepos()
+const { fetchRepositories, checkAvailability, startupError } = useRepos()
 const {
   fetchWorktrees,
   pullAllWorktrees,
@@ -229,6 +230,38 @@ const unregisterWatcher = onWorktreeChanged(() => {
 
 // Global quick-switch shortcut listener (⌘⇧W) — opens the command palette
 let unlistenQuickSwitch: UnlistenFn | null = null
+
+// Bundled CLI startup failure: only a genuinely missing sidecar needs a reinstall
+const bundledCliMissing = computed(() => startupError.value?.code === 'BUNDLED_CLI_MISSING')
+const retryingStartup = ref(false)
+
+async function retryStartup() {
+  retryingStartup.value = true
+  try {
+    if (await checkAvailability()) await fetchRepositories()
+  } finally {
+    retryingStartup.value = false
+  }
+}
+
+async function copyStartupDiagnostics() {
+  let build: string
+  try {
+    build = JSON.stringify(await useWt().getBuildInfo(), null, 2)
+  } catch (e) {
+    const err = useWt().toWtError(e)
+    build = `Build info unavailable: ${err.code}: ${err.message}`
+  }
+  const failure = startupError.value
+  const text = redactHome([
+    'Grove startup diagnostics',
+    `Startup check: ${failure ? `${failure.code}: ${failure.message}` : 'passed'}`,
+    build,
+  ].join('\n'))
+  const result = await copyToClipboard(text)
+  if (result.success) toast.success('Diagnostics copied')
+  else toast.error('Could not copy diagnostics')
+}
 
 // Initial load
 onMounted(async () => {
@@ -1042,7 +1075,7 @@ async function handleTitlebarDrag(e: MouseEvent) {
     <!-- Update notification banner -->
     <UpdateBanner />
 
-    <!-- grove CLI not available state -->
+    <!-- Bundled grove CLI failed its startup check -->
     <div v-if="!wtAvailable" class="flex-1 flex items-center justify-center p-8">
       <div class="max-w-md text-center animate-fade-in">
         <div class="w-20 h-20 mx-auto mb-8 rounded-2xl bg-danger-muted flex items-center justify-center shadow-lg">
@@ -1052,20 +1085,31 @@ async function handleTitlebarDrag(e: MouseEvent) {
           </svg>
         </div>
         <h2 class="text-2xl font-semibold text-text-primary mb-3 tracking-tight">
-          grove CLI Not Found
+          {{ bundledCliMissing ? 'Bundled CLI is missing' : 'Bundled CLI could not start' }}
         </h2>
-        <p class="text-text-secondary mb-8 leading-relaxed">
-          The grove command-line tool is not installed or not in your PATH.
-          Please install grove to use this application.
+        <p class="text-text-secondary mb-4 leading-relaxed">
+          <template v-if="bundledCliMissing">
+            The grove command-line tool that ships inside Grove is missing from this copy of the app.
+            Reinstall Grove from the same download to restore it.
+          </template>
+          <template v-else>
+            Grove includes its own grove command-line tool, but it failed to start.
+          </template>
         </p>
-        <a href="https://github.com/your-org/grove" target="_blank"
-          class="inline-flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-accent-hover text-white font-medium rounded-xl transition-all duration-150 hover:shadow-glow">
-          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-            <path fill-rule="evenodd" clip-rule="evenodd"
-              d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0012 2z" />
-          </svg>
-          Installation Guide
-        </a>
+        <p data-testid="startup-error-reason"
+          class="mb-8 p-3 rounded-lg bg-surface-overlay text-left text-sm font-mono text-text-secondary break-words select-text">
+          {{ startupError ? `${startupError.code}: ${startupError.message}` : 'No reason was reported.' }}
+        </p>
+        <div class="flex items-center justify-center gap-3">
+          <button type="button" data-testid="startup-retry" :disabled="retryingStartup" @click="retryStartup"
+            class="px-5 py-2.5 bg-accent hover:bg-accent-hover disabled:opacity-60 text-white font-medium rounded-xl transition-all duration-150">
+            {{ retryingStartup ? 'Retrying…' : 'Retry' }}
+          </button>
+          <button type="button" data-testid="startup-copy-diagnostics" @click="copyStartupDiagnostics"
+            class="px-5 py-2.5 bg-surface-overlay hover:bg-surface-raised text-text-primary font-medium rounded-xl transition-all duration-150">
+            Copy diagnostics
+          </button>
+        </div>
       </div>
     </div>
 

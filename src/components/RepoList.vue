@@ -457,7 +457,7 @@ onMounted(() => {
             <p class="text-2xs text-text-muted mb-2">Quick start:</p>
             <code class="text-2xs font-mono text-accent block">grove add &lt;repo&gt; &lt;branch&gt;</code>
           </div>
-          <a href="https://github.com/your-org/grove#getting-started" target="_blank"
+          <a href="https://github.com/withoutfanfare/grove/blob/main/docs/users/getting-started.md" target="_blank"
             class="inline-flex items-center gap-1 text-2xs text-accent hover:text-accent-hover mt-3 transition-colors">
             <span>View documentation</span>
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
