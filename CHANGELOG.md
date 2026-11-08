@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.5] - 8 November 2026
+
+### Fixed
+
+- Delete worktrees: the safety check no longer refuses worktrees whose database cannot be identified (such as Codex and t3 worktrees) unless you ask to drop the database.
+
 ## [0.4.4] - 8 November 2026
 
 ### Fixed
