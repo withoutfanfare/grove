@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.4] - 8 November 2026
+
+### Fixed
+
+- Delete merged branches: a slow plan from an earlier opening no longer replaces the current list or interrupts a deletion in progress.
+- Delete worktree: a safety check from an earlier opening can no longer mark the newly opened worktree as removed.
+- The worktree list no longer stays stuck on loading placeholders after a batch delete.
+- The activity log fully hides quoted passwords containing spaces and quoted keys such as `"password":"…"`.
+- Pull all rejects detached worktrees straight away instead of re-listing the repository for each one.
+- Build information now records the correct app revision after commits on any branch or worktree, and the bundled CLI is verified as the exact copy shipped.
+
 ## [0.4.3] - 3 November 2026
 
 ### Fixed
