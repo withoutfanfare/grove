@@ -164,6 +164,8 @@ function stopElapsedTimer() {
 
 // Reset options when dialog opens
 watch(() => props.isOpen, async (open) => {
+  // Invalidate any preflight from an earlier opening, so it cannot act on this worktree.
+  preflightRun++
   if (open) {
     // Keep the branch unless the user asks: deleting it is a separate, unrecoverable choice.
     deleteBranch.value = false

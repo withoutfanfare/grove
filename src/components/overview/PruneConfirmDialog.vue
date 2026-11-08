@@ -41,8 +41,11 @@ const plans = ref<RepoPlan[]>([])
 const executable = computed(() => plans.value.filter((p) => p.plan && p.plan.branches.length > 0))
 const totalTargets = computed(() => executable.value.reduce((sum, p) => sum + p.plan!.branches.length, 0))
 const blocked = computed(() => plans.value.filter((p) => p.error))
+// Bumped on every open and close, so a slow plan from an earlier opening can never publish.
+let planningRun = 0
 
 watch(() => props.isOpen, async (open) => {
+  const run = ++planningRun
   if (!open) return
   phase.value = 'planning'
   plans.value = []
@@ -54,6 +57,7 @@ watch(() => props.isOpen, async (open) => {
       loaded.push({ repo, error: wt.toWtError(error).message })
     }
   }
+  if (run !== planningRun) return
   plans.value = loaded
   phase.value = 'review'
 }, { immediate: true })

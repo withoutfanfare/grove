@@ -203,9 +203,10 @@ export function useWorktrees() {
         }
       }
     } finally {
-      // Only clear loading state if this is still the active fetch for this repo.
+      // Fetches for one repo never overlap (inFlightFetches), so this run still owns
+      // the loading flag even when a removal invalidated its result.
       // Silent revalidation never toggled loading, so it must not clear it either.
-      if (!opts?.silent && expectedFetchId.get(repoName) === fetchId) {
+      if (!opts?.silent) {
         store.setLoadingWorktrees(false);
       }
     }

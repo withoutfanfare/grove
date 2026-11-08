@@ -27,6 +27,8 @@ it('redacts home folders and credentials before storing or copying', () => {
   expect(text).not.toMatch(/danny|ghp_|hunter2/)
   expect(entries.value[0].details).not.toContain('hunter2')
   expect(redact('token: abc123')).toBe('token: [redacted]')
+  expect(redact('DB_PASSWORD="correct horse battery staple" next')).toBe('DB_PASSWORD=[redacted] next')
+  expect(redact('{"password":"hunter2","user":"x"}')).toBe('{"password":[redacted],"user":"x"}')
 })
 
 it('keeps a mixed, cancelled batch receipt listing completed, failed and not-started items', async () => {

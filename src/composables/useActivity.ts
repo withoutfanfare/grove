@@ -36,7 +36,8 @@ const SECRET_PATTERNS: [RegExp, string][] = [
   [/(\w+:\/\/)[^/\s:@]+:[^/\s@]+@/g, '$1[redacted]@'],
   [/\b(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{16,}|xox[abpr]-[A-Za-z0-9-]{10,})\b/g, '[redacted]'],
   // Also catches prefixed keys such as DB_PASSWORD=… or GITHUB_TOKEN: …
-  [/([\w-]*(?:password|passwd|pwd|token|secret|api[_-]?key))(\s*[=:]\s*)\S+/gi, '$1$2[redacted]'],
+  // Quoted keys ("password":) and whole quoted values ("a b c") are covered too.
+  [/([\w-]*(?:password|passwd|pwd|token|secret|api[_-]?key)["']?)(\s*[=:]\s*)(?:"[^"]*"|'[^']*'|\S+)/gi, '$1$2[redacted]'],
 ]
 
 /** Remove home-folder names and anything that looks like a credential */

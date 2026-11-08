@@ -1561,7 +1561,11 @@ pub fn pull_all_with_progress_identified(repo_name: &str, app: &tauri::AppHandle
                 emit_progress(app, "pull_all", current, total, branch, "in_progress", None);
 
                 // Execute individual pull
-                let result = pull_worktree(app, repo_name, branch).and_then(require_successful_pull);
+                // Resolve from the record already fetched: a detached target fails here
+                // instead of re-listing the whole repository inside pull_worktree.
+                let result = resolve_pull_branch(std::slice::from_ref(wt), branch)
+                    .and_then(|resolved| pull_worktree(app, repo_name, resolved))
+                    .and_then(require_successful_pull);
 
                 // L1: Removed unused _order tracking - completion order is not needed
                 // as progress events provide real-time status updates
