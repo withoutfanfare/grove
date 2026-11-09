@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.8] - 9 November 2026
+
+### Fixed
+
+- Worktrees with files offloaded to iCloud no longer fail the delete safety check or stall the worktree list. Grove now compares file size and modified time, so it does not download every file to check for changes.
+- A worktree whose status cannot be read is shown as not clean, with "status unknown", instead of appearing clean.
+
 ## [0.4.7] - 9 November 2026
 
 ### Fixed
