@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.6] - 9 November 2026
+
+### Fixed
+
+- A worktree whose files are offloaded to iCloud no longer hangs the worktree list: its status check gives up after 10 seconds and shows as unknown.
+- The activity log fully hides quoted passwords that contain an escaped quote.
+- Switching repository while the previous one is still loading no longer hides the loading state of the new one.
+- Read-only Git commands such as `git status` no longer trigger a rebuild of the app's build information.
+
 ## [0.4.5] - 8 November 2026
 
 ### Fixed
