@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.7] - 9 November 2026
+
+### Fixed
+
+- The worktree list still hung on a worktree offloaded to iCloud, because the fallback status checks had no time limit. They now do, and a worktree that has already timed out is not checked again.
+
+### Changed
+
+- Grove is now released under the MIT licence.
+
 ## [0.4.6] - 9 November 2026
 
 ### Fixed
