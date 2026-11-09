@@ -45,7 +45,7 @@ fn main() {
     // Ask Git where its files live, so linked worktrees and any checked-out branch are watched.
     // Only existing paths: Cargo reruns on every build for a missing one.
     let head_ref = output("git", &["symbolic-ref", "-q", "HEAD"]);
-    for name in ["HEAD", "index", "packed-refs", head_ref.as_str()] {
+    for name in ["HEAD", "logs/HEAD", "packed-refs", head_ref.as_str()] {
         let path = output("git", &["rev-parse", "--path-format=absolute", "--git-path", name]);
         if name != "unknown" && std::path::Path::new(&path).exists() {
             println!("cargo:rerun-if-changed={path}");

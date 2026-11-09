@@ -29,6 +29,8 @@ it('redacts home folders and credentials before storing or copying', () => {
   expect(redact('token: abc123')).toBe('token: [redacted]')
   expect(redact('DB_PASSWORD="correct horse battery staple" next')).toBe('DB_PASSWORD=[redacted] next')
   expect(redact('{"password":"hunter2","user":"x"}')).toBe('{"password":[redacted],"user":"x"}')
+  expect(redact('DB_PASSWORD="alpha\\"bravo" next')).toBe('DB_PASSWORD=[redacted] next')
+  expect(redact('{"password":"hun\\"ter2","user":"x"}')).toBe('{"password":[redacted],"user":"x"}')
 })
 
 it('keeps a mixed, cancelled batch receipt listing completed, failed and not-started items', async () => {

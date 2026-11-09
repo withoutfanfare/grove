@@ -37,6 +37,9 @@ let trayRefreshTimeout: ReturnType<typeof setTimeout> | undefined;
 // Global fetch counter for race condition prevention
 let globalFetchId = 0;
 
+// The visible fetch that last switched the loading state on; only it may switch it off.
+let loadingOwner = 0;
+
 // Track the expected fetch ID for the current repository
 // Only updates from this fetch ID should be applied to the store
 const expectedFetchId = new Map<string, number>();
@@ -159,6 +162,7 @@ export function useWorktrees() {
     // Silent revalidation keeps the cached list painted (no skeleton); only the
     // visible (non-silent) path toggles the loading state.
     if (!opts?.silent) {
+      loadingOwner = fetchId;
       store.setLoadingWorktrees(true);
     }
     store.clearError();
@@ -203,10 +207,10 @@ export function useWorktrees() {
         }
       }
     } finally {
-      // Fetches for one repo never overlap (inFlightFetches), so this run still owns
-      // the loading flag even when a removal invalidated its result.
+      // A removal may have invalidated this run's result, but it still owns the loading
+      // flag unless a later visible fetch (another repo's) has taken it over.
       // Silent revalidation never toggled loading, so it must not clear it either.
-      if (!opts?.silent) {
+      if (!opts?.silent && loadingOwner === fetchId) {
         store.setLoadingWorktrees(false);
       }
     }
