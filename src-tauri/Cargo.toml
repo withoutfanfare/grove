@@ -3,6 +3,7 @@ name = "grove-app"
 version = "0.4.6"
 description = "A Tauri App"
 authors = ["Danny Harding"]
+license = "MIT"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
