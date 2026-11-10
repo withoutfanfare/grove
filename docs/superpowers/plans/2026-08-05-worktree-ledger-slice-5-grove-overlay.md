@@ -802,7 +802,7 @@ Background: `prepare-sidecar.sh` hardcodes `$PROJECT_ROOT/../grove-cli/grove`, w
 GROVE_SOURCE="${GROVE_CLI_SOURCE:-$PROJECT_ROOT/../grove-cli/grove}"
 ```
 
-- [ ] **Step 2: Verify** — `GROVE_CLI_SOURCE=/Users/dannyharding/Development/Code/Project/grove-cli/grove ./scripts/prepare-sidecar.sh` succeeds from the worktree and `grep -c ledger_overlay_json src-tauri/binaries/grove-aarch64-apple-darwin` prints ≥ 1.
+- [ ] **Step 2: Verify** — `GROVE_CLI_SOURCE=/Users/you/Development/Code/Project/grove-cli/grove ./scripts/prepare-sidecar.sh` succeeds from the worktree and `grep -c ledger_overlay_json src-tauri/binaries/grove-aarch64-apple-darwin` prints ≥ 1.
 
 - [ ] **Step 3: Write `docs/developers/ledger-overlay.md`** — one page: the overlay contract table (copy from this plan's header), the three render states (absent / unavailable / available), the no-bypass rule, `GROVE_WAY_BIN` as the test seam, and the note that badges depend on the **bundled sidecar** carrying `ledger_overlay_json` and the **installed `way`** supporting `worktree resume --format json` — stale binaries degrade honestly to "Ledger unknown". Add one sentence + link in `docs/developers/sidecar.md` about `GROVE_CLI_SOURCE`.
 
