@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.11] - 10 November 2026
+
+### Fixed
+
+- Deleting a worktree could hang until it timed out when the command had finished but a background process it started was still running. Grove now waits a moment for the last output and carries on.
+- The worktree list no longer refreshes part-way through deleting several worktrees, which could make the next deletion fail.
+- The message after deleting several worktrees now also says how many were not started.
+
 ## [0.4.10] - 10 November 2026
 
 ### Fixed
