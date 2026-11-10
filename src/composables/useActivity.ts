@@ -29,12 +29,22 @@ export interface ActivityEntry {
 const entries = ref<ActivityEntry[]>([])
 let nextId = 1
 
-// A quoted credential value. Double quotes honour backslash escapes (across newlines too).
-// In single quotes a backslash is literal in shell and dotenv but an escape elsewhere, so a
-// value containing \' is ambiguous and is redacted to the end of the line.
-const QUOTED = String.raw`"(?:[^"\\]|\\[\s\S])*"|"[^"]*"|'[^'\n]*\\'[^\n]*|'[^']*'`
-// Text glued to the closing quote ('it'\''s', "abc"'def') is still part of the value.
-const SECRET_VALUE = String.raw`(?:${QUOTED})(?:${QUOTED}|[^\s,;}\]])*|\S+`
+// A quoted credential value. Where a backslash makes the end of the value ambiguous, hide
+// more rather than less: an over-redacted receipt is safer than a leaked credential.
+const QUOTED = [
+  // \" then a space: an escaped quote, or a literal backslash closing the value. Hide the line.
+  String.raw`"[^"\n]*\\"(?=[ \t])[^\n]*`,
+  // A backslash line continuation: hide every continued line.
+  String.raw`"[^"\n]*\\\n(?:[^\n]*\\\n)*[^\n]*`,
+  String.raw`"(?:[^"\\]|\\[\s\S])*"`,
+  String.raw`"[^"]*"`,
+  // \' is literal in shell and dotenv but an escape elsewhere. Hide everything after it.
+  String.raw`'[^']*\\'[\s\S]*`,
+  String.raw`'[^']*'`,
+].join('|')
+// Text glued to the closing quote ('it'\''s', "abc"'def') is still part of the value, but
+// only on the same line, so a stray quote cannot swallow the lines that follow.
+const SECRET_VALUE = String.raw`(?:${QUOTED})(?:"[^"\n]*"|'[^'\n]*'|[^\s,;}\]])*|\S+`
 
 const SECRET_PATTERNS: [RegExp, string][] = [
   [/\/Users\/[^/\s]+/g, '~'],

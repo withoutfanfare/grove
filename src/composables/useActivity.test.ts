@@ -42,6 +42,24 @@ it('redacts text glued to a quoted credential and values with ambiguous backslas
   expect(redact('PASSWORD="abc\\\ndef"')).toBe('PASSWORD=[redacted]')
 })
 
+it('redacts multi-line and backslash-ambiguous quoted credentials in full', () => {
+  expect(redact("password='it\\'s\nsecond-line'")).toBe('password=[redacted]')
+  expect(redact("password='first\nit\\'s secret'")).toBe('password=[redacted]')
+  expect(redact(String.raw`PASSWORD="C:\dir\" API_KEY="second credential"`)).toBe('PASSWORD=[redacted]')
+  expect(redact('PASSWORD="abc\\\nAPI_KEY="k1 k2"')).toBe('PASSWORD=[redacted]')
+  expect(redact('PASSWORD="abc\\\ndef\\\nghi jkl" next')).toBe('PASSWORD=[redacted]')
+})
+
+it('does not let a stray quote after a credential swallow later lines', () => {
+  expect(redact(`PASSWORD="abc"'\nfetch failed\nit didn't work`)).toBe(`PASSWORD=[redacted]\nfetch failed\nit didn't work`)
+})
+
+it('redacts a long run of escaped quotes without stalling', () => {
+  const started = Date.now()
+  expect(redact('password="' + 'a\\"'.repeat(50_000))).toBe('password=[redacted]')
+  expect(Date.now() - started).toBeLessThan(1000)
+})
+
 it('keeps a mixed, cancelled batch receipt listing completed, failed and not-started items', async () => {
   const { setActivePinia, createPinia } = await import('pinia')
   setActivePinia(createPinia())
