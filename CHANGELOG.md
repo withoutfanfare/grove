@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.9] - 10 November 2026
+
+### Fixed
+
+- Activity receipts could keep part of a password or token when extra text followed a closing quote, when a single-quoted value ended in a backslash, or when a quoted value ran over a line break. The whole value is now hidden.
+- The worktree list could stay on its loading placeholders after its data had arrived, while another repository was still loading.
+- Updates the bundled grove command-line tool with fixes to removal previews, pruning, status time limits, database drops and confirmed removals that were wrongly refused.
+
 ## [0.4.8] - 9 November 2026
 
 ### Fixed
