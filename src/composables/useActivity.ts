@@ -29,6 +29,13 @@ export interface ActivityEntry {
 const entries = ref<ActivityEntry[]>([])
 let nextId = 1
 
+// A quoted credential value. Double quotes honour backslash escapes (across newlines too).
+// In single quotes a backslash is literal in shell and dotenv but an escape elsewhere, so a
+// value containing \' is ambiguous and is redacted to the end of the line.
+const QUOTED = String.raw`"(?:[^"\\]|\\[\s\S])*"|"[^"]*"|'[^'\n]*\\'[^\n]*|'[^']*'`
+// Text glued to the closing quote ('it'\''s', "abc"'def') is still part of the value.
+const SECRET_VALUE = String.raw`(?:${QUOTED})(?:${QUOTED}|[^\s,;}\]])*|\S+`
+
 const SECRET_PATTERNS: [RegExp, string][] = [
   [/\/Users\/[^/\s]+/g, '~'],
   [/\/home\/[^/\s]+/g, '~'],
@@ -37,7 +44,7 @@ const SECRET_PATTERNS: [RegExp, string][] = [
   [/\b(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{16,}|xox[abpr]-[A-Za-z0-9-]{10,})\b/g, '[redacted]'],
   // Also catches prefixed keys such as DB_PASSWORD=… or GITHUB_TOKEN: …
   // Quoted keys ("password":) and whole quoted values ("a b c") are covered too.
-  [/([\w-]*(?:password|passwd|pwd|token|secret|api[_-]?key)["']?)(\s*[=:]\s*)(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\S+)/gi, '$1$2[redacted]'],
+  [new RegExp(String.raw`([\w-]*(?:password|passwd|pwd|token|secret|api[_-]?key)["']?)(\s*[=:]\s*)(?:${SECRET_VALUE})`, 'gi'), '$1$2[redacted]'],
 ]
 
 /** Remove home-folder names and anything that looks like a credential */

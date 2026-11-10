@@ -152,6 +152,34 @@ describe('useWorktrees', () => {
       expect(store.loadingWorktrees).toBe(false)
     })
 
+    it('returning to a repo whose fetch is in flight stops loading when that fetch lands', async () => {
+      const release: Record<string, () => void> = {}
+      mockTauriInvoke.mockImplementation((command: string, args?: { repoName?: string }) => {
+        if (command === 'get_worktree_status') {
+          return new Promise((resolve) => { release[args!.repoName!] = () => resolve([]) })
+        }
+        return Promise.resolve(undefined)
+      })
+      const store = useWorktreeStore()
+      store.setRepositories([{ name: 'repo-a', worktrees: 1 }, { name: 'repo-b', worktrees: 1 }])
+      const { fetchWorktrees } = useWorktrees()
+
+      store.selectRepository('repo-a')
+      const a = fetchWorktrees()
+      store.selectRepository('repo-b')
+      const b = fetchWorktrees()
+      store.selectRepository('repo-a')
+      void fetchWorktrees()
+
+      release['repo-a']()
+      await a
+      expect(store.loadingWorktrees).toBe(false)
+
+      release['repo-b']()
+      await b
+      expect(store.loadingWorktrees).toBe(false)
+    })
+
     it('toggles loadingWorktrees when not silent', async () => {
       const resolved = [
         { path: '/repo/main', branch: 'main', dirty: false, ahead: 0, behind: 0, sha: 'abc' },

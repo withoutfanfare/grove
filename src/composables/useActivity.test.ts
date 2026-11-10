@@ -33,6 +33,15 @@ it('redacts home folders and credentials before storing or copying', () => {
   expect(redact('{"password":"hun\\"ter2","user":"x"}')).toBe('{"password":[redacted],"user":"x"}')
 })
 
+it('redacts text glued to a quoted credential and values with ambiguous backslashes', () => {
+  expect(redact('DB_PASSWORD="alpha"bravo')).toBe('DB_PASSWORD=[redacted]')
+  expect(redact(String.raw`DB_PASSWORD='it'\''s-secret' next`)).toBe('DB_PASSWORD=[redacted] next')
+  expect(redact("password: 'it''s-secret'")).toBe('password: [redacted]')
+  expect(redact(`TOKEN="abc"'def'`)).toBe('TOKEN=[redacted]')
+  expect(redact(String.raw`DB_PASSWORD='abc\' API_KEY='second credential'`)).not.toMatch(/second|credential/)
+  expect(redact('PASSWORD="abc\\\ndef"')).toBe('PASSWORD=[redacted]')
+})
+
 it('keeps a mixed, cancelled batch receipt listing completed, failed and not-started items', async () => {
   const { setActivePinia, createPinia } = await import('pinia')
   setActivePinia(createPinia())
