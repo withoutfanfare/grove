@@ -218,7 +218,8 @@ const fetchCounter = ref(0)
 // Silent when the list is already painted: a watcher event must update the
 // cards in place, never swap the whole list back to skeletons.
 const handleWorktreeChange = useDebounceFn(async () => {
-  if (selectedRepoName.value) {
+  // A batch refreshes once it finishes; listing mid-batch contends for the next item's Git locks.
+  if (selectedRepoName.value && !isBatchRunning.value) {
     await fetchWorktrees({ silent: store.isRepoLoaded(selectedRepoName.value) })
   }
 }, 500)
@@ -697,9 +698,9 @@ function reportBatchRemoval(result: RemoveSelectedResult | null) {
     toast.error(error.value?.message || 'Failed to delete selected worktrees')
     return
   }
-  const { succeeded, failed } = result.summary
-  if (failed > 0) {
-    toast.warning(`Deleted ${succeeded}, ${failed} failed`)
+  const { succeeded, failed, cancelled } = result.summary
+  if (failed > 0 || cancelled > 0) {
+    toast.warning(`Deleted ${succeeded}, ${failed} failed, ${cancelled} not started`)
     // Keep the selection: the progress panel shows the failures for retry,
     // and the store prunes the successfully-deleted paths on the next refresh.
   } else {

@@ -86,6 +86,7 @@ pub fn run(mut command: Command, timeout: Duration, limit: usize) -> WtResult<Ou
     let mut buffers = [Vec::new(), Vec::new()];
     let mut eof = [false; 2];
     let deadline = Instant::now() + timeout;
+    let mut exited_at: Option<Instant> = None;
     let result = loop {
         if setup_failed {
             break Err(WtError::new(
@@ -123,8 +124,8 @@ pub fn run(mut command: Command, timeout: Duration, limit: usize) -> WtResult<Ou
         if let Some(e) = failure {
             break Err(e);
         }
-        // Keep the leader unreaped until pipes close, preventing process-group ID reuse.
-        if eof.iter().all(|v| *v) {
+        // WNOWAIT keeps the leader unreaped, preventing process-group ID reuse.
+        {
             let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
             let waited = unsafe {
                 libc::waitid(
@@ -144,7 +145,12 @@ pub fn run(mut command: Command, timeout: Duration, limit: usize) -> WtResult<Ou
             let exited = unsafe { info.si_pid() } != 0;
             #[cfg(not(target_os = "linux"))]
             let exited = info.si_pid != 0;
-            if exited {
+            // A background child can hold the pipes open for ever, so a finished
+            // command only gets a short grace period to deliver its last output.
+            if exited
+                && (eof.iter().all(|v| *v)
+                    || exited_at.get_or_insert_with(Instant::now).elapsed() >= Duration::from_millis(200))
+            {
                 // The unreaped leader reserves the process-group ID. Stop attached
                 // background children even if they redirected their output pipes.
                 if !stop_owned_group(pid) {
@@ -308,6 +314,16 @@ mod tests {
             run(c, Duration::from_secs(2), 10000).unwrap_err().code,
             "OUTPUT_TOO_LARGE"
         );
+    }
+    #[test]
+    fn finished_command_does_not_wait_for_a_background_child_holding_its_pipes() {
+        let mut command = Command::new("/bin/sh");
+        command.args(["-c", "printf done; sleep 5 & exit 0"]);
+        let started = Instant::now();
+        let output = run(command, Duration::from_secs(4), 4096).unwrap();
+        assert!(started.elapsed() < Duration::from_secs(2));
+        assert!(output.status.success());
+        assert_eq!(output.stdout, b"done");
     }
     #[test]
     fn descendant_pipe_timeout_prevents_delayed_write() {
