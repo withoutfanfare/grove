@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.10] - 10 November 2026
+
+### Fixed
+
+- Activity receipts could still keep part of a password or token when a quoted value contained a backslash before a quote and ran over a line break, or was followed by a second credential. These are now hidden in full.
+- A stray quote after a credential could hide the lines that followed it in a receipt.
+- Updates the bundled grove command-line tool to the latest develop build: removal is allowed when a worktree's database is unknown unless a drop is requested, a worktree with no commits can be cleared, and status and removal checks no longer take optional Git locks.
+
 ## [0.4.9] - 10 November 2026
 
 ### Fixed
